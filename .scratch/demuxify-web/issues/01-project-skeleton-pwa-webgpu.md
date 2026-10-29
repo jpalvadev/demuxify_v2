@@ -4,12 +4,11 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** claimed
+**Status:** completed
 
-- [ ] Modern web project initialized with TypeScript, Tailwind CSS, and ShadCN UI primitives.
-- [ ] PWA manifest and service worker configured for offline capability and installability.
-- [ ] Hardware acceleration detection checking for `navigator.gpu` adapter and device availability.
-- [ ] UI shell displays header, theme support, WebGPU status indicator badge, and a main dropzone container.
-- [ ] Graceful fallback advisory shown to the user when WebGPU is not supported by their browser or hardware.
-- [ ] Basic unit and component integration tests verifying WebGPU capability detection and UI shell rendering.
-
+- [x] Modern web project initialized with TypeScript, Tailwind CSS, and ShadCN UI primitives.
+- [x] PWA manifest and service worker configured for offline capability and installability.
+- [x] Hardware acceleration detection checking for `navigator.gpu` adapter and device availability.
+- [x] UI shell displays header, theme support, WebGPU status indicator badge, and a main dropzone container.
+- [x] Graceful fallback advisory shown to the user when WebGPU is not supported by their browser or hardware.
+- [x] Basic unit and component integration tests verifying WebGPU capability detection and UI shell rendering.

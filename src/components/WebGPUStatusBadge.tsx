@@ -1,0 +1,55 @@
+import React from 'react';
+import { Cpu, Zap, AlertTriangle, Loader2 } from 'lucide-react';
+import { WebGPUCapability } from '../lib/webgpu';
+
+interface WebGPUStatusBadgeProps {
+  capability: WebGPUCapability | null;
+  isLoading?: boolean;
+}
+
+export const WebGPUStatusBadge: React.FC<WebGPUStatusBadgeProps> = ({ capability, isLoading }) => {
+  if (isLoading || !capability) {
+    return (
+      <div
+        className="inline-flex items-center gap-2 px-3 py-1 text-xs font-medium rounded-full bg-muted text-muted-foreground border border-border"
+        title="Detecting graphics acceleration capabilities..."
+      >
+        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+        <span>Detecting WebGPU...</span>
+      </div>
+    );
+  }
+
+  if (capability.supported) {
+    const deviceName = capability.adapterInfo?.device || capability.adapterInfo?.vendor || 'Hardware Acceleration';
+    return (
+      <div
+        className="inline-flex items-center gap-2 px-3 py-1 text-xs font-semibold rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
+        title={`WebGPU Active: ${deviceName}`}
+      >
+        <span className="relative flex h-2 w-2">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+          <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+        </span>
+        <Zap className="w-3.5 h-3.5 text-emerald-400" />
+        <span>WebGPU Active</span>
+        {capability.adapterInfo?.device && (
+          <span className="hidden sm:inline text-emerald-500/80 font-normal">
+            ({capability.adapterInfo.device})
+          </span>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="inline-flex items-center gap-2 px-3 py-1 text-xs font-semibold rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/30"
+      title={capability.errorReason || 'Running in CPU/WASM fallback mode'}
+    >
+      <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
+      <Cpu className="w-3.5 h-3.5" />
+      <span>Fallback Mode (CPU)</span>
+    </div>
+  );
+};
