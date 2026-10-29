@@ -5,8 +5,9 @@
  * across browser sessions, supporting stream progress reporting.
  */
 
-export const MODEL_CACHE_NAME = 'demuxify-model-cache-v1';
-export const DEFAULT_MODEL_URL = 'https://raw.githubusercontent.com/demuxify/models/main/htdemucs_v4.onnx';
+export const MODEL_CACHE_NAME = "demuxify-model-cache-v1";
+export const DEFAULT_MODEL_URL =
+  "https://huggingface.co/StemSplitio/htdemucs-onnx/resolve/main/htdemucs_fp16weights.onnx";
 
 export interface DownloadProgress {
   loadedBytes: number;
@@ -18,13 +19,19 @@ export interface DownloadProgress {
  * Checks if Cache Storage API is available in current environment.
  */
 function isCacheStorageAvailable(): boolean {
-  return typeof globalThis !== 'undefined' && 'caches' in globalThis && typeof globalThis.caches?.open === 'function';
+  return (
+    typeof globalThis !== "undefined" &&
+    "caches" in globalThis &&
+    typeof globalThis.caches?.open === "function"
+  );
 }
 
 /**
  * Checks if model weights are already stored in Model Cache.
  */
-export async function isModelCached(url: string = DEFAULT_MODEL_URL): Promise<boolean> {
+export async function isModelCached(
+  url: string = DEFAULT_MODEL_URL
+): Promise<boolean> {
   if (!isCacheStorageAvailable()) {
     return false;
   }
@@ -87,15 +94,19 @@ export async function getModelWeights(
   // 2. Fetch from network with stream progress reporting
   const response = await fetch(url);
   if (!response.ok) {
-    throw new Error(`Failed to download model weights from ${url}: ${response.status} ${response.statusText}`);
+    throw new Error(
+      `Failed to download model weights from ${url}: ${response.status} ${response.statusText}`
+    );
   }
 
-  const contentLengthHeader = response.headers.get('Content-Length');
-  const totalBytes = contentLengthHeader ? parseInt(contentLengthHeader, 10) : 0;
+  const contentLengthHeader = response.headers.get("Content-Length");
+  const totalBytes = contentLengthHeader
+    ? parseInt(contentLengthHeader, 10)
+    : 0;
 
   let buffer: ArrayBuffer;
 
-  if (response.body && typeof response.body.getReader === 'function') {
+  if (response.body && typeof response.body.getReader === "function") {
     const reader = response.body.getReader();
     const chunks: Uint8Array[] = [];
     let loadedBytes = 0;
@@ -106,7 +117,8 @@ export async function getModelWeights(
       if (value) {
         chunks.push(value);
         loadedBytes += value.byteLength;
-        const progress = totalBytes > 0 ? Math.min(loadedBytes / totalBytes, 1) : 0;
+        const progress =
+          totalBytes > 0 ? Math.min(loadedBytes / totalBytes, 1) : 0;
         onProgress?.({
           loadedBytes,
           totalBytes: totalBytes > 0 ? totalBytes : loadedBytes,
@@ -140,13 +152,13 @@ export async function getModelWeights(
       // Response constructor accepts ArrayBuffer
       const responseToCache = new Response(buffer.slice(0), {
         headers: {
-          'Content-Type': 'application/octet-stream',
-          'Content-Length': buffer.byteLength.toString(),
+          "Content-Type": "application/octet-stream",
+          "Content-Length": buffer.byteLength.toString(),
         },
       });
       await cache.put(url, responseToCache);
     } catch (err) {
-      console.warn('Failed to persist model weights to Model Cache:', err);
+      console.warn("Failed to persist model weights to Model Cache:", err);
     }
   }
 
