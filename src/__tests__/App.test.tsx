@@ -2,10 +2,30 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import App from '../App';
 import * as webgpuModule from '../lib/webgpu';
+import * as audioDecoderModule from '../lib/audioDecoder';
 
 describe('App UI Shell', () => {
+  const dummyBuffer = {
+    duration: 180,
+    sampleRate: 44100,
+    numberOfChannels: 2,
+    length: 180 * 44100,
+    getChannelData: () => new Float32Array(500),
+  };
+
   beforeEach(() => {
     vi.restoreAllMocks();
+
+    vi.spyOn(audioDecoderModule, 'decodeAudio').mockResolvedValue({
+      buffer: dummyBuffer as any,
+      metadata: {
+        fileName: 'song_master.mp3',
+        fileSize: 5000000,
+        duration: 180,
+        sampleRate: 44100,
+        numberOfChannels: 2,
+      },
+    });
   });
 
   it('renders application branding and header', async () => {
@@ -74,7 +94,7 @@ describe('App UI Shell', () => {
     });
   });
 
-  it('updates UI when a Source Mix file is selected', async () => {
+  it('decodes audio and displays SourceMixCard and MasterWaveform when a file is selected', async () => {
     vi.spyOn(webgpuModule, 'detectWebGPUCapability').mockResolvedValue({
       supported: true,
       isFallback: false,
@@ -93,7 +113,100 @@ describe('App UI Shell', () => {
 
     await waitFor(() => {
       expect(screen.getByText('song_master.mp3')).toBeInTheDocument();
-      expect(screen.getByText(/loaded source mix/i)).toBeInTheDocument();
+      // Metadata in SourceMixCard and MasterWaveform
+      expect(screen.getAllByText(/3:00/).length).toBeGreaterThanOrEqual(1);
+      expect(screen.getByText(/44\.1\s*kHz/i)).toBeInTheDocument();
+      expect(screen.getByText(/Stereo/i)).toBeInTheDocument();
+      // Primary button
+      expect(screen.getByRole('button', { name: /separate stems|start separation/i })).toBeInTheDocument();
+      // Master waveform
+      expect(screen.getByRole('slider', { name: /master waveform timeline/i })).toBeInTheDocument();
+    });
+  });
+
+  it('allows interactive scrubbing on the Master Waveform to seek playback position', async () => {
+    vi.spyOn(webgpuModule, 'detectWebGPUCapability').mockResolvedValue({
+      supported: true,
+      isFallback: false,
+    });
+
+    render(<App />);
+
+    const file = new File(['audio'], 'song_master.mp3', { type: 'audio/mp3' });
+    const fileInput = screen.getByLabelText(/select source mix file/i, { selector: 'input' });
+    fireEvent.change(fileInput, { target: { files: [file] } });
+
+    await waitFor(() => {
+      expect(screen.getByRole('slider', { name: /master waveform timeline/i })).toBeInTheDocument();
+    });
+
+    const slider = screen.getByRole('slider', { name: /master waveform timeline/i });
+    vi.spyOn(slider, 'getBoundingClientRect').mockReturnValue({
+      left: 0,
+      top: 0,
+      width: 600,
+      height: 100,
+      right: 600,
+      bottom: 100,
+      x: 0,
+      y: 0,
+      toJSON: () => {},
+    });
+
+    // Seek via arrow key (5 seconds)
+    fireEvent.keyDown(slider, { key: 'ArrowRight' });
+    expect(slider).toHaveAttribute('aria-valuenow', '5');
+
+    // Seek via pointer at 50% (300px / 600px * 180s = 90s)
+    fireEvent.pointerDown(slider, { clientX: 300, pointerId: 1 });
+    expect(slider).toHaveAttribute('aria-valuenow', '90');
+  });
+
+  it('allows removing the loaded Source Mix to return to the dropzone', async () => {
+    vi.spyOn(webgpuModule, 'detectWebGPUCapability').mockResolvedValue({
+      supported: true,
+      isFallback: false,
+    });
+
+    render(<App />);
+
+    const file = new File(['audio'], 'song_master.mp3', { type: 'audio/mp3' });
+    const fileInput = screen.getByLabelText(/select source mix file/i, { selector: 'input' });
+    fireEvent.change(fileInput, { target: { files: [file] } });
+
+    await waitFor(() => {
+      expect(screen.getByText('song_master.mp3')).toBeInTheDocument();
+    });
+
+    const removeBtn = screen.getByRole('button', { name: /remove source mix/i });
+    fireEvent.click(removeBtn);
+
+    await waitFor(() => {
+      expect(screen.queryByText('song_master.mp3')).not.toBeInTheDocument();
+      expect(screen.getByText(/drag and drop your source mix/i)).toBeInTheDocument();
+    });
+  });
+
+  it('displays descriptive error when audio decoding fails', async () => {
+    vi.spyOn(webgpuModule, 'detectWebGPUCapability').mockResolvedValue({
+      supported: true,
+      isFallback: false,
+    });
+    vi.spyOn(audioDecoderModule, 'decodeAudio').mockRejectedValue(
+      new Error('Failed to decode audio file "corrupted.mp3": Unsupported codec')
+    );
+
+    render(<App />);
+
+    const file = new File(['bad data'], 'corrupted.mp3', { type: 'audio/mp3' });
+    const fileInput = screen.getByLabelText(/select source mix file/i, { selector: 'input' });
+    fireEvent.change(fileInput, { target: { files: [file] } });
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toBeInTheDocument();
+      expect(
+        screen.getByText(/Failed to decode audio file "corrupted\.mp3": Unsupported codec/i)
+      ).toBeInTheDocument();
     });
   });
 
