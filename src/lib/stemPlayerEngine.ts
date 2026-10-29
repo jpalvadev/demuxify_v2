@@ -1,4 +1,8 @@
 import { StemName, STEM_NAMES } from './chunkOverlapAdd';
+import {
+  registerWsolaAudioWorklet,
+  WSOLA_WORKLET_PROCESSOR_NAME,
+} from './wsolaProcessor';
 
 export interface StemMixerState {
   volume: number; // 0.0 to 1.0
@@ -8,6 +12,11 @@ export interface StemMixerState {
 
 export type StemMixerStates = Record<StemName, StemMixerState>;
 
+export interface TimeStretchState {
+  tempo: number; // 0.5 to 2.0
+  pitch: number; // -12 to 12 semitones
+}
+
 export interface StemPlayerEngineOptions {
   audioContext?: AudioContext;
   sampleRate?: number;
@@ -16,6 +25,7 @@ export interface StemPlayerEngineOptions {
 
 export type PositionListener = (timeSec: number) => void;
 export type StateListener = (state: StemMixerStates) => void;
+export type TimeStretchListener = (state: TimeStretchState) => void;
 
 function createAudioBufferFromChannels(
   audioContext: AudioContext,
@@ -49,6 +59,12 @@ export class StemPlayerEngine {
   private animationFrameId: number | null = null;
   private positionListeners: Set<PositionListener> = new Set();
   private stateListeners: Set<StateListener> = new Set();
+  private timeStretchListeners: Set<TimeStretchListener> = new Set();
+
+  private tempo: number = 1.0;
+  private pitch: number = 0; // semitones (-12 to +12)
+  private workletNode: AudioWorkletNode | null = null;
+  private useWorklet: boolean = false;
 
   constructor(
     stems: Record<StemName, Float32Array[] | AudioBuffer>,
@@ -109,6 +125,68 @@ export class StemPlayerEngine {
 
     this.duration = maxDuration;
     this.applyGainMatrix();
+    this.initAudioWorklet(sampleRate);
+  }
+
+  private async initAudioWorklet(sampleRate: number): Promise<void> {
+    try {
+      const registered = await registerWsolaAudioWorklet(this.audioContext);
+      if (!registered) return;
+
+      const AudioWorkletNodeClass =
+        (window as unknown as { AudioWorkletNode?: typeof AudioWorkletNode }).AudioWorkletNode ||
+        (globalThis as unknown as { AudioWorkletNode?: typeof AudioWorkletNode }).AudioWorkletNode;
+
+      if (!AudioWorkletNodeClass) return;
+
+      const workletNode = new AudioWorkletNodeClass(
+        this.audioContext,
+        WSOLA_WORKLET_PROCESSOR_NAME,
+        {
+          numberOfOutputs: 4,
+          outputChannelCount: [2, 2, 2, 2],
+        }
+      );
+
+      // Collect 8 channels across the 4 stems
+      const stems8: Float32Array[] = [];
+      for (const stem of STEM_NAMES) {
+        const buf = this.stemBuffers[stem];
+        const left = buf.getChannelData(0);
+        const right = buf.numberOfChannels > 1 ? buf.getChannelData(1) : left;
+        stems8.push(left);
+        stems8.push(right);
+      }
+
+      workletNode.port.postMessage({
+        type: 'loadStems',
+        stems: stems8,
+        sampleRate,
+      });
+
+      // Connect 4 stereo outputs to stemGainNodes
+      for (let i = 0; i < STEM_NAMES.length; i++) {
+        const stem = STEM_NAMES[i];
+        workletNode.connect(this.stemGainNodes[stem], i);
+      }
+
+      workletNode.port.onmessage = (event) => {
+        if (event.data?.type === 'ended') {
+          if (this.playing) {
+            this.pause();
+            this.currentOffset = 0;
+            this.notifyPosition();
+          }
+        }
+      };
+
+      this.workletNode = workletNode;
+      this.useWorklet = true;
+    } catch {
+      // AudioWorklet initialization failed, fallback remains active
+      this.useWorklet = false;
+      this.workletNode = null;
+    }
   }
 
   public getAudioContext(): AudioContext {
@@ -133,7 +211,7 @@ export class StemPlayerEngine {
 
   public getCurrentTime(): number {
     if (this.playing) {
-      const elapsed = this.audioContext.currentTime - this.playStartContextTime;
+      const elapsed = (this.audioContext.currentTime - this.playStartContextTime) * this.tempo;
       return Math.min(this.duration, Math.max(0, this.currentOffset + elapsed));
     }
     return this.currentOffset;
@@ -227,37 +305,47 @@ export class StemPlayerEngine {
       this.currentOffset = 0;
     }
 
-    this.stopActiveSources();
-
     const startTime = this.audioContext.currentTime;
     this.playStartContextTime = startTime;
     const offset = this.currentOffset;
 
-    const sources: AudioBufferSourceNode[] = [];
-    for (const stem of STEM_NAMES) {
-      const source = this.audioContext.createBufferSource();
-      source.buffer = this.stemBuffers[stem];
-      source.connect(this.stemGainNodes[stem]);
+    if (this.useWorklet && this.workletNode) {
+      this.workletNode.port.postMessage({ type: 'seek', timeSec: offset });
+      this.workletNode.port.postMessage({ type: 'setTempo', tempo: this.tempo });
+      this.workletNode.port.postMessage({ type: 'setPitch', pitch: this.pitch });
+      this.workletNode.port.postMessage({ type: 'play' });
+    } else {
+      this.stopActiveSources();
 
-      // Synchronized start across all stems
-      source.start(startTime, offset);
-      sources.push(source);
-    }
-
-    this.activeSources = sources;
-    this.playing = true;
-
-    // Listen on the first source ended event to handle auto-pause on completion
-    if (sources[0]) {
-      sources[0].onended = () => {
-        if (this.playing && this.getCurrentTime() >= this.duration - 0.05) {
-          this.pause();
-          this.currentOffset = 0;
-          this.notifyPosition();
+      const sources: AudioBufferSourceNode[] = [];
+      for (const stem of STEM_NAMES) {
+        const source = this.audioContext.createBufferSource();
+        source.buffer = this.stemBuffers[stem];
+        if (source.playbackRate) {
+          source.playbackRate.setValueAtTime(this.tempo, startTime);
         }
-      };
+        source.connect(this.stemGainNodes[stem]);
+
+        // Synchronized start across all stems
+        source.start(startTime, offset);
+        sources.push(source);
+      }
+
+      this.activeSources = sources;
+
+      // Listen on the first source ended event to handle auto-pause on completion
+      if (sources[0]) {
+        sources[0].onended = () => {
+          if (this.playing && this.getCurrentTime() >= this.duration - 0.05) {
+            this.pause();
+            this.currentOffset = 0;
+            this.notifyPosition();
+          }
+        };
+      }
     }
 
+    this.playing = true;
     this.startPositionLoop();
     this.notifyPosition();
   }
@@ -266,7 +354,13 @@ export class StemPlayerEngine {
     if (!this.playing) return;
 
     this.currentOffset = this.getCurrentTime();
-    this.stopActiveSources();
+
+    if (this.useWorklet && this.workletNode) {
+      this.workletNode.port.postMessage({ type: 'pause' });
+    } else {
+      this.stopActiveSources();
+    }
+
     this.playing = false;
     this.stopPositionLoop();
     this.notifyPosition();
@@ -275,16 +369,21 @@ export class StemPlayerEngine {
   public seek(timeSec: number): void {
     const clampedTime = Math.max(0, Math.min(this.duration, timeSec));
     this.currentOffset = clampedTime;
+    const startTime = this.audioContext.currentTime;
+    this.playStartContextTime = startTime;
 
-    if (this.playing) {
+    if (this.useWorklet && this.workletNode) {
+      this.workletNode.port.postMessage({ type: 'seek', timeSec: clampedTime });
+    } else if (this.playing) {
       this.stopActiveSources();
-      const startTime = this.audioContext.currentTime;
-      this.playStartContextTime = startTime;
 
       const sources: AudioBufferSourceNode[] = [];
       for (const stem of STEM_NAMES) {
         const source = this.audioContext.createBufferSource();
         source.buffer = this.stemBuffers[stem];
+        if (source.playbackRate) {
+          source.playbackRate.setValueAtTime(this.tempo, startTime);
+        }
         source.connect(this.stemGainNodes[stem]);
         source.start(startTime, clampedTime);
         sources.push(source);
@@ -370,11 +469,83 @@ export class StemPlayerEngine {
     }
   }
 
+  public getTempo(): number {
+    return this.tempo;
+  }
+
+  public setTempo(tempo: number): void {
+    const clamped = Math.max(0.5, Math.min(2.0, tempo));
+    if (this.playing) {
+      this.currentOffset = this.getCurrentTime();
+      this.playStartContextTime = this.audioContext.currentTime;
+      for (const source of this.activeSources) {
+        if (source.playbackRate) {
+          source.playbackRate.setValueAtTime(clamped, this.audioContext.currentTime);
+        }
+      }
+    }
+    this.tempo = clamped;
+    if (this.useWorklet && this.workletNode) {
+      this.workletNode.port.postMessage({ type: 'setTempo', tempo: clamped });
+    }
+    this.notifyTimeStretch();
+  }
+
+  public getPitch(): number {
+    return this.pitch;
+  }
+
+  public setPitch(semitones: number): void {
+    const clamped = Math.max(-12, Math.min(12, semitones));
+    this.pitch = clamped;
+    if (this.useWorklet && this.workletNode) {
+      this.workletNode.port.postMessage({ type: 'setPitch', pitch: clamped });
+    }
+    this.notifyTimeStretch();
+  }
+
+  public resetTimeStretch(): void {
+    this.setTempo(1.0);
+    this.setPitch(0);
+    if (this.useWorklet && this.workletNode) {
+      this.workletNode.port.postMessage({ type: 'resetTimeStretch' });
+    }
+  }
+
+  public getTimeStretch(): TimeStretchState {
+    return { tempo: this.tempo, pitch: this.pitch };
+  }
+
+  public subscribeTimeStretch(listener: TimeStretchListener): () => void {
+    this.timeStretchListeners.add(listener);
+    listener(this.getTimeStretch());
+    return () => {
+      this.timeStretchListeners.delete(listener);
+    };
+  }
+
+  private notifyTimeStretch(): void {
+    const state = this.getTimeStretch();
+    for (const listener of this.timeStretchListeners) {
+      listener(state);
+    }
+  }
+
   public dispose(): void {
     this.pause();
     this.stopPositionLoop();
     this.positionListeners.clear();
     this.stateListeners.clear();
+    this.timeStretchListeners.clear();
+
+    if (this.workletNode) {
+      try {
+        this.workletNode.disconnect();
+      } catch {
+        // Ignored
+      }
+      this.workletNode = null;
+    }
 
     for (const stem of STEM_NAMES) {
       try {

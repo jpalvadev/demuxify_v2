@@ -361,4 +361,124 @@ describe('StemPlayerEngine', () => {
       expect(vocalsGain.disconnect).toHaveBeenCalled();
     });
   });
+
+  describe('Time-Stretch & Pitch Controls', () => {
+    it('initializes tempo to 1.0 and pitch to 0', () => {
+      const engine = new StemPlayerEngine(dummyStems, {
+        audioContext: mockCtx as any,
+        sampleRate,
+      });
+
+      expect(engine.getTempo()).toBe(1.0);
+      expect(engine.getPitch()).toBe(0);
+      expect(engine.getTimeStretch()).toEqual({ tempo: 1.0, pitch: 0 });
+    });
+
+    it('clamps tempo to range [0.5, 2.0]', () => {
+      const engine = new StemPlayerEngine(dummyStems, {
+        audioContext: mockCtx as any,
+        sampleRate,
+      });
+
+      engine.setTempo(1.5);
+      expect(engine.getTempo()).toBe(1.5);
+
+      engine.setTempo(0.2);
+      expect(engine.getTempo()).toBe(0.5);
+
+      engine.setTempo(3.0);
+      expect(engine.getTempo()).toBe(2.0);
+    });
+
+    it('clamps pitch to range [-12, +12]', () => {
+      const engine = new StemPlayerEngine(dummyStems, {
+        audioContext: mockCtx as any,
+        sampleRate,
+      });
+
+      engine.setPitch(3);
+      expect(engine.getPitch()).toBe(3);
+
+      engine.setPitch(-15);
+      expect(engine.getPitch()).toBe(-12);
+
+      engine.setPitch(14);
+      expect(engine.getPitch()).toBe(12);
+    });
+
+    it('resets tempo to 1.0 and pitch to 0 via resetTimeStretch()', () => {
+      const engine = new StemPlayerEngine(dummyStems, {
+        audioContext: mockCtx as any,
+        sampleRate,
+      });
+
+      engine.setTempo(1.75);
+      engine.setPitch(-4);
+      expect(engine.getTimeStretch()).toEqual({ tempo: 1.75, pitch: -4 });
+
+      engine.resetTimeStretch();
+      expect(engine.getTempo()).toBe(1.0);
+      expect(engine.getPitch()).toBe(0);
+      expect(engine.getTimeStretch()).toEqual({ tempo: 1.0, pitch: 0 });
+    });
+
+    it('notifies subscribers via subscribeTimeStretch', () => {
+      const engine = new StemPlayerEngine(dummyStems, {
+        audioContext: mockCtx as any,
+        sampleRate,
+      });
+
+      const listener = vi.fn();
+      const unsub = engine.subscribeTimeStretch(listener);
+
+      expect(listener).toHaveBeenCalledWith({ tempo: 1.0, pitch: 0 });
+
+      engine.setTempo(1.25);
+      expect(listener).toHaveBeenCalledWith({ tempo: 1.25, pitch: 0 });
+
+      engine.setPitch(2);
+      expect(listener).toHaveBeenCalledWith({ tempo: 1.25, pitch: 2 });
+
+      unsub();
+      engine.setTempo(1.5);
+      expect(listener).toHaveBeenCalledTimes(3);
+    });
+
+    it('accounts for tempo scaling in playback position tracking', async () => {
+      const engine = new StemPlayerEngine(dummyStems, {
+        audioContext: mockCtx as any,
+        sampleRate,
+      });
+
+      engine.setTempo(2.0);
+      await engine.play();
+
+      // In 1 second of audioContext time at 2.0x tempo, 2.0 seconds of audio elapsed
+      mockCtx.currentTime = 11.0; // +1.0 sec
+      expect(engine.getCurrentTime()).toBeCloseTo(2.0, 2);
+
+      // Now set tempo to 0.5x while playing
+      engine.setTempo(0.5);
+      // Offset should be locked at 2.0, and 1 more second of real time adds 0.5s of audio
+      mockCtx.currentTime = 12.0; // +1.0 sec further
+      expect(engine.getCurrentTime()).toBeCloseTo(2.5, 2);
+    });
+
+    it('falls back gracefully in mock/headless environment where audioWorklet is not instantiated', () => {
+      // In this environment mockCtx has no audioWorklet
+      expect(mockCtx).not.toHaveProperty('audioWorklet');
+
+      const engine = new StemPlayerEngine(dummyStems, {
+        audioContext: mockCtx as any,
+        sampleRate,
+      });
+
+      // Should not throw and methods work seamlessly
+      expect(() => {
+        engine.setTempo(1.2);
+        engine.setPitch(-2);
+        engine.resetTimeStretch();
+      }).not.toThrow();
+    });
+  });
 });
