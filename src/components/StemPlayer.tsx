@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { Play, Pause, RotateCcw, Volume2, Layers, Download, Gauge, Music, Plus, Minus } from 'lucide-react';
+import { Play, Pause, RotateCcw, Volume2, Layers, Trash2, Download, Gauge, Music, Plus, Minus } from 'lucide-react';
 import { StemName, STEM_NAMES } from '../lib/chunkOverlapAdd';
 import { StemPlayerEngine, StemMixerStates } from '../lib/stemPlayerEngine';
 import { StemTrack } from './StemTrack';
@@ -17,6 +17,11 @@ export interface StemPlayerProps {
   audioContext?: AudioContext;
   songTitle?: string;
   className?: string;
+  initialMixerStates?: StemMixerStates;
+  initialMasterVolume?: number;
+  initialCurrentTime?: number;
+  onMixerChange?: (mixer: { stems: StemMixerStates; masterVolume: number; currentTime: number }) => void;
+  onPurgeSession?: () => void;
 }
 
 function formatTime(totalSeconds: number): string {
@@ -35,19 +40,26 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
   audioContext,
   songTitle = 'track',
   className,
+  initialMixerStates,
+  initialMasterVolume,
+  initialCurrentTime,
+  onMixerChange,
+  onPurgeSession,
 }) => {
   const engineRef = useRef<StemPlayerEngine | null>(null);
 
   const [isPlaying, setIsPlaying] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
+  const [currentTime, setCurrentTime] = useState(initialCurrentTime ?? 0);
   const [duration, setDuration] = useState(providedDuration ?? 0);
-  const [mixerStates, setMixerStates] = useState<StemMixerStates>({
-    vocals: { volume: 1.0, muted: false, solo: false },
-    drums: { volume: 1.0, muted: false, solo: false },
-    bass: { volume: 1.0, muted: false, solo: false },
-    other: { volume: 1.0, muted: false, solo: false },
-  });
-  const [masterVolume, setMasterVolume] = useState(1.0);
+  const [mixerStates, setMixerStates] = useState<StemMixerStates>(
+    initialMixerStates ?? {
+      vocals: { volume: 1.0, muted: false, solo: false },
+      drums: { volume: 1.0, muted: false, solo: false },
+      bass: { volume: 1.0, muted: false, solo: false },
+      other: { volume: 1.0, muted: false, solo: false },
+    }
+  );
+  const [masterVolume, setMasterVolume] = useState(initialMasterVolume ?? 1.0);
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
   const [tempo, setTempo] = useState(1.0);
   const [pitch, setPitch] = useState(0);
@@ -58,12 +70,18 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
       audioContext,
       sampleRate,
       duration: providedDuration,
+      initialMixerStates,
+      initialMasterVolume,
+      initialCurrentTime,
     });
     engineRef.current = engine;
 
     setDuration(engine.getDuration());
     setMixerStates(engine.getAllStemStates());
     setMasterVolume(engine.getMasterVolume());
+    if (initialCurrentTime !== undefined) {
+      setCurrentTime(initialCurrentTime);
+    }
     setTempo(engine.getTempo());
     setPitch(engine.getPitch());
 
@@ -136,28 +154,61 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
     if (!engine) return;
     engine.seek(seekTime);
     setCurrentTime(seekTime);
-  }, []);
+    onMixerChange?.({
+      stems: engine.getAllStemStates(),
+      masterVolume: engine.getMasterVolume(),
+      currentTime: seekTime,
+    });
+  }, [onMixerChange]);
 
   const handleReset = useCallback(() => {
     handleSeek(0);
   }, [handleSeek]);
 
   const handleVolumeChange = useCallback((stem: StemName, volume: number) => {
-    engineRef.current?.setStemVolume(stem, volume);
-  }, []);
+    const engine = engineRef.current;
+    if (!engine) return;
+    engine.setStemVolume(stem, volume);
+    onMixerChange?.({
+      stems: engine.getAllStemStates(),
+      masterVolume: engine.getMasterVolume(),
+      currentTime: engine.getCurrentTime(),
+    });
+  }, [onMixerChange]);
 
   const handleToggleMute = useCallback((stem: StemName) => {
-    engineRef.current?.toggleStemMute(stem);
-  }, []);
+    const engine = engineRef.current;
+    if (!engine) return;
+    engine.toggleStemMute(stem);
+    onMixerChange?.({
+      stems: engine.getAllStemStates(),
+      masterVolume: engine.getMasterVolume(),
+      currentTime: engine.getCurrentTime(),
+    });
+  }, [onMixerChange]);
 
   const handleToggleSolo = useCallback((stem: StemName) => {
-    engineRef.current?.toggleStemSolo(stem);
-  }, []);
+    const engine = engineRef.current;
+    if (!engine) return;
+    engine.toggleStemSolo(stem);
+    onMixerChange?.({
+      stems: engine.getAllStemStates(),
+      masterVolume: engine.getMasterVolume(),
+      currentTime: engine.getCurrentTime(),
+    });
+  }, [onMixerChange]);
 
   const handleMasterVolumeChange = useCallback((volume: number) => {
-    engineRef.current?.setMasterVolume(volume);
+    const engine = engineRef.current;
+    if (!engine) return;
+    engine.setMasterVolume(volume);
     setMasterVolume(volume);
-  }, []);
+    onMixerChange?.({
+      stems: engine.getAllStemStates(),
+      masterVolume: volume,
+      currentTime: engine.getCurrentTime(),
+    });
+  }, [onMixerChange]);
 
   const handleTempoChange = useCallback((newTempo: number) => {
     engineRef.current?.setTempo(newTempo);
@@ -259,6 +310,19 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
                 </>
               )}
             </button>
+
+            {onPurgeSession && (
+              <button
+                type="button"
+                aria-label="Purge Session"
+                title="Purge session and start fresh"
+                onClick={onPurgeSession}
+                className="flex h-10 px-3 items-center justify-center gap-1.5 rounded-xl border border-border bg-secondary/60 text-muted-foreground hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30 transition-all text-xs font-semibold"
+              >
+                <Trash2 className="h-4 w-4" />
+                <span className="hidden sm:inline">Reset Session</span>
+              </button>
+            )}
 
             {/* Export Stems Action */}
             <button

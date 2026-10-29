@@ -6,6 +6,7 @@ import { FallbackAdvisory } from './components/FallbackAdvisory';
 import { SourceMixCard } from './components/SourceMixCard';
 import { MasterWaveform } from './components/MasterWaveform';
 import { StemPlayer } from './components/StemPlayer';
+import { SessionRecovery } from './components/SessionRecovery';
 import { SeparationProgress, SeparationPhase } from './components/SeparationProgress';
 import { detectWebGPUCapability, WebGPUCapability } from './lib/webgpu';
 import { decodeAudio, DecodedSourceMix } from './lib/audioDecoder';
@@ -13,6 +14,15 @@ import { computeWaveformPeaks, WaveformPeaks } from './lib/waveformPeaks';
 import { InferenceClient, ChunkProgress } from './lib/inferenceClient';
 import { DownloadProgress } from './lib/modelCache';
 import { StemName, STEM_NAMES } from './lib/chunkOverlapAdd';
+import {
+  loadActiveSession,
+  hasActiveSession,
+  clearActiveSession,
+  createSessionAutoSaver,
+  DemuxifySession,
+  SessionMixerState,
+} from './lib/sessionStore';
+import { StemMixerStates } from './lib/stemPlayerEngine';
 
 const SUPPORTED_EXTENSIONS = ['.mp3', '.wav', '.flac', '.ogg', '.aac', '.m4a'];
 const SUPPORTED_MIME_TYPES = [
@@ -46,8 +56,15 @@ export const App: React.FC = () => {
   const [separationError, setSeparationError] = useState<string | null>(null);
   const [separatedStems, setSeparatedStems] = useState<Record<StemName, Float32Array[]> | null>(null);
 
+  // Session Recovery & Persistence State
+  const [detectedSession, setDetectedSession] = useState<{ title: string; duration: number } | null>(null);
+  const [isResumingSession, setIsResumingSession] = useState(false);
+  const [restoredMixerState, setRestoredMixerState] = useState<SessionMixerState | null>(null);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const inferenceClientRef = useRef<InferenceClient | null>(null);
+  const cachedSessionRef = useRef<DemuxifySession | null>(null);
+  const autoSaverRef = useRef(createSessionAutoSaver(600));
 
   useEffect(() => {
     let isMounted = true;
@@ -75,9 +92,30 @@ export const App: React.FC = () => {
 
     probeCapability();
 
+    async function checkPreviousSession() {
+      try {
+        const hasSession = await hasActiveSession();
+        if (hasSession && isMounted) {
+          const session = await loadActiveSession();
+          if (session && isMounted) {
+            cachedSessionRef.current = session;
+            setDetectedSession({
+              title: session.metadata.title,
+              duration: session.metadata.duration,
+            });
+          }
+        }
+      } catch {
+        // Silently ignore session check error
+      }
+    }
+
+    checkPreviousSession();
+
     return () => {
       isMounted = false;
       inferenceClientRef.current?.terminate();
+      autoSaverRef.current.cancel();
     };
   }, []);
 
@@ -123,6 +161,7 @@ export const App: React.FC = () => {
   };
 
   const handleSourceMixSelected = (file: File) => {
+    setDetectedSession(null);
     processAudioFile(file);
   };
 
@@ -130,6 +169,9 @@ export const App: React.FC = () => {
     if (inferenceClientRef.current) {
       inferenceClientRef.current.cancel();
     }
+    autoSaverRef.current.cancel();
+    cachedSessionRef.current = null;
+    clearActiveSession().catch(() => {});
     setSelectedFile(null);
     setDecodedSourceMix(null);
     setWaveformPeaks(null);
@@ -140,9 +182,89 @@ export const App: React.FC = () => {
     setDownloadProgress(null);
     setChunkProgress(null);
     setSeparationError(null);
+    setRestoredMixerState(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
+  };
+
+  const handleResumeSession = async () => {
+    setIsResumingSession(true);
+    try {
+      let session = cachedSessionRef.current;
+      if (!session) {
+        session = await loadActiveSession();
+      }
+      if (!session) {
+        setDetectedSession(null);
+        return;
+      }
+
+      cachedSessionRef.current = session;
+
+      const AudioCtx =
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      const audioCtx = new AudioCtx();
+      const numChannels = session.sourceMix.channels.length;
+      const length = session.sourceMix.channels[0]?.length ?? 0;
+      const buffer = audioCtx.createBuffer(numChannels, length, session.metadata.sampleRate);
+      for (let c = 0; c < numChannels; c++) {
+        buffer.getChannelData(c).set(session.sourceMix.channels[c]);
+      }
+
+      const peaks = computeWaveformPeaks(buffer);
+
+      setDecodedSourceMix({
+        buffer,
+        metadata: {
+          fileName: session.metadata.filename,
+          fileSize: session.metadata.size ?? 0,
+          duration: session.metadata.duration,
+          sampleRate: session.metadata.sampleRate,
+          numberOfChannels: numChannels,
+        },
+      });
+      setWaveformPeaks(peaks);
+      setSeparatedStems(session.stems);
+      setRestoredMixerState(session.mixer);
+      setCurrentTime(session.mixer.currentTime ?? 0);
+      setSeparationPhase('completed');
+      setDetectedSession(null);
+    } catch (err) {
+      setDecodeError('Failed to resume previous session.');
+    } finally {
+      setIsResumingSession(false);
+    }
+  };
+
+  const handleDiscardSession = async () => {
+    setDetectedSession(null);
+    cachedSessionRef.current = null;
+    autoSaverRef.current.cancel();
+    await clearActiveSession();
+  };
+
+  const handlePurgeSession = async () => {
+    autoSaverRef.current.cancel();
+    cachedSessionRef.current = null;
+    await clearActiveSession();
+    handleClearSourceMix();
+  };
+
+  const handleMixerChange = (mixer: { stems: StemMixerStates; masterVolume: number; currentTime: number }) => {
+    if (!cachedSessionRef.current) return;
+    const updatedSession: DemuxifySession = {
+      ...cachedSessionRef.current,
+      mixer: {
+        ...cachedSessionRef.current.mixer,
+        stems: mixer.stems,
+        masterVolume: mixer.masterVolume,
+        currentTime: mixer.currentTime,
+      },
+    };
+    cachedSessionRef.current = updatedSession;
+    autoSaverRef.current.debounceSave(updatedSession);
   };
 
   const handleChangeFile = () => {
@@ -199,6 +321,41 @@ export const App: React.FC = () => {
 
       setSeparatedStems(result.stems);
       setSeparationPhase('completed');
+
+      const initialMixerState: SessionMixerState = {
+        stems: {
+          vocals: { volume: 1.0, muted: false, solo: false },
+          drums: { volume: 1.0, muted: false, solo: false },
+          bass: { volume: 1.0, muted: false, solo: false },
+          other: { volume: 1.0, muted: false, solo: false },
+        },
+        masterVolume: 1.0,
+        currentTime: 0,
+        pitchSemitones: 0,
+        tempoRatio: 1.0,
+      };
+      setRestoredMixerState(initialMixerState);
+
+      const sessionToSave: DemuxifySession = {
+        metadata: {
+          id: `session-${Date.now()}`,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          title: decodedSourceMix.metadata.fileName.replace(/\.[^/.]+$/, ''),
+          filename: decodedSourceMix.metadata.fileName,
+          duration: decodedSourceMix.metadata.duration,
+          sampleRate: decodedSourceMix.metadata.sampleRate,
+          size: decodedSourceMix.metadata.fileSize,
+        },
+        sourceMix: {
+          channels: audio,
+        },
+        stems: result.stems,
+        mixer: initialMixerState,
+      };
+
+      cachedSessionRef.current = sessionToSave;
+      autoSaverRef.current.debounceSave(sessionToSave);
     } catch (err) {
       if (err instanceof Error && /cancelled/i.test(err.message)) {
         setSeparationPhase('idle');
@@ -274,6 +431,17 @@ export const App: React.FC = () => {
             className="sr-only"
             onChange={handleFileInputChange}
           />
+
+          {/* Previous Session Recovery Prompt */}
+          {detectedSession && !decodedSourceMix && !isDecoding && (
+            <SessionRecovery
+              title={detectedSession.title}
+              duration={detectedSession.duration}
+              onResume={handleResumeSession}
+              onDiscard={handleDiscardSession}
+              isResuming={isResumingSession}
+            />
+          )}
 
           {/* Decoding In-Progress Indicator */}
           {isDecoding && (
@@ -357,6 +525,11 @@ export const App: React.FC = () => {
                   duration={decodedSourceMix.metadata.duration}
                   sourceMixBuffer={decodedSourceMix.buffer}
                   masterPeaks={waveformPeaks}
+                  initialMixerStates={restoredMixerState?.stems}
+                  initialMasterVolume={restoredMixerState?.masterVolume}
+                  initialCurrentTime={restoredMixerState?.currentTime}
+                  onMixerChange={handleMixerChange}
+                  onPurgeSession={handlePurgeSession}
                   songTitle={decodedSourceMix.metadata.fileName}
                 />
               ) : (
