@@ -43,7 +43,10 @@ export function pitchRatioToSemitones(ratio: number): number {
  * To achieve a target tempo T without altering duration due to pitch, WSOLA must stretch by:
  * alpha = T / R
  */
-export function calculateEffectiveWsolaAlpha(tempo: number, pitchSemitones: number): number {
+export function calculateEffectiveWsolaAlpha(
+  tempo: number,
+  pitchSemitones: number
+): number {
   const pitchRatio = semitonesToPitchRatio(pitchSemitones);
   return tempo / pitchRatio;
 }
@@ -67,7 +70,10 @@ export function createHannWindow(size: number): Float32Array {
  * When ratio > 1.0, pitches up and shortens duration.
  * When ratio < 1.0, pitches down and lengthens duration.
  */
-export function resampleChannel(channel: Float32Array, ratio: number): Float32Array {
+export function resampleChannel(
+  channel: Float32Array,
+  ratio: number
+): Float32Array {
   if (Math.abs(ratio - 1.0) < 1e-6) {
     return new Float32Array(channel);
   }
@@ -190,7 +196,10 @@ export class WsolaProcessor {
   /**
    * Process multiple audio channels with WSOLA time stretching and resampling.
    */
-  public process(inputChannels: Float32Array[], params?: ProcessParams): Float32Array[] {
+  public process(
+    inputChannels: Float32Array[],
+    params?: ProcessParams
+  ): Float32Array[] {
     const tempo = Math.max(0.5, Math.min(2.0, params?.tempo ?? this.tempo));
     const pitch = Math.max(-12, Math.min(12, params?.pitch ?? this.pitch));
 
@@ -238,7 +247,13 @@ export class WsolaProcessor {
         chosenPos = 0;
       } else {
         const refPos = prevChosenPos + Ss;
-        const delta = findBestOffset(composite, refPos, targetPos, N, this.searchRange);
+        const delta = findBestOffset(
+          composite,
+          refPos,
+          targetPos,
+          N,
+          this.searchRange
+        );
         chosenPos = Math.max(0, Math.min(inLen - N, targetPos + delta));
       }
 
@@ -267,7 +282,7 @@ export class WsolaProcessor {
   }
 }
 
-export const WSOLA_WORKLET_PROCESSOR_NAME = 'wsola-multitrack-processor';
+export const WSOLA_WORKLET_PROCESSOR_NAME = "wsola-multitrack-processor";
 
 /**
  * Standalone AudioWorklet processor implementation code that executes in AudioWorkletGlobalScope.
@@ -445,6 +460,27 @@ class WsolaMultitrackProcessor extends (typeof AudioWorkletProcessor !== 'undefi
   synthesizeFrames(minSamples) {
     if (!this.stems || this.stems.length < 8 || !this.composite) return;
     const maxStemLen = this.stems[0].length;
+
+    // Fast path: pristine zero-latency bit-perfect passthrough when tempo=1.0 and pitch=0
+    // Prevents audio worklet thread starvation and buffer underrun clicks/fritura
+    if (Math.abs(this.tempo - 1.0) < 1e-4 && Math.abs(this.pitch) < 1e-4) {
+      while (this.bufferedCount < minSamples && this.inputPos < maxStemLen) {
+        const toCopy = Math.min(minSamples - this.bufferedCount, maxStemLen - this.inputPos);
+        if (toCopy <= 0) break;
+        for (let c = 0; c < 8; c++) {
+          const inCh = this.stems[c];
+          for (let k = 0; k < toCopy; k++) {
+            const dstIdx = (this.ringWritePos + k) % this.ringCapacity;
+            this.outRing[c][dstIdx] = inCh[this.inputPos + k];
+          }
+        }
+        this.ringWritePos = (this.ringWritePos + toCopy) % this.ringCapacity;
+        this.bufferedCount += toCopy;
+        this.inputPos += toCopy;
+      }
+      return;
+    }
+
     const pitchRatio = Math.pow(2, this.pitch / 12);
     const alpha = this.tempo / pitchRatio;
     const Sa = this.Ss * alpha;
@@ -593,24 +629,31 @@ export const WsolaMultitrackProcessor = new Function(`
  * Registers the WSOLA AudioWorklet processor module in the given AudioContext.
  * Returns true if registration succeeded, or false if unsupported/failed.
  */
-export async function registerWsolaAudioWorklet(audioContext: AudioContext): Promise<boolean> {
+export async function registerWsolaAudioWorklet(
+  audioContext: AudioContext
+): Promise<boolean> {
   if (
     !audioContext ||
     !audioContext.audioWorklet ||
-    typeof audioContext.audioWorklet.addModule !== 'function'
+    typeof audioContext.audioWorklet.addModule !== "function"
   ) {
     return false;
   }
 
   try {
     let url: string;
-    if (typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
-      const blob = new Blob([WSOLA_WORKLET_SOURCE], { type: 'application/javascript' });
+    if (
+      typeof URL !== "undefined" &&
+      typeof URL.createObjectURL === "function"
+    ) {
+      const blob = new Blob([WSOLA_WORKLET_SOURCE], {
+        type: "application/javascript",
+      });
       url = URL.createObjectURL(blob);
       await audioContext.audioWorklet.addModule(url);
       URL.revokeObjectURL(url);
-    } else if (typeof btoa === 'function') {
-      url = 'data:application/javascript;base64,' + btoa(WSOLA_WORKLET_SOURCE);
+    } else if (typeof btoa === "function") {
+      url = "data:application/javascript;base64," + btoa(WSOLA_WORKLET_SOURCE);
       await audioContext.audioWorklet.addModule(url);
     } else {
       return false;

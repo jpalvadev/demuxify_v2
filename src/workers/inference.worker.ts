@@ -150,11 +150,30 @@ async function handleStart(
 
       if (session && !isMockSession) {
         // Prepare tensor for ONNX Demucs
-        // Demucs expects [1, 2, chunkSamples]
+        // Demucs expects [1, 2, chunkSamples] normalized by (x - mean) / std
         const chunkSamples = chunk.audio[0].length;
+
+        let sum = 0;
+        let sumSq = 0;
+        const totalChunkSamples = 2 * chunkSamples;
+        for (let sIdx = 0; sIdx < chunkSamples; sIdx++) {
+          const l = chunk.audio[0][sIdx];
+          const r = chunk.audio[1][sIdx];
+          sum += l + r;
+          sumSq += l * l + r * r;
+        }
+        const mean = sum / totalChunkSamples;
+        const variance = Math.max(
+          1e-8,
+          sumSq / totalChunkSamples - mean * mean
+        );
+        const std = Math.sqrt(variance);
+
         const tensorData = new Float32Array(2 * chunkSamples);
-        tensorData.set(chunk.audio[0], 0);
-        tensorData.set(chunk.audio[1], chunkSamples);
+        for (let sIdx = 0; sIdx < chunkSamples; sIdx++) {
+          tensorData[sIdx] = (chunk.audio[0][sIdx] - mean) / std;
+          tensorData[chunkSamples + sIdx] = (chunk.audio[1][sIdx] - mean) / std;
+        }
 
         const inputName = session.inputNames[0];
         const inputTensor = new ort.Tensor("float32", tensorData, [
@@ -193,15 +212,14 @@ async function handleStart(
         for (let s = 0; s < DEMUCS_STEM_ORDER.length; s++) {
           const stemName = DEMUCS_STEM_ORDER[s];
           const stemOffset = s * stridePerStem;
-          chunkStems[stemName][0].set(
-            outData.subarray(stemOffset, stemOffset + chunkSamples)
-          );
-          chunkStems[stemName][1].set(
-            outData.subarray(
-              stemOffset + chunkSamples,
-              stemOffset + 2 * chunkSamples
-            )
-          );
+          const leftTarget = chunkStems[stemName][0];
+          const rightTarget = chunkStems[stemName][1];
+          for (let sIdx = 0; sIdx < chunkSamples; sIdx++) {
+            // Denormalize: stem = out * std + mean
+            leftTarget[sIdx] = outData[stemOffset + sIdx] * std + mean;
+            rightTarget[sIdx] =
+              outData[stemOffset + chunkSamples + sIdx] * std + mean;
+          }
         }
       } else {
         // Mock / simulation mode: deterministic DSP filter separation
