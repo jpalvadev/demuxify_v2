@@ -4,7 +4,7 @@
 
 **Blocked by:** 03: Inference Engine Web Worker & Model Cache Pipeline
 
-**Status:** ready-for-agent
+**Status:** claimed
 
 - [ ] Web Audio API multi-channel audio graph connecting all four Stems to dedicated GainNodes feeding the master destination.
 - [ ] Sample-accurate synchronized start, stop, and seek operations across all four Stems without drift.
