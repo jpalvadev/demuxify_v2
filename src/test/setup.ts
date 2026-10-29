@@ -2,6 +2,28 @@ import '@testing-library/jest-dom';
 import { vi } from 'vitest';
 
 if (typeof window !== 'undefined') {
+  if (typeof Blob !== 'undefined' && !Blob.prototype.arrayBuffer) {
+    Blob.prototype.arrayBuffer = function (this: Blob) {
+      return new Promise<ArrayBuffer>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as ArrayBuffer);
+        reader.onerror = () => reject(reader.error);
+        reader.readAsArrayBuffer(this);
+      });
+    };
+  }
+
+  if (typeof URL.createObjectURL === 'undefined') {
+    URL.createObjectURL = vi.fn((_blob: Blob) => `blob:mock-url-${Math.random()}`);
+  }
+  if (typeof URL.revokeObjectURL === 'undefined') {
+    URL.revokeObjectURL = vi.fn();
+  }
+
+  if (typeof HTMLAnchorElement !== 'undefined') {
+    HTMLAnchorElement.prototype.click = vi.fn();
+  }
+
   if (!window.PointerEvent) {
     window.PointerEvent = window.MouseEvent as any;
   }

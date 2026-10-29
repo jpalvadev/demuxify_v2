@@ -13,6 +13,7 @@ Implementation map for Demuxify Web.
 - [Ticket 04 Resolved](issues/04-stem-player-multitrack-sync.md): Multi-track Web Audio API engine in `src/lib/stemPlayerEngine.ts` with synchronized play/pause/seek and solo/mute gain matrix. `src/components/StemTrack.tsx` with faders and canvas waveforms. `src/components/StemPlayer.tsx` with transport bar and spacebar control.
 
 - [Ticket 04 Resolved](issues/04-stem-player-multitrack-sync.md): Multi-track audio engine in `src/lib/stemPlayerEngine.ts` with dedicated GainNodes per stem routing into Master Gain; concurrent sample-accurate transport (`play`, `pause`, `seek`); Solo/Mute gain matrix; Stem player UI in `src/components/StemPlayer.tsx` with global transport, spacebar shortcut, and interactive per-stem track strips in `src/components/StemTrack.tsx`.
+- [Ticket 07 Resolved](issues/07-export-pipeline-bundle-zip.md): Full export pipeline with standard RIFF WAVE encoder (16/24-bit PCM), dedicated background MP3 export worker using LameJS (128/192/256/320 kbps), PKZIP bundle generator packaging all 4 stems into a single archive, and interactive ExportDialog integrated into StemPlayer.
 
 ## Fog
 - Model weights: HTDemucs ONNX format in browser runtime (WebGPU / WASM fallback).

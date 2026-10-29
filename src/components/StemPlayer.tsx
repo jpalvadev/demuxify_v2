@@ -1,9 +1,10 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { Play, Pause, RotateCcw, Volume2, Layers } from 'lucide-react';
+import { Play, Pause, RotateCcw, Volume2, Layers, Download } from 'lucide-react';
 import { StemName, STEM_NAMES } from '../lib/chunkOverlapAdd';
 import { StemPlayerEngine, StemMixerStates } from '../lib/stemPlayerEngine';
 import { StemTrack } from './StemTrack';
 import { MasterWaveform } from './MasterWaveform';
+import { ExportDialog } from './ExportDialog';
 import { WaveformPeaks } from '../lib/waveformPeaks';
 import { cn } from '../lib/utils';
 
@@ -14,6 +15,7 @@ export interface StemPlayerProps {
   sourceMixBuffer?: AudioBuffer | null;
   masterPeaks?: WaveformPeaks | null;
   audioContext?: AudioContext;
+  songTitle?: string;
   className?: string;
 }
 
@@ -31,6 +33,7 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
   sourceMixBuffer,
   masterPeaks,
   audioContext,
+  songTitle = 'track',
   className,
 }) => {
   const engineRef = useRef<StemPlayerEngine | null>(null);
@@ -45,6 +48,7 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
     other: { volume: 1.0, muted: false, solo: false },
   });
   const [masterVolume, setMasterVolume] = useState(1.0);
+  const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
 
   // Initialize engine
   useEffect(() => {
@@ -213,6 +217,18 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
                 </>
               )}
             </button>
+
+            {/* Export Stems Action */}
+            <button
+              type="button"
+              aria-label="Export Stems"
+              title="Export isolated stems (WAV/MP3/ZIP)"
+              onClick={() => setIsExportDialogOpen(true)}
+              className="flex h-10 px-3.5 items-center justify-center gap-2 rounded-xl border border-border bg-secondary/60 text-foreground font-medium shadow-xs hover:bg-secondary hover:border-primary/40 active:scale-95 transition-all text-xs sm:text-sm"
+            >
+              <Download className="h-4 w-4 text-primary" />
+              <span>Export Stems</span>
+            </button>
           </div>
 
           {/* Master Volume Slider */}
@@ -280,6 +296,15 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
           );
         })}
       </div>
+
+      {/* Export Dialog Modal */}
+      <ExportDialog
+        isOpen={isExportDialogOpen}
+        onClose={() => setIsExportDialogOpen(false)}
+        stems={stems}
+        sampleRate={sampleRate}
+        songTitle={songTitle}
+      />
     </section>
   );
 };
