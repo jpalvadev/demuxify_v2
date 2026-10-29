@@ -31,6 +31,55 @@ if (typeof window !== 'undefined') {
     (globalThis as any).Worker = MockWorker as any;
   }
 
+  if (!window.AudioContext) {
+    class MockAudioContext {
+      currentTime = 0;
+      state = 'running';
+      destination = { connect: vi.fn(), disconnect: vi.fn() };
+      resume = vi.fn().mockResolvedValue(undefined);
+      suspend = vi.fn().mockResolvedValue(undefined);
+      close = vi.fn().mockResolvedValue(undefined);
+      createGain() {
+        const gainNode = {
+          gain: {
+            value: 1.0,
+            setValueAtTime: vi.fn(function (this: any, val: number) {
+              this.value = val;
+            }),
+          },
+          connect: vi.fn(),
+          disconnect: vi.fn(),
+        };
+        return gainNode;
+      }
+      createBufferSource() {
+        return {
+          buffer: null,
+          connect: vi.fn(),
+          disconnect: vi.fn(),
+          start: vi.fn(),
+          stop: vi.fn(),
+          onended: null,
+        };
+      }
+      createBuffer(channels: number, length: number, sampleRate: number) {
+        const channelArrays = Array.from({ length: channels }, () => new Float32Array(length));
+        return {
+          numberOfChannels: channels,
+          length,
+          sampleRate,
+          duration: length / sampleRate,
+          getChannelData: vi.fn((ch: number) => channelArrays[ch]),
+          copyToChannel: vi.fn((src: Float32Array, ch: number) => {
+            channelArrays[ch].set(src);
+          }),
+        };
+      }
+      decodeAudioData = vi.fn();
+    }
+    window.AudioContext = MockAudioContext as any;
+  }
+
   if (typeof HTMLCanvasElement !== 'undefined') {
     HTMLCanvasElement.prototype.getContext = function (this: HTMLCanvasElement, contextType: string) {
       if (contextType === '2d') {

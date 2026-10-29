@@ -334,5 +334,46 @@ describe('App UI Shell', () => {
       expect(screen.queryByRole('region', { name: /separation progress/i })).not.toBeInTheDocument();
     });
   });
+
+  it('activates and displays the Stem Player with all 4 stems and controls when separation completes', async () => {
+    vi.spyOn(webgpuModule, 'detectWebGPUCapability').mockResolvedValue({
+      supported: true,
+      isFallback: false,
+    });
+
+    vi.spyOn(InferenceClient.prototype, 'init').mockResolvedValue({ backend: 'webgpu' });
+    vi.spyOn(InferenceClient.prototype, 'separate').mockResolvedValue({
+      stems: {
+        vocals: [new Float32Array(500), new Float32Array(500)],
+        drums: [new Float32Array(500), new Float32Array(500)],
+        bass: [new Float32Array(500), new Float32Array(500)],
+        other: [new Float32Array(500), new Float32Array(500)],
+      },
+      duration: 180,
+    });
+
+    render(<App />);
+
+    const file = new File(['audio'], 'song_master.mp3', { type: 'audio/mp3' });
+    const fileInput = screen.getByLabelText(/select source mix file/i, { selector: 'input' });
+    fireEvent.change(fileInput, { target: { files: [file] } });
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /separate stems|start separation/i })).toBeInTheDocument();
+    });
+
+    const separateBtn = screen.getByRole('button', { name: /separate stems|start separation/i });
+    fireEvent.click(separateBtn);
+
+    await waitFor(() => {
+      expect(screen.getByRole('region', { name: /stem player/i })).toBeInTheDocument();
+    });
+
+    const stemPlayerRegion = screen.getByRole('region', { name: /stem player/i });
+    expect(within(stemPlayerRegion).getByRole('button', { name: /play/i })).toBeInTheDocument();
+    expect(within(stemPlayerRegion).getByRole('button', { name: /mute vocals/i })).toBeInTheDocument();
+    expect(within(stemPlayerRegion).getByRole('button', { name: /solo drums/i })).toBeInTheDocument();
+    expect(within(stemPlayerRegion).getByRole('slider', { name: /bass volume/i })).toBeInTheDocument();
+  });
 });
 
