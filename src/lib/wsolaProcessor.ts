@@ -2,7 +2,7 @@
  * WSOLA (Waveform Similarity Overlap-Add) Time-Stretch & Pitch-Shifting Processor.
  *
  * Implements real-time time-scale modification (tempo: 0.5x to 2.0x) and pitch shifting
- * (-12 to +12 semitones) across 4 stereo Stems (8 audio channels total).
+ * (-12 to +12 semitones or fractional cents) across 4 stereo Stems (8 audio channels total).
  * Preserves inter-stem phase synchronization by deriving overlap-add offsets from a unified
  * composite reference across all channels, preventing comb filtering.
  */
@@ -21,7 +21,7 @@ export interface ProcessParams {
 }
 
 /**
- * Converts a musical pitch offset in semitones (-12 to +12) to a frequency/playback ratio.
+ * Converts a musical pitch offset in semitones (-12 to +12) or fractional cents to a frequency/playback ratio.
  * Formula: ratio = 2 ^ (semitones / 12)
  */
 export function semitonesToPitchRatio(semitones: number): number {
@@ -134,7 +134,7 @@ export function findBestOffset(
 }
 
 /**
- * WsolaProcessor manages time-stretching and pitch shifting for multi-channel audio
+ * WsolaProcessor manages batch time-stretching and pitch shifting for multi-channel audio
  * (e.g. 4 stereo stems = 8 channels) while ensuring inter-channel phase synchronization.
  */
 export class WsolaProcessor {
@@ -269,49 +269,255 @@ export class WsolaProcessor {
 
 export const WSOLA_WORKLET_PROCESSOR_NAME = 'wsola-multitrack-processor';
 
+/**
+ * Standalone AudioWorklet processor implementation code that executes in AudioWorkletGlobalScope.
+ * Implements real-time streaming WSOLA time-stretching (0.5x-2.0x) and pitch transposition (-12 to +12 st)
+ * across 4 stereo Stems (8 audio channels) with phase-locked multi-channel coherence.
+ */
 export const WSOLA_WORKLET_SOURCE = `
-class WsolaMultitrackProcessor extends AudioWorkletProcessor {
+function findBestOffset(signal, inLen, refPos, targetPos, windowSize, searchRange) {
+  let bestDelta = 0;
+  let bestCorr = -Infinity;
+
+  for (let delta = -searchRange; delta <= searchRange; delta++) {
+    const candPos = targetPos + delta;
+    if (candPos < 0 || candPos + windowSize > inLen) continue;
+    let dot = 0;
+    let norm = 0;
+    for (let k = 0; k < windowSize; k++) {
+      const r = (refPos + k < inLen) ? signal[refPos + k] : 0;
+      const c = signal[candPos + k];
+      dot += r * c;
+      norm += c * c;
+    }
+    const score = norm > 1e-9 ? dot / Math.sqrt(norm) : dot;
+    if (score > bestCorr) {
+      bestCorr = score;
+      bestDelta = delta;
+    }
+  }
+  return bestDelta;
+}
+
+class WsolaMultitrackProcessor extends (typeof AudioWorkletProcessor !== 'undefined' ? AudioWorkletProcessor : Object) {
   constructor() {
     super();
-    this.stems = []; // Array of 8 Float32Arrays: [vL, vR, dL, dR, bL, bR, oL, oR]
+    this.stems = []; // 8 Float32Arrays: [vL, vR, dL, dR, bL, bR, oL, oR]
+    this.composite = null;
     this.playing = false;
     this.tempo = 1.0;
     this.pitch = 0;
-    this.readPos = 0;
+    this.readPos = 0; // Current position in source audio (samples)
     this.sampleRate = 44100;
     this.quantumCounter = 0;
+
+    // WSOLA parameters (N = 512, Ss = 256, searchRange = 128)
+    this.N = 512;
+    this.Ss = 256;
+    this.searchRange = 128;
+    this.window = new Float32Array(this.N);
+    for (let k = 0; k < this.N; k++) {
+      this.window[k] = 0.5 * (1 - Math.cos((2 * Math.PI * k) / this.N));
+    }
+
+    // Overlap-add accumulator buffers (8 channels x 512 samples)
+    this.acc = Array.from({ length: 8 }, () => new Float32Array(this.N));
+
+    // Intermediate resample buffer (8 channels x 4096 capacity)
+    this.resampleCapacity = 4096;
+    this.resampleBuf = Array.from({ length: 8 }, () => new Float32Array(this.resampleCapacity));
+    this.resampleBufLen = 0;
+    this.resamplePos = 0;
+
+    // Output ring buffer (8 channels x 16384 capacity)
+    this.ringCapacity = 16384;
+    this.outRing = Array.from({ length: 8 }, () => new Float32Array(this.ringCapacity));
+    this.ringWritePos = 0;
+    this.ringReadPos = 0;
+    this.bufferedCount = 0;
+
+    // Synthesis tracking
+    this.inputPos = 0;
+    this.prevChosenPos = 0;
+
+    if (!this.port) {
+      this.port = { postMessage: () => {} };
+    }
 
     this.port.onmessage = (event) => {
       const data = event.data;
       if (!data) return;
 
       switch (data.type) {
-        case 'loadStems':
+        case 'loadStems': {
           this.stems = data.stems || [];
           this.sampleRate = data.sampleRate || 44100;
           this.readPos = 0;
+          this.inputPos = 0;
+          this.prevChosenPos = 0;
+          this.resetBuffers();
+
+          if (this.stems.length >= 8 && this.stems[0]) {
+            const maxLen = this.stems[0].length;
+            this.composite = new Float32Array(maxLen);
+            const numCh = this.stems.length;
+            for (let c = 0; c < numCh; c++) {
+              const ch = this.stems[c];
+              for (let i = 0; i < maxLen; i++) {
+                this.composite[i] += ch[i] / numCh;
+              }
+            }
+          }
           break;
-        case 'setTempo':
-          this.tempo = Math.max(0.5, Math.min(2.0, Number(data.tempo) || 1.0));
+        }
+        case 'setTempo': {
+          const newTempo = Math.max(0.5, Math.min(2.0, Number(data.tempo) || 1.0));
+          if (Math.abs(newTempo - this.tempo) > 1e-4) {
+            this.tempo = newTempo;
+            this.resetBuffers();
+            this.inputPos = Math.round(this.readPos);
+            this.prevChosenPos = this.inputPos;
+          }
           break;
-        case 'setPitch':
-          this.pitch = Math.max(-12, Math.min(12, Number(data.pitch) || 0));
+        }
+        case 'setPitch': {
+          const newPitch = Math.max(-12, Math.min(12, Number(data.pitch) || 0));
+          if (Math.abs(newPitch - this.pitch) > 1e-4) {
+            this.pitch = newPitch;
+            this.resetBuffers();
+            this.inputPos = Math.round(this.readPos);
+            this.prevChosenPos = this.inputPos;
+          }
           break;
-        case 'resetTimeStretch':
+        }
+        case 'resetTimeStretch': {
           this.tempo = 1.0;
           this.pitch = 0;
+          this.resetBuffers();
+          this.inputPos = Math.round(this.readPos);
+          this.prevChosenPos = this.inputPos;
           break;
-        case 'play':
+        }
+        case 'play': {
           this.playing = true;
           break;
-        case 'pause':
+        }
+        case 'pause': {
           this.playing = false;
           break;
-        case 'seek':
+        }
+        case 'seek': {
           this.readPos = Math.max(0, (Number(data.timeSec) || 0) * this.sampleRate);
+          this.inputPos = Math.round(this.readPos);
+          this.prevChosenPos = this.inputPos;
+          this.resetBuffers();
           break;
+        }
       }
     };
+  }
+
+  resetBuffers() {
+    this.bufferedCount = 0;
+    this.ringWritePos = 0;
+    this.ringReadPos = 0;
+    this.resampleBufLen = 0;
+    this.resamplePos = 0;
+
+    if (this.stems && this.stems.length >= 8 && this.stems[0]) {
+      const maxStemLen = this.stems[0].length;
+      const startPos = Math.max(0, Math.min(maxStemLen - this.N, Math.round(this.inputPos)));
+      for (let c = 0; c < 8; c++) {
+        const inCh = this.stems[c];
+        const accCh = this.acc[c];
+        for (let k = 0; k < this.N; k++) {
+          const s = (startPos + k < maxStemLen) ? inCh[startPos + k] : 0;
+          accCh[k] = s * this.window[k];
+        }
+      }
+    } else {
+      for (let c = 0; c < 8; c++) {
+        this.acc[c].fill(0);
+      }
+    }
+  }
+
+  synthesizeFrames(minSamples) {
+    if (!this.stems || this.stems.length < 8 || !this.composite) return;
+    const maxStemLen = this.stems[0].length;
+    const pitchRatio = Math.pow(2, this.pitch / 12);
+    const alpha = this.tempo / pitchRatio;
+    const Sa = this.Ss * alpha;
+
+    while (this.bufferedCount < minSamples && this.inputPos < maxStemLen) {
+      const targetPos = Math.round(this.inputPos + Sa);
+      if (targetPos >= maxStemLen) break;
+
+      const refPos = this.prevChosenPos + this.Ss;
+      const bestDelta = findBestOffset(this.composite, maxStemLen, refPos, targetPos, this.N, this.searchRange);
+      const chosenPos = Math.max(0, Math.min(maxStemLen - this.N, targetPos + bestDelta));
+      this.prevChosenPos = chosenPos;
+      this.inputPos = targetPos;
+
+      // Overlap-add windowed segment across all 8 channels with shared chosenPos (preserving phase)
+      for (let c = 0; c < 8; c++) {
+        const inCh = this.stems[c];
+        const accCh = this.acc[c];
+        for (let k = 0; k < this.N; k++) {
+          const s = (chosenPos + k < maxStemLen) ? inCh[chosenPos + k] : 0;
+          accCh[k] += s * this.window[k];
+        }
+      }
+
+      // First Ss samples of acc are ready -> copy to resampleBuf
+      if (this.resampleBufLen + this.Ss <= this.resampleCapacity) {
+        for (let c = 0; c < 8; c++) {
+          for (let k = 0; k < this.Ss; k++) {
+            this.resampleBuf[c][this.resampleBufLen + k] = this.acc[c][k];
+          }
+        }
+        this.resampleBufLen += this.Ss;
+      }
+
+      // Shift acc by Ss
+      for (let c = 0; c < 8; c++) {
+        const accCh = this.acc[c];
+        for (let k = 0; k < this.N - this.Ss; k++) {
+          accCh[k] = accCh[k + this.Ss];
+        }
+        for (let k = this.N - this.Ss; k < this.N; k++) {
+          accCh[k] = 0;
+        }
+      }
+
+      // Resample from resampleBuf into outRing
+      let written = 0;
+      while (this.resamplePos + 1 < this.resampleBufLen && this.bufferedCount + written < this.ringCapacity) {
+        const idx = Math.floor(this.resamplePos);
+        const frac = this.resamplePos - idx;
+        const dstIdx = (this.ringWritePos + written) % this.ringCapacity;
+        for (let c = 0; c < 8; c++) {
+          const s0 = this.resampleBuf[c][idx];
+          const s1 = this.resampleBuf[c][idx + 1];
+          this.outRing[c][dstIdx] = s0 + frac * (s1 - s0);
+        }
+        written++;
+        this.resamplePos += pitchRatio;
+      }
+
+      if (this.resamplePos >= 1) {
+        const consumed = Math.floor(this.resamplePos);
+        const remaining = this.resampleBufLen - consumed;
+        for (let c = 0; c < 8; c++) {
+          this.resampleBuf[c].copyWithin(0, consumed, this.resampleBufLen);
+        }
+        this.resampleBufLen = remaining;
+        this.resamplePos -= consumed;
+      }
+
+      this.ringWritePos = (this.ringWritePos + written) % this.ringCapacity;
+      this.bufferedCount += written;
+    }
   }
 
   process(inputs, outputs, parameters) {
@@ -319,44 +525,45 @@ class WsolaMultitrackProcessor extends AudioWorkletProcessor {
       return true;
     }
 
-    const pitchRatio = Math.pow(2, this.pitch / 12);
-    // Net speed factor through input audio is tempo
-    const step = this.tempo;
-    const quantumLength = outputs[0] && outputs[0][0] ? outputs[0][0].length : 128;
     const maxStemLen = this.stems[0].length;
+    if (this.readPos >= maxStemLen) {
+      this.playing = false;
+      this.port.postMessage({ type: 'ended' });
+      return true;
+    }
 
-    for (let i = 0; i < quantumLength; i++) {
-      const currentIdx = Math.floor(this.readPos);
-      const frac = this.readPos - currentIdx;
+    const quantumLength = outputs[0] && outputs[0][0] ? outputs[0][0].length : 128;
 
-      if (currentIdx >= maxStemLen) {
-        this.playing = false;
-        this.port.postMessage({ type: 'ended' });
-        break;
+    if (this.bufferedCount < 1024) {
+      this.synthesizeFrames(2048);
+    }
+
+    const toWrite = Math.min(quantumLength, this.bufferedCount);
+
+    for (let s = 0; s < 4; s++) {
+      const outStem = outputs[s];
+      if (!outStem) continue;
+      const leftCh = s * 2;
+      const rightCh = s * 2 + 1;
+
+      for (let i = 0; i < toWrite; i++) {
+        const srcIdx = (this.ringReadPos + i) % this.ringCapacity;
+        if (outStem[0]) outStem[0][i] = this.outRing[leftCh][srcIdx];
+        if (outStem[1]) outStem[1][i] = this.outRing[rightCh][srcIdx];
       }
-
-      const nextIdx = Math.min(currentIdx + 1, maxStemLen - 1);
-
-      // 4 stems (outputs 0..3), each with 2 channels (L, R)
-      for (let s = 0; s < 4; s++) {
-        const outStem = outputs[s];
-        if (!outStem) continue;
-
-        const leftChIdx = s * 2;
-        const rightChIdx = s * 2 + 1;
-
-        const leftIn = this.stems[leftChIdx];
-        const rightIn = this.stems[rightChIdx];
-
-        if (outStem[0] && leftIn) {
-          outStem[0][i] = leftIn[currentIdx] + frac * (leftIn[nextIdx] - leftIn[currentIdx]);
-        }
-        if (outStem[1] && rightIn) {
-          outStem[1][i] = rightIn[currentIdx] + frac * (rightIn[nextIdx] - rightIn[currentIdx]);
-        }
+      for (let i = toWrite; i < quantumLength; i++) {
+        if (outStem[0]) outStem[0][i] = 0;
+        if (outStem[1]) outStem[1][i] = 0;
       }
+    }
 
-      this.readPos += step;
+    this.ringReadPos = (this.ringReadPos + toWrite) % this.ringCapacity;
+    this.bufferedCount -= toWrite;
+    this.readPos += toWrite * this.tempo;
+
+    if (this.readPos >= maxStemLen || (toWrite === 0 && this.inputPos >= maxStemLen)) {
+      this.playing = false;
+      this.port.postMessage({ type: 'ended' });
     }
 
     this.quantumCounter++;
@@ -371,8 +578,16 @@ class WsolaMultitrackProcessor extends AudioWorkletProcessor {
   }
 }
 
-registerProcessor('${WSOLA_WORKLET_PROCESSOR_NAME}', WsolaMultitrackProcessor);
+if (typeof registerProcessor === 'function') {
+  registerProcessor('${WSOLA_WORKLET_PROCESSOR_NAME}', WsolaMultitrackProcessor);
+}
 `;
+
+// Export class directly for unit testing and direct inspection
+export const WsolaMultitrackProcessor = new Function(`
+  ${WSOLA_WORKLET_SOURCE}
+  return WsolaMultitrackProcessor;
+`)();
 
 /**
  * Registers the WSOLA AudioWorklet processor module in the given AudioContext.
@@ -406,4 +621,3 @@ export async function registerWsolaAudioWorklet(audioContext: AudioContext): Pro
     return false;
   }
 }
-

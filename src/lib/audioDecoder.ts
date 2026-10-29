@@ -6,6 +6,8 @@ export interface SourceMixMetadata {
   numberOfChannels: number;
 }
 
+import { createAudioContext } from './audioContext';
+
 export interface DecodedSourceMix {
   buffer: AudioBuffer;
   metadata: SourceMixMetadata;
@@ -14,18 +16,13 @@ export interface DecodedSourceMix {
 export interface DecodeAudioOptions {
   fileName?: string;
   fileSize?: number;
+  mimeType?: string;
   audioContext?: AudioContext;
 }
 
 function getAudioContext(provided?: AudioContext): AudioContext {
   if (provided) return provided;
-  const AudioCtx =
-    window.AudioContext ||
-    (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-  if (!AudioCtx) {
-    throw new Error('Web Audio API (AudioContext) is not supported in this browser.');
-  }
-  return new AudioCtx();
+  return createAudioContext();
 }
 
 async function fileToArrayBuffer(file: Blob): Promise<ArrayBuffer> {

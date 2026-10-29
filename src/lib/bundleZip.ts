@@ -2,7 +2,8 @@ import JSZip from 'jszip';
 import { STEM_NAMES, StemName } from './chunkOverlapAdd';
 
 export interface CreateStemBundleOptions {
-  songTitle?: string;
+  sourceMixTitle?: string;
+  songTitle?: string; // backwards compatibility alias
   format?: 'wav' | 'mp3';
   onProgress?: (percent: number) => void;
 }
@@ -10,22 +11,25 @@ export interface CreateStemBundleOptions {
 /**
  * Strips file extensions and sanitizes characters that are illegal across modern file systems.
  */
-export function sanitizeSongTitle(title?: string): string {
-  if (!title) return 'track';
+export function sanitizeSourceMixTitle(title?: string, defaultTitle: string = 'track'): string {
+  if (!title) return defaultTitle;
   const withoutExt = title.replace(/\.[a-zA-Z0-9]+$/, '').trim();
   const sanitized = withoutExt.replace(/[/\\?%*:|"<>]/g, '_').trim();
-  return sanitized || 'track';
+  return sanitized || defaultTitle;
 }
 
+/** Backwards compatibility alias */
+export const sanitizeSongTitle = sanitizeSourceMixTitle;
+
 /**
- * Formats a clean stem filename: `<SongTitle>_<stem>.<ext>`
+ * Formats a clean stem filename: `<SourceMixTitle>_<stem>.<ext>`
  */
 export function formatStemFileName(
-  songTitle: string,
+  sourceMixTitle: string,
   stem: StemName,
   ext: 'wav' | 'mp3'
 ): string {
-  const base = sanitizeSongTitle(songTitle);
+  const base = sanitizeSourceMixTitle(sourceMixTitle);
   return `${base}_${stem}.${ext}`;
 }
 
@@ -43,14 +47,14 @@ export async function createStemBundleZip(
     }
   }
 
-  const songTitle = options?.songTitle || 'track';
+  const title = options?.sourceMixTitle || options?.songTitle || 'source_mix';
   const format = options?.format || 'wav';
   const onProgress = options?.onProgress;
 
   const zip = new JSZip();
 
   for (const stem of STEM_NAMES) {
-    const fileName = formatStemFileName(songTitle, stem, format);
+    const fileName = formatStemFileName(title, stem, format);
     const data = stemFiles[stem];
     zip.file(fileName, data);
   }

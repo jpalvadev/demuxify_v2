@@ -8,6 +8,7 @@ import { MasterWaveform } from './components/MasterWaveform';
 import { StemPlayer } from './components/StemPlayer';
 import { SessionRecovery } from './components/SessionRecovery';
 import { SeparationProgress, SeparationPhase } from './components/SeparationProgress';
+import { ToastContainer } from './components/Toast';
 import { detectWebGPUCapability, WebGPUCapability } from './lib/webgpu';
 import { decodeAudio, DecodedSourceMix } from './lib/audioDecoder';
 import { computeWaveformPeaks, WaveformPeaks } from './lib/waveformPeaks';
@@ -530,6 +531,7 @@ export const App: React.FC = () => {
                   initialCurrentTime={restoredMixerState?.currentTime}
                   onMixerChange={handleMixerChange}
                   onPurgeSession={handlePurgeSession}
+                  sourceMixTitle={decodedSourceMix.metadata.fileName}
                   songTitle={decodedSourceMix.metadata.fileName}
                 />
               ) : (
@@ -545,6 +547,8 @@ export const App: React.FC = () => {
           )}
         </section>
       </main>
+
+      <ToastContainer />
 
       <footer className="border-t border-border/60 py-6 text-center text-xs text-muted-foreground">
         <p>Demuxify Web • 100% Client-Side Audio Source Separation • Powered by Demucs v4 &amp; WebGPU</p>

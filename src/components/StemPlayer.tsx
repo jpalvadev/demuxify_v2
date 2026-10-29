@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { Play, Pause, RotateCcw, Volume2, Layers, Trash2, Download, Gauge, Music, Plus, Minus } from 'lucide-react';
 import { StemName, STEM_NAMES } from '../lib/chunkOverlapAdd';
 import { StemPlayerEngine, StemMixerStates } from '../lib/stemPlayerEngine';
-import { StemTrack } from './StemTrack';
+import { StemStrip } from './StemStrip';
 import { MasterWaveform } from './MasterWaveform';
 import { ExportDialog } from './ExportDialog';
 import { WaveformPeaks } from '../lib/waveformPeaks';
@@ -15,7 +15,8 @@ export interface StemPlayerProps {
   sourceMixBuffer?: AudioBuffer | null;
   masterPeaks?: WaveformPeaks | null;
   audioContext?: AudioContext;
-  songTitle?: string;
+  sourceMixTitle?: string;
+  songTitle?: string; // backwards compatibility alias
   className?: string;
   initialMixerStates?: StemMixerStates;
   initialMasterVolume?: number;
@@ -38,7 +39,8 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
   sourceMixBuffer,
   masterPeaks,
   audioContext,
-  songTitle = 'track',
+  sourceMixTitle: propSourceMixTitle,
+  songTitle: propSongTitle,
   className,
   initialMixerStates,
   initialMasterVolume,
@@ -46,6 +48,7 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
   onMixerChange,
   onPurgeSession,
 }) => {
+  const sourceMixTitle = propSourceMixTitle || propSongTitle || 'source_mix';
   const engineRef = useRef<StemPlayerEngine | null>(null);
 
   const [isPlaying, setIsPlaying] = useState(false);
@@ -463,7 +466,11 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
                 data-testid="current-pitch-label"
                 className="font-mono text-xs font-bold text-foreground bg-secondary px-2 py-0.5 rounded-md border border-border"
               >
-                {pitch > 0 ? `+${pitch}` : pitch} st
+                {pitch === 0
+                  ? '0 st'
+                  : `${pitch > 0 ? '+' : ''}${
+                      Number.isInteger(pitch) ? pitch : pitch.toFixed(2).replace(/\.?0+$/, '')
+                    } st`}
               </span>
             </div>
 
@@ -485,9 +492,9 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
                   type="range"
                   min="-12"
                   max="12"
-                  step="1"
+                  step="0.01"
                   value={pitch}
-                  onChange={(e) => handlePitchChange(parseInt(e.target.value, 10))}
+                  onChange={(e) => handlePitchChange(parseFloat(e.target.value))}
                   aria-label="Pitch Shift"
                   className="w-full accent-primary cursor-pointer h-1.5 bg-secondary rounded-lg appearance-none"
                 />
@@ -515,7 +522,7 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
         </div>
       </div>
 
-      {/* 4 Stem Tracks List */}
+      {/* 4 Stem Strips List */}
       <div className="space-y-2.5">
         <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-muted-foreground px-1">
           <span>Stems</span>
@@ -530,15 +537,13 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
           const stemBuffer = engineRef.current?.getStemBuffer(stem);
 
           return (
-            <StemTrack
+            <StemStrip
               key={stem}
               stem={stem}
+              settings={state}
               audioBuffer={stemBuffer}
               duration={duration}
               currentTime={currentTime}
-              volume={state.volume}
-              muted={state.muted}
-              solo={state.solo}
               isSilenced={isSilenced}
               onVolumeChange={(vol) => handleVolumeChange(stem, vol)}
               onToggleMute={() => handleToggleMute(stem)}
@@ -555,7 +560,7 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
         onClose={() => setIsExportDialogOpen(false)}
         stems={stems}
         sampleRate={sampleRate}
-        songTitle={songTitle}
+        sourceMixTitle={sourceMixTitle}
       />
     </section>
   );
