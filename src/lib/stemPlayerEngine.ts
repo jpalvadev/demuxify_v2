@@ -1,0 +1,397 @@
+import { StemName, STEM_NAMES } from './chunkOverlapAdd';
+
+export interface StemMixerState {
+  volume: number; // 0.0 to 1.0
+  muted: boolean;
+  solo: boolean;
+}
+
+export type StemMixerStates = Record<StemName, StemMixerState>;
+
+export interface StemPlayerEngineOptions {
+  audioContext?: AudioContext;
+  sampleRate?: number;
+  duration?: number;
+}
+
+export type PositionListener = (timeSec: number) => void;
+export type StateListener = (state: StemMixerStates) => void;
+
+function createAudioBufferFromChannels(
+  audioContext: AudioContext,
+  channels: Float32Array[],
+  sampleRate: number
+): AudioBuffer {
+  const numChannels = channels.length;
+  const length = channels[0]?.length ?? 0;
+  const buffer = audioContext.createBuffer(numChannels, length, sampleRate);
+  for (let c = 0; c < numChannels; c++) {
+    buffer.getChannelData(c).set(channels[c]);
+  }
+  return buffer;
+}
+
+export class StemPlayerEngine {
+  private audioContext: AudioContext;
+  private isOwnContext: boolean = false;
+  private masterGainNode: GainNode;
+  private stemGainNodes: Record<StemName, GainNode>;
+  private stemBuffers: Record<StemName, AudioBuffer>;
+  private stemStates: StemMixerStates;
+  private masterVolume: number = 1.0;
+
+  private duration: number = 0;
+  private currentOffset: number = 0;
+  private playStartContextTime: number = 0;
+  private playing: boolean = false;
+  private activeSources: AudioBufferSourceNode[] = [];
+
+  private animationFrameId: number | null = null;
+  private positionListeners: Set<PositionListener> = new Set();
+  private stateListeners: Set<StateListener> = new Set();
+
+  constructor(
+    stems: Record<StemName, Float32Array[] | AudioBuffer>,
+    options?: StemPlayerEngineOptions
+  ) {
+    if (options?.audioContext) {
+      this.audioContext = options.audioContext;
+    } else {
+      const AudioCtx =
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      if (!AudioCtx) {
+        throw new Error('Web Audio API (AudioContext) is not supported in this browser.');
+      }
+      this.audioContext = new AudioCtx();
+      this.isOwnContext = true;
+    }
+
+    const sampleRate = options?.sampleRate ?? 44100;
+
+    // Build Master Gain Node
+    this.masterGainNode = this.audioContext.createGain();
+    this.masterGainNode.connect(this.audioContext.destination);
+
+    // Initialize stem states and gain nodes
+    this.stemStates = {
+      vocals: { volume: 1.0, muted: false, solo: false },
+      drums: { volume: 1.0, muted: false, solo: false },
+      bass: { volume: 1.0, muted: false, solo: false },
+      other: { volume: 1.0, muted: false, solo: false },
+    };
+
+    this.stemGainNodes = {} as Record<StemName, GainNode>;
+    this.stemBuffers = {} as Record<StemName, AudioBuffer>;
+
+    let maxDuration = options?.duration ?? 0;
+
+    for (const stem of STEM_NAMES) {
+      const gainNode = this.audioContext.createGain();
+      gainNode.connect(this.masterGainNode);
+      this.stemGainNodes[stem] = gainNode;
+
+      const stemData = stems[stem];
+      let audioBuffer: AudioBuffer;
+      if (stemData && 'numberOfChannels' in stemData) {
+        audioBuffer = stemData as AudioBuffer;
+      } else if (Array.isArray(stemData)) {
+        audioBuffer = createAudioBufferFromChannels(this.audioContext, stemData, sampleRate);
+      } else {
+        audioBuffer = this.audioContext.createBuffer(2, 1, sampleRate);
+      }
+
+      this.stemBuffers[stem] = audioBuffer;
+      if (audioBuffer.duration > maxDuration) {
+        maxDuration = audioBuffer.duration;
+      }
+    }
+
+    this.duration = maxDuration;
+    this.applyGainMatrix();
+  }
+
+  public getAudioContext(): AudioContext {
+    return this.audioContext;
+  }
+
+  public getMasterGainNode(): GainNode {
+    return this.masterGainNode;
+  }
+
+  public getStemGainNode(stem: StemName): GainNode {
+    return this.stemGainNodes[stem];
+  }
+
+  public getStemBuffer(stem: StemName): AudioBuffer {
+    return this.stemBuffers[stem];
+  }
+
+  public getDuration(): number {
+    return this.duration;
+  }
+
+  public getCurrentTime(): number {
+    if (this.playing) {
+      const elapsed = this.audioContext.currentTime - this.playStartContextTime;
+      return Math.min(this.duration, Math.max(0, this.currentOffset + elapsed));
+    }
+    return this.currentOffset;
+  }
+
+  public isPlaying(): boolean {
+    return this.playing;
+  }
+
+  public getStemState(stem: StemName): StemMixerState {
+    return { ...this.stemStates[stem] };
+  }
+
+  public getAllStemStates(): StemMixerStates {
+    return {
+      vocals: { ...this.stemStates.vocals },
+      drums: { ...this.stemStates.drums },
+      bass: { ...this.stemStates.bass },
+      other: { ...this.stemStates.other },
+    };
+  }
+
+  public getMasterVolume(): number {
+    return this.masterVolume;
+  }
+
+  public setMasterVolume(volume: number): void {
+    this.masterVolume = Math.max(0, Math.min(1, volume));
+    this.masterGainNode.gain.setValueAtTime(this.masterVolume, this.audioContext.currentTime);
+  }
+
+  public setStemVolume(stem: StemName, volume: number): void {
+    this.stemStates[stem].volume = Math.max(0, Math.min(1, volume));
+    this.applyGainMatrix();
+    this.notifyState();
+  }
+
+  public setStemMute(stem: StemName, muted: boolean): void {
+    this.stemStates[stem].muted = muted;
+    this.applyGainMatrix();
+    this.notifyState();
+  }
+
+  public toggleStemMute(stem: StemName): void {
+    this.setStemMute(stem, !this.stemStates[stem].muted);
+  }
+
+  public setStemSolo(stem: StemName, solo: boolean): void {
+    this.stemStates[stem].solo = solo;
+    this.applyGainMatrix();
+    this.notifyState();
+  }
+
+  public toggleStemSolo(stem: StemName): void {
+    this.setStemSolo(stem, !this.stemStates[stem].solo);
+  }
+
+  private applyGainMatrix(): void {
+    const hasAnySolo = STEM_NAMES.some((stem) => this.stemStates[stem].solo);
+
+    for (const stem of STEM_NAMES) {
+      const state = this.stemStates[stem];
+      let effectiveGain = 0;
+
+      if (hasAnySolo) {
+        if (state.solo && !state.muted) {
+          effectiveGain = state.volume;
+        } else {
+          effectiveGain = 0;
+        }
+      } else {
+        if (!state.muted) {
+          effectiveGain = state.volume;
+        } else {
+          effectiveGain = 0;
+        }
+      }
+
+      this.stemGainNodes[stem].gain.setValueAtTime(effectiveGain, this.audioContext.currentTime);
+    }
+  }
+
+  public async play(): Promise<void> {
+    if (this.playing) return;
+
+    if (this.audioContext.state === 'suspended') {
+      await this.audioContext.resume();
+    }
+
+    if (this.currentOffset >= this.duration) {
+      this.currentOffset = 0;
+    }
+
+    this.stopActiveSources();
+
+    const startTime = this.audioContext.currentTime;
+    this.playStartContextTime = startTime;
+    const offset = this.currentOffset;
+
+    const sources: AudioBufferSourceNode[] = [];
+    for (const stem of STEM_NAMES) {
+      const source = this.audioContext.createBufferSource();
+      source.buffer = this.stemBuffers[stem];
+      source.connect(this.stemGainNodes[stem]);
+
+      // Synchronized start across all stems
+      source.start(startTime, offset);
+      sources.push(source);
+    }
+
+    this.activeSources = sources;
+    this.playing = true;
+
+    // Listen on the first source ended event to handle auto-pause on completion
+    if (sources[0]) {
+      sources[0].onended = () => {
+        if (this.playing && this.getCurrentTime() >= this.duration - 0.05) {
+          this.pause();
+          this.currentOffset = 0;
+          this.notifyPosition();
+        }
+      };
+    }
+
+    this.startPositionLoop();
+    this.notifyPosition();
+  }
+
+  public pause(): void {
+    if (!this.playing) return;
+
+    this.currentOffset = this.getCurrentTime();
+    this.stopActiveSources();
+    this.playing = false;
+    this.stopPositionLoop();
+    this.notifyPosition();
+  }
+
+  public seek(timeSec: number): void {
+    const clampedTime = Math.max(0, Math.min(this.duration, timeSec));
+    this.currentOffset = clampedTime;
+
+    if (this.playing) {
+      this.stopActiveSources();
+      const startTime = this.audioContext.currentTime;
+      this.playStartContextTime = startTime;
+
+      const sources: AudioBufferSourceNode[] = [];
+      for (const stem of STEM_NAMES) {
+        const source = this.audioContext.createBufferSource();
+        source.buffer = this.stemBuffers[stem];
+        source.connect(this.stemGainNodes[stem]);
+        source.start(startTime, clampedTime);
+        sources.push(source);
+      }
+      this.activeSources = sources;
+
+      if (sources[0]) {
+        sources[0].onended = () => {
+          if (this.playing && this.getCurrentTime() >= this.duration - 0.05) {
+            this.pause();
+            this.currentOffset = 0;
+            this.notifyPosition();
+          }
+        };
+      }
+    }
+
+    this.notifyPosition();
+  }
+
+  private stopActiveSources(): void {
+    for (const source of this.activeSources) {
+      try {
+        source.stop();
+        source.disconnect();
+      } catch {
+        // Source may already be stopped
+      }
+    }
+    this.activeSources = [];
+  }
+
+  private startPositionLoop(): void {
+    this.stopPositionLoop();
+    const tick = () => {
+      if (this.playing) {
+        this.notifyPosition();
+        if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+          this.animationFrameId = window.requestAnimationFrame(tick);
+        }
+      }
+    };
+
+    if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+      this.animationFrameId = window.requestAnimationFrame(tick);
+    }
+  }
+
+  private stopPositionLoop(): void {
+    if (this.animationFrameId !== null && typeof window !== 'undefined' && typeof window.cancelAnimationFrame === 'function') {
+      window.cancelAnimationFrame(this.animationFrameId);
+      this.animationFrameId = null;
+    }
+  }
+
+  public subscribePosition(listener: PositionListener): () => void {
+    this.positionListeners.add(listener);
+    listener(this.getCurrentTime());
+    return () => {
+      this.positionListeners.delete(listener);
+    };
+  }
+
+  public subscribeState(listener: StateListener): () => void {
+    this.stateListeners.add(listener);
+    listener(this.getAllStemStates());
+    return () => {
+      this.stateListeners.delete(listener);
+    };
+  }
+
+  private notifyPosition(): void {
+    const curTime = this.getCurrentTime();
+    for (const listener of this.positionListeners) {
+      listener(curTime);
+    }
+  }
+
+  private notifyState(): void {
+    const states = this.getAllStemStates();
+    for (const listener of this.stateListeners) {
+      listener(states);
+    }
+  }
+
+  public dispose(): void {
+    this.pause();
+    this.stopPositionLoop();
+    this.positionListeners.clear();
+    this.stateListeners.clear();
+
+    for (const stem of STEM_NAMES) {
+      try {
+        this.stemGainNodes[stem].disconnect();
+      } catch {
+        // Node might already be disconnected
+      }
+    }
+
+    try {
+      this.masterGainNode.disconnect();
+    } catch {
+      // Ignored
+    }
+
+    if (this.isOwnContext && this.audioContext.state !== 'closed') {
+      this.audioContext.close().catch(() => {});
+    }
+  }
+}

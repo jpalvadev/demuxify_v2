@@ -5,6 +5,7 @@ import { SourceMixDropzone } from './components/SourceMixDropzone';
 import { FallbackAdvisory } from './components/FallbackAdvisory';
 import { SourceMixCard } from './components/SourceMixCard';
 import { MasterWaveform } from './components/MasterWaveform';
+import { StemPlayer } from './components/StemPlayer';
 import { SeparationProgress, SeparationPhase } from './components/SeparationProgress';
 import { detectWebGPUCapability, WebGPUCapability } from './lib/webgpu';
 import { decodeAudio, DecodedSourceMix } from './lib/audioDecoder';
@@ -348,13 +349,24 @@ export const App: React.FC = () => {
                 </div>
               )}
 
-              <MasterWaveform
-                peaks={waveformPeaks}
-                audioBuffer={decodedSourceMix.buffer}
-                duration={decodedSourceMix.metadata.duration}
-                currentTime={currentTime}
-                onSeek={handleSeek}
-              />
+              {/* Render Stem Player when separation completes; otherwise render Source Mix Master Waveform */}
+              {separationPhase === 'completed' && separatedStems ? (
+                <StemPlayer
+                  stems={separatedStems}
+                  sampleRate={decodedSourceMix.metadata.sampleRate}
+                  duration={decodedSourceMix.metadata.duration}
+                  sourceMixBuffer={decodedSourceMix.buffer}
+                  masterPeaks={waveformPeaks}
+                />
+              ) : (
+                <MasterWaveform
+                  peaks={waveformPeaks}
+                  audioBuffer={decodedSourceMix.buffer}
+                  duration={decodedSourceMix.metadata.duration}
+                  currentTime={currentTime}
+                  onSeek={handleSeek}
+                />
+              )}
             </div>
           )}
         </section>
