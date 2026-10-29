@@ -4,7 +4,7 @@
 
 **Blocked by:** 04: Multi-Track Stem Player with Synchronized Playback, Solo & Mute Controls
 
-**Status:** ready-for-agent
+**Status:** claimed
 
 - [ ] Custom AudioWorkletProcessor implementing WSOLA time-scale modification across 4 parallel stereo Stems.
 - [ ] Pitch shifting engine allowing real-time transposition between -12 and +12 semitones independent of playback speed.

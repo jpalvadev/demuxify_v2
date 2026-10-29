@@ -4,7 +4,7 @@
 
 **Blocked by:** 04: Multi-Track Stem Player with Synchronized Playback, Solo & Mute Controls
 
-**Status:** ready-for-agent
+**Status:** claimed
 
 - [ ] Persistence store module managing IndexedDB metadata schema and OPFS audio buffer files.
 - [ ] Auto-save mechanism persisting the active Session whenever separation finishes or mixer settings change.

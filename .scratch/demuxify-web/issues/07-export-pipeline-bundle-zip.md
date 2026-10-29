@@ -4,7 +4,7 @@
 
 **Blocked by:** 04: Multi-Track Stem Player with Synchronized Playback, Solo & Mute Controls
 
-**Status:** ready-for-agent
+**Status:** claimed
 
 - [ ] Export dialog in the Stem Player allowing selection of export format (WAV PCM 16/24-bit or MP3) and bitrate (128, 192, 256, 320 kbps).
 - [ ] Dedicated audio export worker encoding MP3 using LameJS off the main UI thread.
