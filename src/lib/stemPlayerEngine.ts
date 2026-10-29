@@ -12,6 +12,9 @@ export interface StemPlayerEngineOptions {
   audioContext?: AudioContext;
   sampleRate?: number;
   duration?: number;
+  initialMixerStates?: StemMixerStates;
+  initialMasterVolume?: number;
+  initialCurrentTime?: number;
 }
 
 export type PositionListener = (timeSec: number) => void;
@@ -74,12 +77,28 @@ export class StemPlayerEngine {
     this.masterGainNode.connect(this.audioContext.destination);
 
     // Initialize stem states and gain nodes
-    this.stemStates = {
-      vocals: { volume: 1.0, muted: false, solo: false },
-      drums: { volume: 1.0, muted: false, solo: false },
-      bass: { volume: 1.0, muted: false, solo: false },
-      other: { volume: 1.0, muted: false, solo: false },
-    };
+    this.stemStates = options?.initialMixerStates
+      ? {
+          vocals: { ...options.initialMixerStates.vocals },
+          drums: { ...options.initialMixerStates.drums },
+          bass: { ...options.initialMixerStates.bass },
+          other: { ...options.initialMixerStates.other },
+        }
+      : {
+          vocals: { volume: 1.0, muted: false, solo: false },
+          drums: { volume: 1.0, muted: false, solo: false },
+          bass: { volume: 1.0, muted: false, solo: false },
+          other: { volume: 1.0, muted: false, solo: false },
+        };
+
+    if (options?.initialMasterVolume !== undefined) {
+      this.masterVolume = Math.max(0, Math.min(1, options.initialMasterVolume));
+      this.masterGainNode.gain.setValueAtTime(this.masterVolume, this.audioContext.currentTime);
+    }
+
+    if (options?.initialCurrentTime !== undefined) {
+      this.currentOffset = Math.max(0, options.initialCurrentTime);
+    }
 
     this.stemGainNodes = {} as Record<StemName, GainNode>;
     this.stemBuffers = {} as Record<StemName, AudioBuffer>;

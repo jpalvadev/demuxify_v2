@@ -375,5 +375,224 @@ describe('App UI Shell', () => {
     expect(within(stemPlayerRegion).getByRole('button', { name: /solo drums/i })).toBeInTheDocument();
     expect(within(stemPlayerRegion).getByRole('slider', { name: /bass volume/i })).toBeInTheDocument();
   });
+
+  it('detects a saved session on startup and presents the recovery banner', async () => {
+    vi.spyOn(webgpuModule, 'detectWebGPUCapability').mockResolvedValue({
+      supported: true,
+      isFallback: false,
+    });
+
+    const sessionStore = await import('../lib/sessionStore');
+    await sessionStore.saveActiveSession({
+      metadata: {
+        id: 'saved-session-test',
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        title: 'Stone',
+        filename: 'stone.mp3',
+        duration: 284,
+        sampleRate: 44100,
+      },
+      sourceMix: {
+        channels: [new Float32Array(500), new Float32Array(500)],
+      },
+      stems: {
+        vocals: [new Float32Array(500), new Float32Array(500)],
+        drums: [new Float32Array(500), new Float32Array(500)],
+        bass: [new Float32Array(500), new Float32Array(500)],
+        other: [new Float32Array(500), new Float32Array(500)],
+      },
+      mixer: {
+        stems: {
+          vocals: { volume: 0.6, muted: false, solo: false },
+          drums: { volume: 0.8, muted: true, solo: false },
+          bass: { volume: 1.0, muted: false, solo: true },
+          other: { volume: 0.5, muted: false, solo: false },
+        },
+        masterVolume: 0.9,
+        currentTime: 42,
+        pitchSemitones: 0,
+        tempoRatio: 1.0,
+      },
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByRole('region', { name: /previous session recovery/i })).toBeInTheDocument();
+    });
+
+    expect(screen.getByRole('heading', { name: /previous session found.*Stone/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /resume session/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /discard/i })).toBeInTheDocument();
+
+    await sessionStore.clearActiveSession();
+  });
+
+  it('hydrates audio buffers and mixer states into Stem Player when resuming session', async () => {
+    vi.spyOn(webgpuModule, 'detectWebGPUCapability').mockResolvedValue({
+      supported: true,
+      isFallback: false,
+    });
+
+    const sessionStore = await import('../lib/sessionStore');
+    await sessionStore.saveActiveSession({
+      metadata: {
+        id: 'hydrate-session-test',
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        title: 'Stone',
+        filename: 'stone.mp3',
+        duration: 284,
+        sampleRate: 44100,
+      },
+      sourceMix: {
+        channels: [new Float32Array(500), new Float32Array(500)],
+      },
+      stems: {
+        vocals: [new Float32Array(500), new Float32Array(500)],
+        drums: [new Float32Array(500), new Float32Array(500)],
+        bass: [new Float32Array(500), new Float32Array(500)],
+        other: [new Float32Array(500), new Float32Array(500)],
+      },
+      mixer: {
+        stems: {
+          vocals: { volume: 0.6, muted: false, solo: false },
+          drums: { volume: 0.8, muted: true, solo: false },
+          bass: { volume: 1.0, muted: false, solo: true },
+          other: { volume: 0.5, muted: false, solo: false },
+        },
+        masterVolume: 0.9,
+        currentTime: 42,
+        pitchSemitones: 0,
+        tempoRatio: 1.0,
+      },
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /resume session/i })).toBeInTheDocument();
+    });
+
+    const resumeBtn = screen.getByRole('button', { name: /resume session/i });
+    fireEvent.click(resumeBtn);
+
+    await waitFor(() => {
+      expect(screen.getByRole('region', { name: /stem player/i })).toBeInTheDocument();
+    });
+
+    // Recovery banner should disappear after resuming
+    expect(screen.queryByRole('region', { name: /previous session recovery/i })).not.toBeInTheDocument();
+
+    // Verify Stem Player has the restored state (e.g. Drums muted, Bass solo)
+    const stemPlayerRegion = screen.getByRole('region', { name: /stem player/i });
+    const drumsMuteBtn = within(stemPlayerRegion).getByRole('button', { name: /mute drums/i });
+    expect(drumsMuteBtn).toHaveAttribute('aria-pressed', 'true');
+
+    const bassSoloBtn = within(stemPlayerRegion).getByRole('button', { name: /solo bass/i });
+    expect(bassSoloBtn).toHaveAttribute('aria-pressed', 'true');
+
+    await sessionStore.clearActiveSession();
+  });
+
+  it('discards saved session and returns to clean dropzone when Discard is clicked', async () => {
+    vi.spyOn(webgpuModule, 'detectWebGPUCapability').mockResolvedValue({
+      supported: true,
+      isFallback: false,
+    });
+
+    const sessionStore = await import('../lib/sessionStore');
+    await sessionStore.saveActiveSession({
+      metadata: {
+        id: 'discard-session-test',
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        title: 'Stone',
+        filename: 'stone.mp3',
+        duration: 120,
+        sampleRate: 44100,
+      },
+      sourceMix: {
+        channels: [new Float32Array(500), new Float32Array(500)],
+      },
+      stems: {
+        vocals: [new Float32Array(500), new Float32Array(500)],
+        drums: [new Float32Array(500), new Float32Array(500)],
+        bass: [new Float32Array(500), new Float32Array(500)],
+        other: [new Float32Array(500), new Float32Array(500)],
+      },
+      mixer: {
+        stems: {
+          vocals: { volume: 1, muted: false, solo: false },
+          drums: { volume: 1, muted: false, solo: false },
+          bass: { volume: 1, muted: false, solo: false },
+          other: { volume: 1, muted: false, solo: false },
+        },
+        masterVolume: 1,
+        currentTime: 0,
+      },
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /discard/i })).toBeInTheDocument();
+    });
+
+    const discardBtn = screen.getByRole('button', { name: /discard/i });
+    fireEvent.click(discardBtn);
+
+    await waitFor(() => {
+      expect(screen.queryByRole('region', { name: /previous session recovery/i })).not.toBeInTheDocument();
+    });
+
+    expect(await sessionStore.hasActiveSession()).toBe(false);
+    expect(screen.getByText(/drag and drop your source mix/i)).toBeInTheDocument();
+  });
+
+  it('allows purging the active session from Stem Player to return to clean state', async () => {
+    vi.spyOn(webgpuModule, 'detectWebGPUCapability').mockResolvedValue({
+      supported: true,
+      isFallback: false,
+    });
+
+    vi.spyOn(InferenceClient.prototype, 'init').mockResolvedValue({ backend: 'webgpu' });
+    vi.spyOn(InferenceClient.prototype, 'separate').mockResolvedValue({
+      stems: {
+        vocals: [new Float32Array(500), new Float32Array(500)],
+        drums: [new Float32Array(500), new Float32Array(500)],
+        bass: [new Float32Array(500), new Float32Array(500)],
+        other: [new Float32Array(500), new Float32Array(500)],
+      },
+      duration: 180,
+    });
+
+    render(<App />);
+
+    const file = new File(['audio'], 'song_master.mp3', { type: 'audio/mp3' });
+    const fileInput = screen.getByLabelText(/select source mix file/i, { selector: 'input' });
+    fireEvent.change(fileInput, { target: { files: [file] } });
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /separate stems|start separation/i })).toBeInTheDocument();
+    });
+
+    const separateBtn = screen.getByRole('button', { name: /separate stems|start separation/i });
+    fireEvent.click(separateBtn);
+
+    await waitFor(() => {
+      expect(screen.getByRole('region', { name: /stem player/i })).toBeInTheDocument();
+    });
+
+    const purgeBtn = screen.getByRole('button', { name: /purge session|reset session/i });
+    fireEvent.click(purgeBtn);
+
+    await waitFor(() => {
+      expect(screen.queryByRole('region', { name: /stem player/i })).not.toBeInTheDocument();
+    });
+
+    expect(screen.getByText(/drag and drop your source mix/i)).toBeInTheDocument();
+  });
 });
 
