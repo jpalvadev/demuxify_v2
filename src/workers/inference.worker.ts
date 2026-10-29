@@ -1,39 +1,61 @@
-import * as ort from 'onnxruntime-web';
-import { getModelWeights, DownloadProgress, DEFAULT_MODEL_URL } from '../lib/modelCache';
+import * as ort from "onnxruntime-web";
+import {
+  getModelWeights,
+  DownloadProgress,
+  DEFAULT_MODEL_URL,
+} from "../lib/modelCache";
+
+// Configure ONNX Runtime WASM binary paths to matching version
+ort.env.wasm.wasmPaths =
+  "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.31.1/dist/";
+
+// Thread safety: if cross-origin isolation (SharedArrayBuffer) is unavailable, constrain to 1 thread
+if (typeof crossOriginIsolated === "undefined" || !crossOriginIsolated) {
+  ort.env.wasm.numThreads = 1;
+}
 import {
   createChunkSegments,
   reconstructStemsFromChunks,
   StemName,
   ChunkOptions,
   ChunkInferenceResult,
-} from '../lib/chunkOverlapAdd';
+} from "../lib/chunkOverlapAdd";
 
 export type WorkerInMessage =
-  | { type: 'init'; modelUrl?: string; useMock?: boolean }
-  | { type: 'start'; audio: Float32Array[]; sampleRate: number; options?: ChunkOptions }
-  | { type: 'cancel' };
+  | { type: "init"; modelUrl?: string; useMock?: boolean }
+  | {
+      type: "start";
+      audio: Float32Array[];
+      sampleRate: number;
+      options?: ChunkOptions;
+    }
+  | { type: "cancel" };
 
 export type WorkerOutMessage =
-  | ({ type: 'download_progress' } & DownloadProgress)
-  | { type: 'init_complete'; backend: 'webgpu' | 'wasm' | 'mock' }
+  | ({ type: "download_progress" } & DownloadProgress)
+  | { type: "init_complete"; backend: "webgpu" | "wasm" | "mock" }
   | {
-      type: 'chunk_progress';
+      type: "chunk_progress";
       chunkIndex: number;
       totalChunks: number;
       progress: number;
       elapsedMs: number;
       etaMs: number;
     }
-  | { type: 'complete'; stems: Record<StemName, Float32Array[]>; duration: number }
-  | { type: 'cancelled' }
-  | { type: 'error'; error: string };
+  | {
+      type: "complete";
+      stems: Record<StemName, Float32Array[]>;
+      duration: number;
+    }
+  | { type: "cancelled" }
+  | { type: "error"; error: string };
 
 let session: ort.InferenceSession | null = null;
 let isMockSession = false;
 let isCancelled = false;
 
 // HTDemucs stem order standard: [drums, bass, other, vocals]
-const DEMUCS_STEM_ORDER: StemName[] = ['drums', 'bass', 'other', 'vocals'];
+const DEMUCS_STEM_ORDER: StemName[] = ["drums", "bass", "other", "vocals"];
 
 async function handleInit(
   modelUrl: string = DEFAULT_MODEL_URL,
@@ -43,37 +65,43 @@ async function handleInit(
   if (useMock) {
     isMockSession = true;
     session = null;
-    postMsg({ type: 'init_complete', backend: 'mock' } satisfies WorkerOutMessage);
+    postMsg({
+      type: "init_complete",
+      backend: "mock",
+    } satisfies WorkerOutMessage);
     return;
   }
 
   try {
     const weightsBuffer = await getModelWeights(modelUrl, (progress) => {
       postMsg({
-        type: 'download_progress',
+        type: "download_progress",
         ...progress,
       } satisfies WorkerOutMessage);
     });
 
-    let backend: 'webgpu' | 'wasm' = 'webgpu';
+    let backend: "webgpu" | "wasm" = "webgpu";
     try {
       session = await ort.InferenceSession.create(weightsBuffer, {
-        executionProviders: ['webgpu', 'wasm'],
+        executionProviders: ["webgpu"],
       });
-      backend = 'webgpu';
+      backend = "webgpu";
     } catch (gpuErr) {
-      console.warn('WebGPU EP initialization failed in Worker, falling back to WASM:', gpuErr);
+      console.warn(
+        "WebGPU EP initialization failed in Worker, falling back to WASM:",
+        gpuErr
+      );
       session = await ort.InferenceSession.create(weightsBuffer, {
-        executionProviders: ['wasm'],
+        executionProviders: ["wasm"],
       });
-      backend = 'wasm';
+      backend = "wasm";
     }
 
     isMockSession = false;
-    postMsg({ type: 'init_complete', backend } satisfies WorkerOutMessage);
+    postMsg({ type: "init_complete", backend } satisfies WorkerOutMessage);
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : String(err);
-    postMsg({ type: 'error', error: errorMessage } satisfies WorkerOutMessage);
+    postMsg({ type: "error", error: errorMessage } satisfies WorkerOutMessage);
   }
 }
 
@@ -93,7 +121,7 @@ async function handleStart(
 
     for (let i = 0; i < totalChunks; i++) {
       if (isCancelled) {
-        postMsg({ type: 'cancelled' } satisfies WorkerOutMessage);
+        postMsg({ type: "cancelled" } satisfies WorkerOutMessage);
         return;
       }
 
@@ -109,7 +137,11 @@ async function handleStart(
         tensorData.set(chunk.audio[1], chunkSamples);
 
         const inputName = session.inputNames[0];
-        const inputTensor = new ort.Tensor('float32', tensorData, [1, 2, chunkSamples]);
+        const inputTensor = new ort.Tensor("float32", tensorData, [
+          1,
+          2,
+          chunkSamples,
+        ]);
 
         const feeds: Record<string, ort.Tensor> = { [inputName]: inputTensor };
         const outputFeeds = await session.run(feeds);
@@ -119,10 +151,22 @@ async function handleStart(
         const outData = outputTensor.data as Float32Array;
 
         chunkStems = {
-          drums: [new Float32Array(chunkSamples), new Float32Array(chunkSamples)],
-          bass: [new Float32Array(chunkSamples), new Float32Array(chunkSamples)],
-          other: [new Float32Array(chunkSamples), new Float32Array(chunkSamples)],
-          vocals: [new Float32Array(chunkSamples), new Float32Array(chunkSamples)],
+          drums: [
+            new Float32Array(chunkSamples),
+            new Float32Array(chunkSamples),
+          ],
+          bass: [
+            new Float32Array(chunkSamples),
+            new Float32Array(chunkSamples),
+          ],
+          other: [
+            new Float32Array(chunkSamples),
+            new Float32Array(chunkSamples),
+          ],
+          vocals: [
+            new Float32Array(chunkSamples),
+            new Float32Array(chunkSamples),
+          ],
         };
 
         const stridePerStem = 2 * chunkSamples;
@@ -133,7 +177,10 @@ async function handleStart(
             outData.subarray(stemOffset, stemOffset + chunkSamples)
           );
           chunkStems[stemName][1].set(
-            outData.subarray(stemOffset + chunkSamples, stemOffset + 2 * chunkSamples)
+            outData.subarray(
+              stemOffset + chunkSamples,
+              stemOffset + 2 * chunkSamples
+            )
           );
         }
       } else {
@@ -162,7 +209,7 @@ async function handleStart(
       const etaMs = Math.round(msPerChunk * remainingChunks);
 
       postMsg({
-        type: 'chunk_progress',
+        type: "chunk_progress",
         chunkIndex: i,
         totalChunks,
         progress: chunksCompleted / totalChunks,
@@ -172,21 +219,25 @@ async function handleStart(
     }
 
     if (isCancelled) {
-      postMsg({ type: 'cancelled' } satisfies WorkerOutMessage);
+      postMsg({ type: "cancelled" } satisfies WorkerOutMessage);
       return;
     }
 
     const totalSamples = audio[0].length;
-    const reconstructed = reconstructStemsFromChunks(results, totalSamples, options);
+    const reconstructed = reconstructStemsFromChunks(
+      results,
+      totalSamples,
+      options
+    );
 
     postMsg({
-      type: 'complete',
+      type: "complete",
       stems: reconstructed,
       duration: totalSamples / sampleRate,
     } satisfies WorkerOutMessage);
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : String(err);
-    postMsg({ type: 'error', error: errorMessage } satisfies WorkerOutMessage);
+    postMsg({ type: "error", error: errorMessage } satisfies WorkerOutMessage);
   }
 }
 
@@ -195,22 +246,21 @@ export async function handleWorkerMessage(
   postMsg: (msg: WorkerOutMessage) => void = (m) => self.postMessage(m)
 ): Promise<void> {
   switch (msg.type) {
-    case 'init':
+    case "init":
       await handleInit(msg.modelUrl, msg.useMock, postMsg);
       break;
-    case 'start':
+    case "start":
       await handleStart(msg.audio, msg.sampleRate, msg.options, postMsg);
       break;
-    case 'cancel':
+    case "cancel":
       isCancelled = true;
-      postMsg({ type: 'cancelled' });
+      postMsg({ type: "cancelled" });
       break;
   }
 }
 
-if (typeof self !== 'undefined') {
+if (typeof self !== "undefined") {
   self.onmessage = (event: MessageEvent<WorkerInMessage>) => {
     handleWorkerMessage(event.data);
   };
 }
-
