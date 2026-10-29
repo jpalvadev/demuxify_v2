@@ -19,6 +19,7 @@ import {
   ChunkOptions,
   ChunkInferenceResult,
 } from "../lib/chunkOverlapAdd";
+import { computeStereoSTFT, computeBatchISTFT } from "../lib/stft";
 
 export type WorkerInMessage =
   | { type: "init"; modelUrl?: string; useMock?: boolean }
@@ -149,76 +150,107 @@ async function handleStart(
       let chunkStems: Record<StemName, Float32Array[]>;
 
       if (session && !isMockSession) {
-        // Prepare tensor for ONNX Demucs
-        // Demucs expects [1, 2, chunkSamples] normalized by (x - mean) / std
         const chunkSamples = chunk.audio[0].length;
+        const inputNames = session.inputNames;
+        const isSpecModel =
+          inputNames.includes("spec_real") && inputNames.includes("spec_imag");
 
-        let sum = 0;
-        let sumSq = 0;
-        const totalChunkSamples = 2 * chunkSamples;
-        for (let sIdx = 0; sIdx < chunkSamples; sIdx++) {
-          const l = chunk.audio[0][sIdx];
-          const r = chunk.audio[1][sIdx];
-          sum += l + r;
-          sumSq += l * l + r * r;
-        }
-        const mean = sum / totalChunkSamples;
-        const variance = Math.max(
-          1e-8,
-          sumSq / totalChunkSamples - mean * mean
-        );
-        const std = Math.sqrt(variance);
+        if (isSpecModel) {
+          // BS-RoFormer 4-stem rhythm model (host STFT/iSTFT architecture)
+          const { real, imag, F, T } = computeStereoSTFT(
+            chunk.audio[0],
+            chunk.audio[1],
+            chunkSamples
+          );
 
-        const tensorData = new Float32Array(2 * chunkSamples);
-        for (let sIdx = 0; sIdx < chunkSamples; sIdx++) {
-          tensorData[sIdx] = (chunk.audio[0][sIdx] - mean) / std;
-          tensorData[chunkSamples + sIdx] = (chunk.audio[1][sIdx] - mean) / std;
-        }
+          const realTensor = new ort.Tensor("float32", real, [1, 2, F, T]);
+          const imagTensor = new ort.Tensor("float32", imag, [1, 2, F, T]);
 
-        const inputName = session.inputNames[0];
-        const inputTensor = new ort.Tensor("float32", tensorData, [
-          1,
-          2,
-          chunkSamples,
-        ]);
+          const feeds: Record<string, ort.Tensor> = {
+            spec_real: realTensor,
+            spec_imag: imagTensor,
+          };
 
-        const feeds: Record<string, ort.Tensor> = { [inputName]: inputTensor };
-        const outputFeeds = await session.run(feeds);
-        const outputName = session.outputNames[0];
-        const outputTensor = outputFeeds[outputName];
-        // Shape: [1, 4, 2, chunkSamples] (stems, channels, samples)
-        const outData = outputTensor.data as Float32Array;
+          const outputFeeds = await session.run(feeds);
+          const outRealTensor =
+            outputFeeds["out_spec_real"] || outputFeeds[session.outputNames[0]];
+          const outImagTensor =
+            outputFeeds["out_spec_imag"] || outputFeeds[session.outputNames[1]];
 
-        chunkStems = {
-          drums: [
-            new Float32Array(chunkSamples),
-            new Float32Array(chunkSamples),
-          ],
-          bass: [
-            new Float32Array(chunkSamples),
-            new Float32Array(chunkSamples),
-          ],
-          other: [
-            new Float32Array(chunkSamples),
-            new Float32Array(chunkSamples),
-          ],
-          vocals: [
-            new Float32Array(chunkSamples),
-            new Float32Array(chunkSamples),
-          ],
-        };
+          const outReal = outRealTensor.data as Float32Array;
+          const outImag = outImagTensor.data as Float32Array;
 
-        const stridePerStem = 2 * chunkSamples;
-        for (let s = 0; s < DEMUCS_STEM_ORDER.length; s++) {
-          const stemName = DEMUCS_STEM_ORDER[s];
-          const stemOffset = s * stridePerStem;
-          const leftTarget = chunkStems[stemName][0];
-          const rightTarget = chunkStems[stemName][1];
+          chunkStems = computeBatchISTFT(outReal, outImag, chunkSamples);
+        } else {
+          // Standard time-domain waveform model fallback
+          let sum = 0;
+          let sumSq = 0;
+          const totalChunkSamples = 2 * chunkSamples;
           for (let sIdx = 0; sIdx < chunkSamples; sIdx++) {
-            // Denormalize: stem = out * std + mean
-            leftTarget[sIdx] = outData[stemOffset + sIdx] * std + mean;
-            rightTarget[sIdx] =
-              outData[stemOffset + chunkSamples + sIdx] * std + mean;
+            const l = chunk.audio[0][sIdx];
+            const r = chunk.audio[1][sIdx];
+            sum += l + r;
+            sumSq += l * l + r * r;
+          }
+          const mean = sum / totalChunkSamples;
+          const variance = Math.max(
+            1e-8,
+            sumSq / totalChunkSamples - mean * mean
+          );
+          const std = Math.sqrt(variance);
+
+          const tensorData = new Float32Array(2 * chunkSamples);
+          for (let sIdx = 0; sIdx < chunkSamples; sIdx++) {
+            tensorData[sIdx] = (chunk.audio[0][sIdx] - mean) / std;
+            tensorData[chunkSamples + sIdx] =
+              (chunk.audio[1][sIdx] - mean) / std;
+          }
+
+          const inputName = session.inputNames[0];
+          const inputTensor = new ort.Tensor("float32", tensorData, [
+            1,
+            2,
+            chunkSamples,
+          ]);
+
+          const feeds: Record<string, ort.Tensor> = {
+            [inputName]: inputTensor,
+          };
+          const outputFeeds = await session.run(feeds);
+          const outputName = session.outputNames[0];
+          const outputTensor = outputFeeds[outputName];
+          const outData = outputTensor.data as Float32Array;
+
+          chunkStems = {
+            drums: [
+              new Float32Array(chunkSamples),
+              new Float32Array(chunkSamples),
+            ],
+            bass: [
+              new Float32Array(chunkSamples),
+              new Float32Array(chunkSamples),
+            ],
+            other: [
+              new Float32Array(chunkSamples),
+              new Float32Array(chunkSamples),
+            ],
+            vocals: [
+              new Float32Array(chunkSamples),
+              new Float32Array(chunkSamples),
+            ],
+          };
+
+          const stridePerStem = 2 * chunkSamples;
+          for (let s = 0; s < DEMUCS_STEM_ORDER.length; s++) {
+            const stemName = DEMUCS_STEM_ORDER[s];
+            const stemOffset = s * stridePerStem;
+            const leftTarget = chunkStems[stemName][0];
+            const rightTarget = chunkStems[stemName][1];
+            for (let sIdx = 0; sIdx < chunkSamples; sIdx++) {
+              leftTarget[sIdx] = outData[stemOffset + sIdx] * std + mean;
+              rightTarget[sIdx] =
+                outData[stemOffset + chunkSamples + sIdx] * std + mean;
+            }
           }
         }
       } else {

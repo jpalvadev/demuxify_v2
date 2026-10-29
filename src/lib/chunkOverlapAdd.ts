@@ -5,8 +5,8 @@
  * boundary artifacts and reconstructs 4 discrete isolated Stems.
  */
 
-export type StemName = 'vocals' | 'drums' | 'bass' | 'other';
-export const STEM_NAMES: StemName[] = ['vocals', 'drums', 'bass', 'other'];
+export type StemName = "vocals" | "drums" | "bass" | "other";
+export const STEM_NAMES: StemName[] = ["vocals", "drums", "bass", "other"];
 
 export interface ChunkOptions {
   /** Chunk length in samples. Default: 343980 (~7.8s at 44.1kHz) */
@@ -31,8 +31,8 @@ export interface ChunkInferenceResult {
   stems: Record<StemName, Float32Array[]>;
 }
 
-export const DEFAULT_CHUNK_SAMPLES = 343980; // ~7.8s @ 44.1kHz
-export const DEFAULT_OVERLAP_SAMPLES = 44100; // 1s @ 44.1kHz
+export const DEFAULT_CHUNK_SAMPLES = 352800; // 8.0s @ 44.1kHz (T=801 frames for BS-RoFormer)
+export const DEFAULT_OVERLAP_SAMPLES = 88200; // 2.0s @ 44.1kHz (25% overlap)
 
 /**
  * Slices multi-channel audio into sequential Chunk Segments with overlap.
@@ -47,7 +47,10 @@ export function createChunkSegments(
   if (totalSamples === 0) return [];
 
   const chunkSamples = options.chunkSamples ?? DEFAULT_CHUNK_SAMPLES;
-  const overlapSamples = Math.min(options.overlapSamples ?? DEFAULT_OVERLAP_SAMPLES, Math.floor(chunkSamples / 2));
+  const overlapSamples = Math.min(
+    options.overlapSamples ?? DEFAULT_OVERLAP_SAMPLES,
+    Math.floor(chunkSamples / 2)
+  );
   const step = Math.max(1, chunkSamples - overlapSamples);
 
   // Calculate starts
@@ -75,7 +78,9 @@ export function createChunkSegments(
     const chunkAudio: Float32Array[] = [];
     for (let c = 0; c < numChannels; c++) {
       const paddedBuffer = new Float32Array(chunkSamples);
-      paddedBuffer.set(channels[c].subarray(startSample, startSample + validSamples));
+      paddedBuffer.set(
+        channels[c].subarray(startSample, startSample + validSamples)
+      );
       chunkAudio.push(paddedBuffer);
     }
 
@@ -137,17 +142,32 @@ export function reconstructStemsFromChunks(
   options: ChunkOptions = {}
 ): Record<StemName, Float32Array[]> {
   const chunkSamples = options.chunkSamples ?? DEFAULT_CHUNK_SAMPLES;
-  const overlapSamples = Math.min(options.overlapSamples ?? DEFAULT_OVERLAP_SAMPLES, Math.floor(chunkSamples / 2));
+  const overlapSamples = Math.min(
+    options.overlapSamples ?? DEFAULT_OVERLAP_SAMPLES,
+    Math.floor(chunkSamples / 2)
+  );
 
   // Determine number of channels from first result
   const numChannels = results[0]?.stems.vocals.length ?? 2;
 
   // Initialize accumulator buffers and weight normalization buffer
   const accumulators: Record<StemName, Float32Array[]> = {
-    vocals: Array.from({ length: numChannels }, () => new Float32Array(totalSamples)),
-    drums: Array.from({ length: numChannels }, () => new Float32Array(totalSamples)),
-    bass: Array.from({ length: numChannels }, () => new Float32Array(totalSamples)),
-    other: Array.from({ length: numChannels }, () => new Float32Array(totalSamples)),
+    vocals: Array.from(
+      { length: numChannels },
+      () => new Float32Array(totalSamples)
+    ),
+    drums: Array.from(
+      { length: numChannels },
+      () => new Float32Array(totalSamples)
+    ),
+    bass: Array.from(
+      { length: numChannels },
+      () => new Float32Array(totalSamples)
+    ),
+    other: Array.from(
+      { length: numChannels },
+      () => new Float32Array(totalSamples)
+    ),
   };
 
   const weightSum = new Float32Array(totalSamples);
@@ -179,10 +199,22 @@ export function reconstructStemsFromChunks(
 
   // Normalize by weight sum to guarantee flat unity gain across all overlap regions
   const reconstructed: Record<StemName, Float32Array[]> = {
-    vocals: Array.from({ length: numChannels }, () => new Float32Array(totalSamples)),
-    drums: Array.from({ length: numChannels }, () => new Float32Array(totalSamples)),
-    bass: Array.from({ length: numChannels }, () => new Float32Array(totalSamples)),
-    other: Array.from({ length: numChannels }, () => new Float32Array(totalSamples)),
+    vocals: Array.from(
+      { length: numChannels },
+      () => new Float32Array(totalSamples)
+    ),
+    drums: Array.from(
+      { length: numChannels },
+      () => new Float32Array(totalSamples)
+    ),
+    bass: Array.from(
+      { length: numChannels },
+      () => new Float32Array(totalSamples)
+    ),
+    other: Array.from(
+      { length: numChannels },
+      () => new Float32Array(totalSamples)
+    ),
   };
 
   for (let i = 0; i < totalSamples; i++) {
