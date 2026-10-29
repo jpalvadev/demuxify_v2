@@ -530,6 +530,7 @@ export const App: React.FC = () => {
                   initialCurrentTime={restoredMixerState?.currentTime}
                   onMixerChange={handleMixerChange}
                   onPurgeSession={handlePurgeSession}
+                  songTitle={decodedSourceMix.metadata.fileName}
                 />
               ) : (
                 <MasterWaveform

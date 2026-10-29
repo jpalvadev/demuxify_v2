@@ -198,4 +198,22 @@ describe('StemPlayer UI Component', () => {
     fireEvent.change(masterSlider, { target: { value: '0.45' } });
     expect(masterSlider).toHaveValue('0.45');
   });
+
+  it('opens ExportDialog when Export Stems button is clicked', () => {
+    render(
+      <StemPlayer
+        stems={dummyStems}
+        sampleRate={sampleRate}
+        audioContext={mockCtx}
+        songTitle="audioslave_stone.mp3"
+      />
+    );
+
+    const exportBtn = screen.getByRole('button', { name: /export stems/i });
+    expect(exportBtn).toBeInTheDocument();
+
+    fireEvent.click(exportBtn);
+
+    expect(screen.getByRole('dialog', { name: /export/i })).toBeInTheDocument();
+  });
 });
