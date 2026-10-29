@@ -13,12 +13,12 @@
 import { fftRadix2InPlace } from "./fftRadix2";
 import { StemName } from "./chunkOverlapAdd";
 
-export const BS_ROFORMER_CHUNK_SAMPLES = 352800; // 8.0s @ 44.1kHz
+export const BS_ROFORMER_CHUNK_SAMPLES = 176400; // 4.0s @ 44.1kHz (T=345 frames for BS-RoFormer-SW)
 export const BS_ROFORMER_N_FFT = 2048;
-export const BS_ROFORMER_HOP_LENGTH = 441;
+export const BS_ROFORMER_HOP_LENGTH = 512;
 export const BS_ROFORMER_WIN_LENGTH = 2048;
 export const BS_ROFORMER_F = 1025; // n_fft / 2 + 1
-export const BS_ROFORMER_T = 801; // Math.floor(352800 / 441) + 1
+export const BS_ROFORMER_T = 345; // Math.floor(176400 / 512) + 1
 
 function makeHannWindow(n: number): Float32Array {
   const w = new Float32Array(n);
@@ -148,9 +148,10 @@ export const BS_ROFORMER_STEM_ORDER: StemName[] = [
 ];
 
 /**
- * Computes batched iSTFT for all 4 stems and 2 stereo channels.
- * Input shapes: real and imag are [4, 2, F, T] planar.
- * Returns { [stemName]: [leftChannel, rightChannel] } of given length.
+ * Computes batched iSTFT for BS-RoFormer outputs.
+ * Input shapes: real and imag are [numStems, 2, F, T] planar.
+ * Handles both 6-stem (bass, drums, other, vocals, guitar, piano) and 4-stem architectures,
+ * producing 4 standard isolated stems: drums, bass, vocals, other.
  */
 export function computeBatchISTFT(
   outSpecReal: Float32Array,
@@ -158,11 +159,11 @@ export function computeBatchISTFT(
   length: number = BS_ROFORMER_CHUNK_SAMPLES,
   nFft: number = BS_ROFORMER_N_FFT,
   hopLength: number = BS_ROFORMER_HOP_LENGTH,
-  winLength: number = BS_ROFORMER_WIN_LENGTH
+  winLength: number = BS_ROFORMER_WIN_LENGTH,
+  numStemsInOutput: number = 6
 ): Record<StemName, Float32Array[]> {
   const F = Math.floor(nFft / 2) + 1;
   const T = Math.floor(length / hopLength) + 1;
-  const numStems = 4;
   const numChannels = 2;
 
   const { windowInvN, invWindowSum, paddedLen, pad } = getISTFTCache(
@@ -172,21 +173,17 @@ export function computeBatchISTFT(
     winLength
   );
 
-  const stems: Record<StemName, Float32Array[]> = {
-    drums: [new Float32Array(length), new Float32Array(length)],
-    bass: [new Float32Array(length), new Float32Array(length)],
-    other: [new Float32Array(length), new Float32Array(length)],
-    vocals: [new Float32Array(length), new Float32Array(length)],
-  };
+  const rawStems: Float32Array[][] = Array.from(
+    { length: numStemsInOutput },
+    () => [new Float32Array(length), new Float32Array(length)]
+  );
 
   const fftBuf = new Float32Array(nFft * 2);
   const padded = new Float32Array(paddedLen);
   const sliceStride = F * T;
   const perStemStride = numChannels * sliceStride;
 
-  for (let s = 0; s < numStems; s++) {
-    const stemName = BS_ROFORMER_STEM_ORDER[s];
-
+  for (let s = 0; s < numStemsInOutput; s++) {
     for (let c = 0; c < numChannels; c++) {
       const inOff = s * perStemStride + c * sliceStride;
       padded.fill(0);
@@ -219,12 +216,35 @@ export function computeBatchISTFT(
         }
       }
 
-      const outChannel = stems[stemName][c];
+      const outChannel = rawStems[s][c];
       for (let i = 0; i < length; i++) {
         outChannel[i] = padded[pad + i] * invWindowSum[pad + i];
       }
     }
   }
 
-  return stems;
+  // 6-stem BS-RoFormer order: 0=bass, 1=drums, 2=other, 3=vocals, 4=guitar, 5=piano
+  if (numStemsInOutput >= 6) {
+    const bass = rawStems[0];
+    const drums = rawStems[1];
+    const vocals = rawStems[3];
+
+    // Combine other (2) + guitar (4) + piano (5) into complete "other" stem
+    const other = [new Float32Array(length), new Float32Array(length)];
+    for (let c = 0; c < 2; c++) {
+      for (let i = 0; i < length; i++) {
+        other[c][i] = rawStems[2][c][i] + rawStems[4][c][i] + rawStems[5][c][i];
+      }
+    }
+
+    return { vocals, drums, bass, other };
+  }
+
+  // 4-stem BS-RoFormer fallback order: 0=drums, 1=bass, 2=other, 3=vocals
+  return {
+    drums: rawStems[0],
+    bass: rawStems[1],
+    other: rawStems[2],
+    vocals: rawStems[3],
+  };
 }

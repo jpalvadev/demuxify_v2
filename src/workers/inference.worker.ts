@@ -156,7 +156,7 @@ async function handleStart(
           inputNames.includes("spec_real") && inputNames.includes("spec_imag");
 
         if (isSpecModel) {
-          // BS-RoFormer 4-stem rhythm model (host STFT/iSTFT architecture)
+          // BS-RoFormer architecture (browser WebGPU-optimized STFT/iSTFT pipeline)
           const { real, imag, F, T } = computeStereoSTFT(
             chunk.audio[0],
             chunk.audio[1],
@@ -177,10 +177,25 @@ async function handleStart(
           const outImagTensor =
             outputFeeds["out_spec_imag"] || outputFeeds[session.outputNames[1]];
 
-          const outReal = outRealTensor.data as Float32Array;
-          const outImag = outImagTensor.data as Float32Array;
+          const numStemsInOutput = outRealTensor.dims[1] || 6;
+          // .slice() ensures an owned copy in JS heap before disposing WebGPU tensor resources
+          const outReal = (outRealTensor.data as Float32Array).slice();
+          const outImag = (outImagTensor.data as Float32Array).slice();
 
-          chunkStems = computeBatchISTFT(outReal, outImag, chunkSamples);
+          realTensor.dispose();
+          imagTensor.dispose();
+          outRealTensor.dispose();
+          outImagTensor.dispose();
+
+          chunkStems = computeBatchISTFT(
+            outReal,
+            outImag,
+            chunkSamples,
+            undefined,
+            undefined,
+            undefined,
+            numStemsInOutput
+          );
         } else {
           // Standard time-domain waveform model fallback
           let sum = 0;

@@ -9,7 +9,7 @@ import {
 } from "../lib/stft";
 
 describe("BS-RoFormer STFT & iSTFT Engine", () => {
-  it("computes forward STFT with exact expected shape [2, 1025, 801]", () => {
+  it("computes forward STFT with exact expected shape [2, 1025, 345]", () => {
     const length = BS_ROFORMER_CHUNK_SAMPLES;
     const left = new Float32Array(length);
     const right = new Float32Array(length);
@@ -46,7 +46,15 @@ describe("BS-RoFormer STFT & iSTFT Engine", () => {
     outReal.set(real, 0);
     outImag.set(imag, 0);
 
-    const reconstructed = computeBatchISTFT(outReal, outImag, length);
+    const reconstructed = computeBatchISTFT(
+      outReal,
+      outImag,
+      length,
+      undefined,
+      undefined,
+      undefined,
+      4
+    );
 
     expect(Object.keys(reconstructed)).toEqual(BS_ROFORMER_STEM_ORDER);
     const recDrumsLeft = reconstructed.drums[0];
