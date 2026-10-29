@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { Play, Pause, RotateCcw, Volume2, Layers } from 'lucide-react';
+import { Play, Pause, RotateCcw, Volume2, Layers, Gauge, Music, Plus, Minus } from 'lucide-react';
 import { StemName, STEM_NAMES } from '../lib/chunkOverlapAdd';
 import { StemPlayerEngine, StemMixerStates } from '../lib/stemPlayerEngine';
 import { StemTrack } from './StemTrack';
@@ -45,6 +45,8 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
     other: { volume: 1.0, muted: false, solo: false },
   });
   const [masterVolume, setMasterVolume] = useState(1.0);
+  const [tempo, setTempo] = useState(1.0);
+  const [pitch, setPitch] = useState(0);
 
   // Initialize engine
   useEffect(() => {
@@ -58,6 +60,8 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
     setDuration(engine.getDuration());
     setMixerStates(engine.getAllStemStates());
     setMasterVolume(engine.getMasterVolume());
+    setTempo(engine.getTempo());
+    setPitch(engine.getPitch());
 
     const unsubPos = engine.subscribePosition((time) => {
       setCurrentTime(time);
@@ -68,9 +72,15 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
       setMixerStates(states);
     });
 
+    const unsubTimeStretch = engine.subscribeTimeStretch((ts) => {
+      setTempo(ts.tempo);
+      setPitch(ts.pitch);
+    });
+
     return () => {
       unsubPos();
       unsubState();
+      unsubTimeStretch();
       engine.dispose();
       engineRef.current = null;
     };
@@ -143,6 +153,38 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
   const handleMasterVolumeChange = useCallback((volume: number) => {
     engineRef.current?.setMasterVolume(volume);
     setMasterVolume(volume);
+  }, []);
+
+  const handleTempoChange = useCallback((newTempo: number) => {
+    engineRef.current?.setTempo(newTempo);
+    setTempo(newTempo);
+  }, []);
+
+  const handlePitchChange = useCallback((newPitch: number) => {
+    engineRef.current?.setPitch(newPitch);
+    setPitch(newPitch);
+  }, []);
+
+  const handleIncrementPitch = useCallback(() => {
+    setPitch((prev) => {
+      const next = Math.min(12, prev + 1);
+      engineRef.current?.setPitch(next);
+      return next;
+    });
+  }, []);
+
+  const handleDecrementPitch = useCallback(() => {
+    setPitch((prev) => {
+      const next = Math.max(-12, prev - 1);
+      engineRef.current?.setPitch(next);
+      return next;
+    });
+  }, []);
+
+  const handleResetTimeStretch = useCallback(() => {
+    engineRef.current?.resetTimeStretch();
+    setTempo(1.0);
+    setPitch(0);
   }, []);
 
   // Determine silencing for visual feedback
@@ -245,6 +287,152 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
           onSeek={handleSeek}
           height={88}
         />
+      </div>
+
+      {/* Time-Stretch & Pitch Shift Controls */}
+      <div className="rounded-xl border border-border/60 bg-secondary/30 p-4 space-y-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary border border-primary/20">
+              <Gauge className="h-4 w-4" />
+            </div>
+            <div>
+              <h4 className="text-sm font-semibold text-foreground">Time-Stretch & Pitch</h4>
+              <p className="text-[11px] text-muted-foreground">
+                Independent real-time tempo (0.5x–2.0x) and pitch transposition (-12 to +12 st)
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            aria-label="Reset Time-Stretch"
+            title="Reset pitch to 0 and tempo to 1.0x"
+            onClick={handleResetTimeStretch}
+            disabled={tempo === 1.0 && pitch === 0}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-border/80 bg-secondary/80 text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-secondary transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+            <span>Reset Pitch & Tempo</span>
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+          {/* Tempo Section */}
+          <div className="rounded-xl border border-border/50 bg-card/60 p-3.5 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                <Gauge className="h-3.5 w-3.5 text-primary" />
+                Tempo / Speed
+              </span>
+              <span
+                data-testid="current-tempo-label"
+                className="font-mono text-xs font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-md border border-primary/20"
+              >
+                {tempo.toFixed(2)}x
+              </span>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <span className="text-[11px] font-mono text-muted-foreground">0.5x</span>
+              <input
+                type="range"
+                min="0.5"
+                max="2.0"
+                step="0.05"
+                value={tempo}
+                onChange={(e) => handleTempoChange(parseFloat(e.target.value))}
+                aria-label="Playback Tempo"
+                className="w-full accent-primary cursor-pointer h-1.5 bg-secondary rounded-lg appearance-none"
+              />
+              <span className="text-[11px] font-mono text-muted-foreground">2.0x</span>
+            </div>
+
+            <div className="flex items-center justify-between gap-1.5 pt-0.5">
+              {[0.75, 1.0, 1.25, 1.5].map((preset) => {
+                const label = `${preset.toFixed(2)}x`;
+                const isSelected = Math.abs(tempo - preset) < 0.01;
+                return (
+                  <button
+                    key={preset}
+                    type="button"
+                    aria-label={`Tempo preset ${label}`}
+                    onClick={() => handleTempoChange(preset)}
+                    className={cn(
+                      'flex-1 py-1 rounded-md text-[11px] font-semibold border transition-all',
+                      isSelected
+                        ? 'bg-primary text-primary-foreground border-primary shadow-sm'
+                        : 'bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground border-border/60'
+                    )}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Pitch Section */}
+          <div className="rounded-xl border border-border/50 bg-card/60 p-3.5 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                <Music className="h-3.5 w-3.5 text-accent" />
+                Pitch Transposition
+              </span>
+              <span
+                data-testid="current-pitch-label"
+                className="font-mono text-xs font-bold text-foreground bg-secondary px-2 py-0.5 rounded-md border border-border"
+              >
+                {pitch > 0 ? `+${pitch}` : pitch} st
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                aria-label="Decrement Pitch"
+                title="Shift pitch down 1 semitone"
+                onClick={handleDecrementPitch}
+                disabled={pitch <= -12}
+                className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+              >
+                <Minus className="h-3.5 w-3.5" />
+              </button>
+
+              <div className="flex-1 flex items-center gap-2">
+                <span className="text-[11px] font-mono text-muted-foreground">-12</span>
+                <input
+                  type="range"
+                  min="-12"
+                  max="12"
+                  step="1"
+                  value={pitch}
+                  onChange={(e) => handlePitchChange(parseInt(e.target.value, 10))}
+                  aria-label="Pitch Shift"
+                  className="w-full accent-primary cursor-pointer h-1.5 bg-secondary rounded-lg appearance-none"
+                />
+                <span className="text-[11px] font-mono text-muted-foreground">+12</span>
+              </div>
+
+              <button
+                type="button"
+                aria-label="Increment Pitch"
+                title="Shift pitch up 1 semitone"
+                onClick={handleIncrementPitch}
+                disabled={pitch >= 12}
+                className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+              >
+                <Plus className="h-3.5 w-3.5" />
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between text-[11px] text-muted-foreground px-1">
+              <span>Octave Down (-12)</span>
+              <span>Original (0)</span>
+              <span>Octave Up (+12)</span>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* 4 Stem Tracks List */}
