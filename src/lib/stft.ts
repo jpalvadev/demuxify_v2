@@ -13,7 +13,7 @@
 import { fftRadix2InPlace } from "./fftRadix2";
 import { StemName } from "./chunkOverlapAdd";
 
-export const BS_ROFORMER_CHUNK_SAMPLES = 176400; // 4.0s @ 44.1kHz (T=345 frames for BS-RoFormer-SW)
+export const BS_ROFORMER_CHUNK_SAMPLES = 176400; // 4.0s @ 44.1kHz
 export const BS_ROFORMER_N_FFT = 2048;
 export const BS_ROFORMER_HOP_LENGTH = 512;
 export const BS_ROFORMER_WIN_LENGTH = 2048;
@@ -139,19 +139,23 @@ function getISTFTCache(
   return entry;
 }
 
-// Canonical BS-RoFormer 4-stem order
-export const BS_ROFORMER_STEM_ORDER: StemName[] = [
+// Canonical BS-RoFormer stem mappings
+export const BS_ROFORMER_4STEM_ORDER: StemName[] = [
   "drums",
   "bass",
   "other",
   "vocals",
 ];
 
+export const BS_ROFORMER_STEM_ORDER = BS_ROFORMER_4STEM_ORDER;
+
 /**
- * Computes batched iSTFT for BS-RoFormer outputs.
- * Input shapes: real and imag are [numStems, 2, F, T] planar.
- * Handles both 6-stem (bass, drums, other, vocals, guitar, piano) and 4-stem architectures,
- * producing 4 standard isolated stems: drums, bass, vocals, other.
+ * Computes batched iSTFT for isolated stems and 2 stereo channels.
+ * Supports both 6-stem models (BS-RoFormer-SW: bass, drums, other, vocals, guitar, piano)
+ * and 4-stem models (drums, bass, other, vocals).
+ *
+ * For 6-stem models, guitar and piano are merged into 'other' to reconstruct
+ * the complete 4-stem canonical set.
  */
 export function computeBatchISTFT(
   outSpecReal: Float32Array,
@@ -173,19 +177,19 @@ export function computeBatchISTFT(
     winLength
   );
 
-  const rawStems: Float32Array[][] = Array.from(
-    { length: numStemsInOutput },
-    () => [new Float32Array(length), new Float32Array(length)]
-  );
-
   const fftBuf = new Float32Array(nFft * 2);
   const padded = new Float32Array(paddedLen);
   const sliceStride = F * T;
   const perStemStride = numChannels * sliceStride;
 
-  for (let s = 0; s < numStemsInOutput; s++) {
+  // Synthesize single stem audio [left, right] from tensor offset
+  const synthesizeStem = (stemIndex: number): Float32Array[] => {
+    const left = new Float32Array(length);
+    const right = new Float32Array(length);
+    const target = [left, right];
+
     for (let c = 0; c < numChannels; c++) {
-      const inOff = s * perStemStride + c * sliceStride;
+      const inOff = stemIndex * perStemStride + c * sliceStride;
       padded.fill(0);
 
       for (let t = 0; t < T; t++) {
@@ -216,35 +220,43 @@ export function computeBatchISTFT(
         }
       }
 
-      const outChannel = rawStems[s][c];
+      const outChan = target[c];
       for (let i = 0; i < length; i++) {
-        outChannel[i] = padded[pad + i] * invWindowSum[pad + i];
+        outChan[i] = padded[pad + i] * invWindowSum[pad + i];
       }
     }
-  }
 
-  // 6-stem BS-RoFormer order: 0=bass, 1=drums, 2=other, 3=vocals, 4=guitar, 5=piano
-  if (numStemsInOutput >= 6) {
-    const bass = rawStems[0];
-    const drums = rawStems[1];
-    const vocals = rawStems[3];
+    return target;
+  };
 
-    // Combine other (2) + guitar (4) + piano (5) into complete "other" stem
-    const other = [new Float32Array(length), new Float32Array(length)];
-    for (let c = 0; c < 2; c++) {
+  if (numStemsInOutput === 6) {
+    // elicwhite/bs-roformer-sw-6stem indices:
+    // 0: bass, 1: drums, 2: other, 3: vocals, 4: guitar, 5: piano
+    const bass = synthesizeStem(0);
+    const drums = synthesizeStem(1);
+    const other = synthesizeStem(2);
+    const vocals = synthesizeStem(3);
+    const guitar = synthesizeStem(4);
+    const piano = synthesizeStem(5);
+
+    // Sum other + guitar + piano to capture full accompaniment in 4-stem mode
+    for (let c = 0; c < numChannels; c++) {
+      const o = other[c];
+      const g = guitar[c];
+      const p = piano[c];
       for (let i = 0; i < length; i++) {
-        other[c][i] = rawStems[2][c][i] + rawStems[4][c][i] + rawStems[5][c][i];
+        o[i] = o[i] + g[i] + p[i];
       }
     }
 
     return { vocals, drums, bass, other };
+  } else {
+    // 4-stem layout: drums, bass, other, vocals
+    return {
+      drums: synthesizeStem(0),
+      bass: synthesizeStem(1),
+      other: synthesizeStem(2),
+      vocals: synthesizeStem(3),
+    };
   }
-
-  // 4-stem BS-RoFormer fallback order: 0=drums, 1=bass, 2=other, 3=vocals
-  return {
-    drums: rawStems[0],
-    bass: rawStems[1],
-    other: rawStems[2],
-    vocals: rawStems[3],
-  };
 }
