@@ -1,13 +1,17 @@
 import React, { useEffect, useState, useRef, ChangeEvent } from 'react';
-import { AlertCircle, Loader2 } from 'lucide-react';
+import { AlertCircle, Loader2, CheckCircle2, Music } from 'lucide-react';
 import { Header } from './components/Header';
 import { SourceMixDropzone } from './components/SourceMixDropzone';
 import { FallbackAdvisory } from './components/FallbackAdvisory';
 import { SourceMixCard } from './components/SourceMixCard';
 import { MasterWaveform } from './components/MasterWaveform';
+import { SeparationProgress, SeparationPhase } from './components/SeparationProgress';
 import { detectWebGPUCapability, WebGPUCapability } from './lib/webgpu';
 import { decodeAudio, DecodedSourceMix } from './lib/audioDecoder';
 import { computeWaveformPeaks, WaveformPeaks } from './lib/waveformPeaks';
+import { InferenceClient, ChunkProgress } from './lib/inferenceClient';
+import { DownloadProgress } from './lib/modelCache';
+import { StemName, STEM_NAMES } from './lib/chunkOverlapAdd';
 
 const SUPPORTED_EXTENSIONS = ['.mp3', '.wav', '.flac', '.ogg', '.aac', '.m4a'];
 const SUPPORTED_MIME_TYPES = [
@@ -34,7 +38,15 @@ export const App: React.FC = () => {
   const [isDecoding, setIsDecoding] = useState(false);
   const [decodeError, setDecodeError] = useState<string | null>(null);
 
+  // Inference Separation State
+  const [separationPhase, setSeparationPhase] = useState<SeparationPhase>('idle');
+  const [downloadProgress, setDownloadProgress] = useState<DownloadProgress | null>(null);
+  const [chunkProgress, setChunkProgress] = useState<ChunkProgress | null>(null);
+  const [separationError, setSeparationError] = useState<string | null>(null);
+  const [separatedStems, setSeparatedStems] = useState<Record<StemName, Float32Array[]> | null>(null);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const inferenceClientRef = useRef<InferenceClient | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -64,6 +76,7 @@ export const App: React.FC = () => {
 
     return () => {
       isMounted = false;
+      inferenceClientRef.current?.terminate();
     };
   }, []);
 
@@ -87,6 +100,8 @@ export const App: React.FC = () => {
     setIsDecoding(true);
     setDecodeError(null);
     setCurrentTime(0);
+    setSeparationPhase('idle');
+    setSeparatedStems(null);
 
     try {
       const decoded = await decodeAudio(file);
@@ -111,11 +126,19 @@ export const App: React.FC = () => {
   };
 
   const handleClearSourceMix = () => {
+    if (inferenceClientRef.current) {
+      inferenceClientRef.current.cancel();
+    }
     setSelectedFile(null);
     setDecodedSourceMix(null);
     setWaveformPeaks(null);
     setCurrentTime(0);
     setDecodeError(null);
+    setSeparationPhase('idle');
+    setSeparatedStems(null);
+    setDownloadProgress(null);
+    setChunkProgress(null);
+    setSeparationError(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -136,9 +159,63 @@ export const App: React.FC = () => {
     setCurrentTime(seekTime);
   };
 
-  const handleStartSeparation = () => {
-    // Ticket 03/04 will connect the Inference Engine to begin chunked separation
-    console.log('Beginning separation on Source Mix:', decodedSourceMix?.metadata.fileName);
+  const handleStartSeparation = async () => {
+    if (!decodedSourceMix) return;
+
+    try {
+      setSeparationPhase('downloading');
+      setSeparationError(null);
+      setSeparatedStems(null);
+
+      if (!inferenceClientRef.current) {
+        inferenceClientRef.current = new InferenceClient();
+      }
+      const client = inferenceClientRef.current;
+
+      const isTestEnv = typeof process !== 'undefined' && process.env?.NODE_ENV === 'test';
+
+      await client.init({
+        useMock: isTestEnv,
+        onDownloadProgress: (p) => {
+          setDownloadProgress(p);
+          setSeparationPhase('downloading');
+        },
+      });
+
+      setSeparationPhase('separating');
+
+      const numChannels = decodedSourceMix.buffer.numberOfChannels;
+      const audio: Float32Array[] = [];
+      for (let c = 0; c < numChannels; c++) {
+        audio.push(decodedSourceMix.buffer.getChannelData(c));
+      }
+
+      const result = await client.separate(audio, decodedSourceMix.buffer.sampleRate, {
+        onChunkProgress: (p) => {
+          setChunkProgress(p);
+        },
+      });
+
+      setSeparatedStems(result.stems);
+      setSeparationPhase('completed');
+    } catch (err) {
+      if (err instanceof Error && /cancelled/i.test(err.message)) {
+        setSeparationPhase('idle');
+      } else {
+        const message = err instanceof Error ? err.message : String(err);
+        setSeparationError(message);
+        setSeparationPhase('error');
+      }
+    }
+  };
+
+  const handleCancelSeparation = () => {
+    if (inferenceClientRef.current) {
+      inferenceClientRef.current.cancel();
+    }
+    setSeparationPhase('idle');
+    setChunkProgress(null);
+    setDownloadProgress(null);
   };
 
   return (
@@ -226,6 +303,50 @@ export const App: React.FC = () => {
                 onChangeFile={handleChangeFile}
                 onRemove={handleClearSourceMix}
               />
+
+              {/* Separation Progress Card (Visible during downloading / separating / error) */}
+              <SeparationProgress
+                phase={separationPhase}
+                downloadProgress={downloadProgress}
+                chunkProgress={chunkProgress}
+                error={separationError}
+                onCancel={handleCancelSeparation}
+                onRetry={handleStartSeparation}
+              />
+
+              {/* Stems Separated Banner (Visible on completion) */}
+              {separationPhase === 'completed' && separatedStems && (
+                <div
+                  role="region"
+                  aria-label="Separation Complete"
+                  className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-5 shadow-sm space-y-3"
+                >
+                  <div className="flex items-center gap-2.5 text-emerald-600 dark:text-emerald-400">
+                    <CheckCircle2 className="h-5 w-5 shrink-0" />
+                    <h3 className="text-base font-semibold">
+                      Separation Complete: 4 Discrete Stems Generated
+                    </h3>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
+                    {STEM_NAMES.map((stem) => (
+                      <div
+                        key={stem}
+                        className="flex items-center gap-2 rounded-xl border border-border bg-card/80 p-3 shadow-xs"
+                      >
+                        <Music className="h-4 w-4 text-primary shrink-0" />
+                        <div>
+                          <div className="text-xs font-semibold capitalize text-foreground">
+                            {stem}
+                          </div>
+                          <div className="text-[10px] text-muted-foreground">
+                            {separatedStems[stem][0]?.length.toLocaleString()} samples
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <MasterWaveform
                 peaks={waveformPeaks}

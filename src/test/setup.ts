@@ -14,6 +14,23 @@ if (typeof window !== 'undefined') {
     } as any;
   }
 
+  if (!window.Worker) {
+    class MockWorker {
+      url: string | URL;
+      onmessage: ((event: MessageEvent) => void) | null = null;
+      onerror: ((event: ErrorEvent) => void) | null = null;
+      constructor(stringUrl: string | URL) {
+        this.url = stringUrl;
+      }
+      postMessage(_data: any) {}
+      terminate() {}
+      addEventListener() {}
+      removeEventListener() {}
+    }
+    window.Worker = MockWorker as any;
+    (globalThis as any).Worker = MockWorker as any;
+  }
+
   if (typeof HTMLCanvasElement !== 'undefined') {
     HTMLCanvasElement.prototype.getContext = function (this: HTMLCanvasElement, contextType: string) {
       if (contextType === '2d') {

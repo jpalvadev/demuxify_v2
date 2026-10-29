@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent, within } from '@testing-library/react';
 import App from '../App';
 import * as webgpuModule from '../lib/webgpu';
 import * as audioDecoderModule from '../lib/audioDecoder';
+import { InferenceClient } from '../lib/inferenceClient';
 
 describe('App UI Shell', () => {
   const dummyBuffer = {
@@ -231,4 +232,107 @@ describe('App UI Shell', () => {
     fireEvent.click(themeToggle);
     expect(document.documentElement.classList.contains('dark')).toBe(true);
   });
+
+  it('initiates stem separation when Separate Stems button is clicked and displays progress', async () => {
+    vi.spyOn(webgpuModule, 'detectWebGPUCapability').mockResolvedValue({
+      supported: true,
+      isFallback: false,
+    });
+
+    render(<App />);
+
+    const file = new File(['audio'], 'song_master.mp3', { type: 'audio/mp3' });
+    const fileInput = screen.getByLabelText(/select source mix file/i, { selector: 'input' });
+    fireEvent.change(fileInput, { target: { files: [file] } });
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /separate stems|start separation/i })).toBeInTheDocument();
+    });
+
+    const separateBtn = screen.getByRole('button', { name: /separate stems|start separation/i });
+    fireEvent.click(separateBtn);
+
+    // Should display SeparationProgress region
+    await waitFor(() => {
+      expect(screen.getByRole('region', { name: /separation progress/i })).toBeInTheDocument();
+    });
+  });
+
+  it('completes separation and renders the 4 separated discrete stems', async () => {
+    vi.spyOn(webgpuModule, 'detectWebGPUCapability').mockResolvedValue({
+      supported: true,
+      isFallback: false,
+    });
+
+    const initSpy = vi.spyOn(InferenceClient.prototype, 'init').mockResolvedValue({ backend: 'webgpu' });
+    const separateSpy = vi.spyOn(InferenceClient.prototype, 'separate').mockResolvedValue({
+      stems: {
+        vocals: [new Float32Array(500), new Float32Array(500)],
+        drums: [new Float32Array(500), new Float32Array(500)],
+        bass: [new Float32Array(500), new Float32Array(500)],
+        other: [new Float32Array(500), new Float32Array(500)],
+      },
+      duration: 180,
+    });
+
+    render(<App />);
+
+    const file = new File(['audio'], 'song_master.mp3', { type: 'audio/mp3' });
+    const fileInput = screen.getByLabelText(/select source mix file/i, { selector: 'input' });
+    fireEvent.change(fileInput, { target: { files: [file] } });
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /separate stems|start separation/i })).toBeInTheDocument();
+    });
+
+    const separateBtn = screen.getByRole('button', { name: /separate stems|start separation/i });
+    fireEvent.click(separateBtn);
+
+    await waitFor(() => {
+      expect(screen.getByRole('region', { name: /separation complete/i })).toBeInTheDocument();
+    });
+
+    const completeRegion = screen.getByRole('region', { name: /separation complete/i });
+    expect(completeRegion).toBeInTheDocument();
+    expect(within(completeRegion).getByText(/vocals/i)).toBeInTheDocument();
+    expect(within(completeRegion).getByText(/drums/i)).toBeInTheDocument();
+    expect(within(completeRegion).getByText(/bass/i)).toBeInTheDocument();
+    expect(within(completeRegion).getByText(/other/i)).toBeInTheDocument();
+
+    expect(initSpy).toHaveBeenCalled();
+    expect(separateSpy).toHaveBeenCalled();
+  });
+
+  it('allows cancelling separation at any time', async () => {
+    vi.spyOn(webgpuModule, 'detectWebGPUCapability').mockResolvedValue({
+      supported: true,
+      isFallback: false,
+    });
+
+    render(<App />);
+
+    const file = new File(['audio'], 'song_master.mp3', { type: 'audio/mp3' });
+    const fileInput = screen.getByLabelText(/select source mix file/i, { selector: 'input' });
+    fireEvent.change(fileInput, { target: { files: [file] } });
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /separate stems|start separation/i })).toBeInTheDocument();
+    });
+
+    const separateBtn = screen.getByRole('button', { name: /separate stems|start separation/i });
+    fireEvent.click(separateBtn);
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /cancel separation/i })).toBeInTheDocument();
+    });
+
+    const cancelBtn = screen.getByRole('button', { name: /cancel separation/i });
+    fireEvent.click(cancelBtn);
+
+    // Should return to idle without SeparationProgress region
+    await waitFor(() => {
+      expect(screen.queryByRole('region', { name: /separation progress/i })).not.toBeInTheDocument();
+    });
+  });
 });
+
