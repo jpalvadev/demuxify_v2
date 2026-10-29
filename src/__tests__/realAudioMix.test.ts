@@ -1,32 +1,33 @@
-import { describe, it, expect, vi } from 'vitest';
-import * as fs from 'fs';
-import * as path from 'path';
-import { decodeAudio } from '../lib/audioDecoder';
-import { computeWaveformPeaks } from '../lib/waveformPeaks';
+import { describe, it, expect, vi } from "vitest";
+import * as fs from "fs";
+import * as path from "path";
+import { decodeAudio } from "../lib/audioDecoder";
+import { computeWaveformPeaks } from "../lib/waveformPeaks";
 import {
   createChunkSegments,
   reconstructStemsFromChunks,
   ChunkInferenceResult,
   StemName,
   STEM_NAMES,
-} from '../lib/chunkOverlapAdd';
-import { encodeWav } from '../lib/wavEncoder';
-import { createStemBundleZip } from '../lib/bundleZip';
+} from "../lib/chunkOverlapAdd";
+import { encodeWav } from "../lib/wavEncoder";
+import { createStemBundleZip } from "../lib/bundleZip";
 
-describe('Real Audio Ingestion & Processing Pipeline (audioslave_stone.mp3)', () => {
+describe("Real Audio Ingestion & Processing Pipeline (audioslave_stone.mp3)", () => {
   const candidatePaths = [
-    path.resolve(process.cwd(), 'audioslave_stone.mp3'),
-    path.resolve(process.cwd(), '..', '..', 'audioslave_stone.mp3'),
+    path.resolve(process.cwd(), "audioslave_stone.mp3"),
+    path.resolve(process.cwd(), "..", "..", "audioslave_stone.mp3"),
   ];
-  const filePath = candidatePaths.find((p) => fs.existsSync(p)) || candidatePaths[0];
+  const filePath =
+    candidatePaths.find((p) => fs.existsSync(p)) || candidatePaths[0];
 
-  it('verifies the real MP3 file exists on disk and has valid file size', () => {
+  it("verifies the real MP3 file exists on disk and has valid file size", () => {
     expect(fs.existsSync(filePath)).toBe(true);
     const stats = fs.statSync(filePath);
     expect(stats.size).toBe(7059467);
   });
 
-  it('decodes real MP3 audio buffer into normalized PCM and extracts metadata', async () => {
+  it("decodes real MP3 audio buffer into normalized PCM and extracts metadata", async () => {
     const fileBuffer = fs.readFileSync(filePath);
     const arrayBuffer = fileBuffer.buffer.slice(
       fileBuffer.byteOffset,
@@ -35,10 +36,7 @@ describe('Real Audio Ingestion & Processing Pipeline (audioslave_stone.mp3)', ()
 
     const sampleRate = 44100;
     const duration = 280; // approximate duration in seconds
-    const mockChannels = [
-      new Float32Array(1000),
-      new Float32Array(1000),
-    ];
+    const mockChannels = [new Float32Array(1000), new Float32Array(1000)];
     const mockAudioBuffer = {
       duration,
       sampleRate,
@@ -52,20 +50,20 @@ describe('Real Audio Ingestion & Processing Pipeline (audioslave_stone.mp3)', ()
     };
 
     const decoded = await decodeAudio(arrayBuffer, {
-      fileName: 'audioslave_stone.mp3',
+      fileName: "audioslave_stone.mp3",
       fileSize: fileBuffer.length,
-      mimeType: 'audio/mp3',
+      mimeType: "audio/mp3",
       audioContext: mockContext as any,
     });
 
-    expect(decoded.metadata.fileName).toBe('audioslave_stone.mp3');
+    expect(decoded.metadata.fileName).toBe("audioslave_stone.mp3");
     expect(decoded.metadata.fileSize).toBe(7059467);
     expect(decoded.metadata.duration).toBe(280);
     expect(decoded.metadata.numberOfChannels).toBe(2);
     expect(decoded.metadata.sampleRate).toBe(44100);
   });
 
-  it('computes waveform peak envelopes across the real audio mix', async () => {
+  it("computes waveform peak envelopes across the real audio mix", async () => {
     // Generate an audio buffer with dynamic content
     const sampleRate = 44100;
     const samples = sampleRate * 2; // 2 seconds
@@ -97,7 +95,7 @@ describe('Real Audio Ingestion & Processing Pipeline (audioslave_stone.mp3)', ()
     }
   });
 
-  it('slices audio into sequential Chunk Segments with OLA windowing and packages a ZIP Export Bundle', async () => {
+  it("slices audio into sequential Chunk Segments with OLA windowing and packages a ZIP Export Bundle", async () => {
     const sampleRate = 44100;
     const testSamples = 44100 * 3; // 3 seconds
     const leftChannel = new Float32Array(testSamples);
@@ -133,10 +131,14 @@ describe('Real Audio Ingestion & Processing Pipeline (audioslave_stone.mp3)', ()
       };
     });
 
-    const reconstructed = reconstructStemsFromChunks(chunkOutputs, testSamples, {
-      chunkSamples,
-      overlapSamples,
-    });
+    const reconstructed = reconstructStemsFromChunks(
+      chunkOutputs,
+      testSamples,
+      {
+        chunkSamples,
+        overlapSamples,
+      }
+    );
     expect(reconstructed.vocals[0].length).toBe(testSamples);
     expect(reconstructed.drums[0].length).toBe(testSamples);
     expect(reconstructed.bass[0].length).toBe(testSamples);
@@ -151,8 +153,8 @@ describe('Real Audio Ingestion & Processing Pipeline (audioslave_stone.mp3)', ()
 
     // Generate ZIP bundle
     const zipBlob = await createStemBundleZip(stemBlobs, {
-      songTitle: 'audioslave_stone',
-      format: 'wav',
+      sourceMixTitle: "audioslave_stone",
+      format: "wav",
     });
     expect(zipBlob.size).toBeGreaterThan(100);
   });

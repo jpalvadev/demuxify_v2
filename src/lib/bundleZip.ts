@@ -1,25 +1,24 @@
-import JSZip from 'jszip';
-import { STEM_NAMES, StemName } from './chunkOverlapAdd';
+import JSZip from "jszip";
+import { STEM_NAMES, StemName } from "./chunkOverlapAdd";
 
 export interface CreateStemBundleOptions {
   sourceMixTitle?: string;
-  songTitle?: string; // backwards compatibility alias
-  format?: 'wav' | 'mp3';
+  format?: "wav" | "mp3";
   onProgress?: (percent: number) => void;
 }
 
 /**
  * Strips file extensions and sanitizes characters that are illegal across modern file systems.
  */
-export function sanitizeSourceMixTitle(title?: string, defaultTitle: string = 'track'): string {
+export function sanitizeSourceMixTitle(
+  title?: string,
+  defaultTitle: string = "track"
+): string {
   if (!title) return defaultTitle;
-  const withoutExt = title.replace(/\.[a-zA-Z0-9]+$/, '').trim();
-  const sanitized = withoutExt.replace(/[/\\?%*:|"<>]/g, '_').trim();
+  const withoutExt = title.replace(/\.[a-zA-Z0-9]+$/, "").trim();
+  const sanitized = withoutExt.replace(/[/\\?%*:|"<>]/g, "_").trim();
   return sanitized || defaultTitle;
 }
-
-/** Backwards compatibility alias */
-export const sanitizeSongTitle = sanitizeSourceMixTitle;
 
 /**
  * Formats a clean stem filename: `<SourceMixTitle>_<stem>.<ext>`
@@ -27,7 +26,7 @@ export const sanitizeSongTitle = sanitizeSourceMixTitle;
 export function formatStemFileName(
   sourceMixTitle: string,
   stem: StemName,
-  ext: 'wav' | 'mp3'
+  ext: "wav" | "mp3"
 ): string {
   const base = sanitizeSourceMixTitle(sourceMixTitle);
   return `${base}_${stem}.${ext}`;
@@ -47,8 +46,8 @@ export async function createStemBundleZip(
     }
   }
 
-  const title = options?.sourceMixTitle || options?.songTitle || 'source_mix';
-  const format = options?.format || 'wav';
+  const title = options?.sourceMixTitle || "source_mix";
+  const format = options?.format || "wav";
   const onProgress = options?.onProgress;
 
   const zip = new JSZip();
@@ -61,9 +60,9 @@ export async function createStemBundleZip(
 
   const zipBlob = await zip.generateAsync(
     {
-      type: 'blob',
-      mimeType: 'application/zip',
-      compression: 'DEFLATE',
+      type: "blob",
+      mimeType: "application/zip",
+      compression: "DEFLATE",
       compressionOptions: { level: 6 },
     },
     (metadata) => {

@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect } from "react";
 import {
   X,
   Download,
@@ -7,17 +7,22 @@ import {
   CheckCircle2,
   AlertTriangle,
   Loader2,
-} from 'lucide-react';
-import { StemName, STEM_NAMES } from '../lib/chunkOverlapAdd';
-import { encodeWav, createWavBlob } from '../lib/wavEncoder';
-import { encodeMp3, createMp3Blob, Mp3Bitrate, VALID_MP3_BITRATES } from '../lib/mp3Encoder';
+} from "lucide-react";
+import { StemName, STEM_NAMES } from "../lib/chunkOverlapAdd";
+import { encodeWav, createWavBlob } from "../lib/wavEncoder";
+import {
+  encodeMp3,
+  createMp3Blob,
+  Mp3Bitrate,
+  VALID_MP3_BITRATES,
+} from "../lib/mp3Encoder";
 import {
   createStemBundleZip,
   formatStemFileName,
   sanitizeSourceMixTitle,
-} from '../lib/bundleZip';
-import { toast } from '../lib/toast';
-import { cn } from '../lib/utils';
+} from "../lib/bundleZip";
+import { toast } from "../lib/toast";
+import { cn } from "../lib/utils";
 
 export interface ExportDialogProps {
   isOpen: boolean;
@@ -25,15 +30,14 @@ export interface ExportDialogProps {
   stems: Record<StemName, Float32Array[] | AudioBuffer>;
   sampleRate?: number;
   sourceMixTitle?: string;
-  songTitle?: string; // backwards compatibility alias
   onExportComplete?: (fileName: string) => void;
 }
 
-export type ExportMode = 'single' | 'bundle';
-export type ExportFormat = 'wav' | 'mp3';
+export type ExportMode = "single" | "bundle";
+export type ExportFormat = "wav" | "mp3";
 
 function extractChannels(source: Float32Array[] | AudioBuffer): Float32Array[] {
-  if ('numberOfChannels' in source) {
+  if ("numberOfChannels" in source) {
     const channels: Float32Array[] = [];
     for (let ch = 0; ch < source.numberOfChannels; ch++) {
       channels.push(source.getChannelData(ch));
@@ -45,7 +49,7 @@ function extractChannels(source: Float32Array[] | AudioBuffer): Float32Array[] {
 
 function triggerDownload(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
+  const a = document.createElement("a");
   a.href = url;
   a.download = filename;
   document.body.appendChild(a);
@@ -61,34 +65,34 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
   onClose,
   stems,
   sampleRate = 44100,
-  sourceMixTitle: propSourceMixTitle,
-  songTitle: propSongTitle,
+  sourceMixTitle = "source_mix",
   onExportComplete,
 }) => {
-  const sourceMixTitle = propSourceMixTitle || propSongTitle || 'source_mix';
-  const [mode, setMode] = useState<ExportMode>('single');
-  const [selectedStem, setSelectedStem] = useState<StemName>('vocals');
-  const [format, setFormat] = useState<ExportFormat>('wav');
+  const [mode, setMode] = useState<ExportMode>("single");
+  const [selectedStem, setSelectedStem] = useState<StemName>("vocals");
+  const [format, setFormat] = useState<ExportFormat>("wav");
   const [bitDepth, setBitDepth] = useState<16 | 24>(16);
   const [bitrate, setBitrate] = useState<Mp3Bitrate>(192);
 
   // Export execution state
   const [isExporting, setIsExporting] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [statusMessage, setStatusMessage] = useState('');
+  const [statusMessage, setStatusMessage] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [successNotification, setSuccessNotification] = useState<string | null>(null);
+  const [successNotification, setSuccessNotification] = useState<string | null>(
+    null
+  );
 
   // Escape key handler
   useEffect(() => {
     if (!isOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !isExporting) {
+      if (e.key === "Escape" && !isExporting) {
         onClose();
       }
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, isExporting, onClose]);
 
   // Reset notifications on opening or changing mode
@@ -97,7 +101,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
       setError(null);
       setSuccessNotification(null);
       setProgress(0);
-      setStatusMessage('');
+      setStatusMessage("");
     }
   }, [isOpen]);
 
@@ -108,7 +112,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
     setSuccessNotification(null);
 
     try {
-      if (mode === 'single') {
+      if (mode === "single") {
         setStatusMessage(`Encoding ${selectedStem}...`);
         const stemData = stems[selectedStem];
         if (!stemData) {
@@ -118,10 +122,10 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
         let blob: Blob;
         let fileName: string;
 
-        if (format === 'wav') {
+        if (format === "wav") {
           setProgress(30);
           blob = createWavBlob(channels, { sampleRate, bitDepth });
-          fileName = formatStemFileName(sourceMixTitle, selectedStem, 'wav');
+          fileName = formatStemFileName(sourceMixTitle, selectedStem, "wav");
           setProgress(100);
         } else {
           blob = await createMp3Blob(channels, {
@@ -129,11 +133,11 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
             bitrate,
             onProgress: (p) => setProgress(Math.round(p * 100)),
           });
-          fileName = formatStemFileName(sourceMixTitle, selectedStem, 'mp3');
+          fileName = formatStemFileName(sourceMixTitle, selectedStem, "mp3");
           setProgress(100);
         }
 
-        setStatusMessage('Triggering download...');
+        setStatusMessage("Triggering download...");
         triggerDownload(blob, fileName);
         const successMsg = `Export complete! Downloaded ${fileName}`;
         setSuccessNotification(successMsg);
@@ -141,7 +145,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
         onExportComplete?.(fileName);
       } else {
         // Full Export Bundle (ZIP)
-        setStatusMessage('Encoding all 4 stems for bundle packaging...');
+        setStatusMessage("Encoding all 4 stems for bundle packaging...");
         const encodedStems: Record<StemName, Uint8Array> = {} as any;
 
         const stemCount = STEM_NAMES.length;
@@ -154,8 +158,11 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
           const channels = extractChannels(stemData);
           setStatusMessage(`Encoding ${stemName} (${i + 1}/${stemCount})...`);
 
-          if (format === 'wav') {
-            encodedStems[stemName] = encodeWav(channels, { sampleRate, bitDepth });
+          if (format === "wav") {
+            encodedStems[stemName] = encodeWav(channels, {
+              sampleRate,
+              bitDepth,
+            });
             setProgress(Math.round(((i + 1) / stemCount) * 75));
           } else {
             const startPct = (i / stemCount) * 75;
@@ -170,7 +177,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
           }
         }
 
-        setStatusMessage('Packaging ZIP bundle...');
+        setStatusMessage("Packaging ZIP bundle...");
         const zipBlob = await createStemBundleZip(encodedStems, {
           sourceMixTitle,
           format,
@@ -180,7 +187,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
         });
 
         const zipFileName = `${sanitizeSourceMixTitle(sourceMixTitle)}_stems.zip`;
-        setStatusMessage('Triggering download...');
+        setStatusMessage("Triggering download...");
         triggerDownload(zipBlob, zipFileName);
         const successMsg = `Export complete! Downloaded ${zipFileName}`;
         setSuccessNotification(successMsg);
@@ -194,7 +201,17 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
     } finally {
       setIsExporting(false);
     }
-  }, [mode, selectedStem, format, bitDepth, bitrate, stems, sampleRate, sourceMixTitle, onExportComplete]);
+  }, [
+    mode,
+    selectedStem,
+    format,
+    bitDepth,
+    bitrate,
+    stems,
+    sampleRate,
+    sourceMixTitle,
+    onExportComplete,
+  ]);
 
   if (!isOpen) return null;
 
@@ -219,7 +236,10 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
               <Download className="h-5 w-5" />
             </div>
             <div>
-              <h2 id="export-dialog-title" className="text-lg font-bold tracking-tight text-foreground">
+              <h2
+                id="export-dialog-title"
+                className="text-lg font-bold tracking-tight text-foreground"
+              >
                 Export Audio Stems
               </h2>
               <p className="text-xs text-muted-foreground">
@@ -248,18 +268,18 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
             <div className="grid grid-cols-2 gap-3">
               <label
                 className={cn(
-                  'flex items-center gap-3 p-3.5 rounded-xl border cursor-pointer transition-all',
-                  mode === 'single'
-                    ? 'border-primary bg-primary/10 text-foreground font-medium shadow-xs'
-                    : 'border-border bg-secondary/40 text-muted-foreground hover:bg-secondary/70'
+                  "flex items-center gap-3 p-3.5 rounded-xl border cursor-pointer transition-all",
+                  mode === "single"
+                    ? "border-primary bg-primary/10 text-foreground font-medium shadow-xs"
+                    : "border-border bg-secondary/40 text-muted-foreground hover:bg-secondary/70"
                 )}
               >
                 <input
                   type="radio"
                   name="export-mode"
                   value="single"
-                  checked={mode === 'single'}
-                  onChange={() => setMode('single')}
+                  checked={mode === "single"}
+                  onChange={() => setMode("single")}
                   disabled={isExporting}
                   className="accent-primary"
                 />
@@ -271,18 +291,18 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
 
               <label
                 className={cn(
-                  'flex items-center gap-3 p-3.5 rounded-xl border cursor-pointer transition-all',
-                  mode === 'bundle'
-                    ? 'border-primary bg-primary/10 text-foreground font-medium shadow-xs'
-                    : 'border-border bg-secondary/40 text-muted-foreground hover:bg-secondary/70'
+                  "flex items-center gap-3 p-3.5 rounded-xl border cursor-pointer transition-all",
+                  mode === "bundle"
+                    ? "border-primary bg-primary/10 text-foreground font-medium shadow-xs"
+                    : "border-border bg-secondary/40 text-muted-foreground hover:bg-secondary/70"
                 )}
               >
                 <input
                   type="radio"
                   name="export-mode"
                   value="bundle"
-                  checked={mode === 'bundle'}
-                  onChange={() => setMode('bundle')}
+                  checked={mode === "bundle"}
+                  onChange={() => setMode("bundle")}
                   disabled={isExporting}
                   className="accent-primary"
                 />
@@ -295,9 +315,12 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
           </div>
 
           {/* Stem Selector (Visible only in Single Stem mode) */}
-          {mode === 'single' && (
+          {mode === "single" && (
             <div className="space-y-1.5">
-              <label htmlFor="stem-select" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <label
+                htmlFor="stem-select"
+                className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+              >
                 Select Stem
               </label>
               <select
@@ -309,7 +332,11 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
                 className="w-full rounded-xl border border-border bg-secondary/60 px-3.5 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 capitalize"
               >
                 {STEM_NAMES.map((stem) => (
-                  <option key={stem} value={stem} className="capitalize bg-card text-foreground">
+                  <option
+                    key={stem}
+                    value={stem}
+                    className="capitalize bg-card text-foreground"
+                  >
                     {stem}
                   </option>
                 ))}
@@ -325,86 +352,113 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
             <div className="grid grid-cols-2 gap-3">
               <label
                 className={cn(
-                  'flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all',
-                  format === 'wav'
-                    ? 'border-primary bg-primary/10 text-foreground font-medium shadow-xs'
-                    : 'border-border bg-secondary/40 text-muted-foreground hover:bg-secondary/70'
+                  "flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all",
+                  format === "wav"
+                    ? "border-primary bg-primary/10 text-foreground font-medium shadow-xs"
+                    : "border-border bg-secondary/40 text-muted-foreground hover:bg-secondary/70"
                 )}
               >
                 <input
                   type="radio"
                   name="export-format"
                   value="wav"
-                  checked={format === 'wav'}
-                  onChange={() => setFormat('wav')}
+                  checked={format === "wav"}
+                  onChange={() => setFormat("wav")}
                   disabled={isExporting}
                   className="accent-primary"
                 />
                 <div>
                   <div className="text-sm">WAV</div>
-                  <div className="text-[11px] text-muted-foreground">Lossless PCM</div>
+                  <div className="text-[11px] text-muted-foreground">
+                    Lossless PCM
+                  </div>
                 </div>
               </label>
 
               <label
                 className={cn(
-                  'flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all',
-                  format === 'mp3'
-                    ? 'border-primary bg-primary/10 text-foreground font-medium shadow-xs'
-                    : 'border-border bg-secondary/40 text-muted-foreground hover:bg-secondary/70'
+                  "flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all",
+                  format === "mp3"
+                    ? "border-primary bg-primary/10 text-foreground font-medium shadow-xs"
+                    : "border-border bg-secondary/40 text-muted-foreground hover:bg-secondary/70"
                 )}
               >
                 <input
                   type="radio"
                   name="export-format"
                   value="mp3"
-                  checked={format === 'mp3'}
-                  onChange={() => setFormat('mp3')}
+                  checked={format === "mp3"}
+                  onChange={() => setFormat("mp3")}
                   disabled={isExporting}
                   className="accent-primary"
                 />
                 <div>
                   <div className="text-sm">MP3</div>
-                  <div className="text-[11px] text-muted-foreground">Compressed MPEG-1</div>
+                  <div className="text-[11px] text-muted-foreground">
+                    Compressed MPEG-1
+                  </div>
                 </div>
               </label>
             </div>
           </div>
 
           {/* Sub-Format Options */}
-          {format === 'wav' ? (
+          {format === "wav" ? (
             <div className="space-y-1.5">
-              <label htmlFor="bit-depth-select" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <label
+                htmlFor="bit-depth-select"
+                className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+              >
                 Bit Depth
               </label>
               <select
                 id="bit-depth-select"
                 aria-label="Bit Depth"
                 value={bitDepth}
-                onChange={(e) => setBitDepth(parseInt(e.target.value, 10) as 16 | 24)}
+                onChange={(e) =>
+                  setBitDepth(parseInt(e.target.value, 10) as 16 | 24)
+                }
                 disabled={isExporting}
                 className="w-full rounded-xl border border-border bg-secondary/60 px-3.5 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
               >
-                <option value="16" className="bg-card text-foreground">16-bit PCM (CD Standard)</option>
-                <option value="24" className="bg-card text-foreground">24-bit PCM (Studio Studio High-Res)</option>
+                <option value="16" className="bg-card text-foreground">
+                  16-bit PCM (CD Standard)
+                </option>
+                <option value="24" className="bg-card text-foreground">
+                  24-bit PCM (Studio Studio High-Res)
+                </option>
               </select>
             </div>
           ) : (
             <div className="space-y-1.5">
-              <label htmlFor="bitrate-select" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <label
+                htmlFor="bitrate-select"
+                className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+              >
                 MP3 Bitrate
               </label>
               <select
                 id="bitrate-select"
                 aria-label="Bitrate"
                 value={bitrate}
-                onChange={(e) => setBitrate(parseInt(e.target.value, 10) as Mp3Bitrate)}
+                onChange={(e) =>
+                  setBitrate(parseInt(e.target.value, 10) as Mp3Bitrate)
+                }
                 disabled={isExporting}
                 className="w-full rounded-xl border border-border bg-secondary/60 px-3.5 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
               >
                 {VALID_MP3_BITRATES.map((br) => (
-                  <option key={br} value={br} className="bg-card text-foreground">
-                    {br} kbps {br === 320 ? '(Maximum Quality)' : br === 192 ? '(Balanced)' : ''}
+                  <option
+                    key={br}
+                    value={br}
+                    className="bg-card text-foreground"
+                  >
+                    {br} kbps{" "}
+                    {br === 320
+                      ? "(Maximum Quality)"
+                      : br === 192
+                        ? "(Balanced)"
+                        : ""}
                   </option>
                 ))}
               </select>
@@ -421,9 +475,11 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
                   ) : (
                     <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
                   )}
-                  {statusMessage || 'Encoding...'}
+                  {statusMessage || "Encoding..."}
                 </span>
-                <span className="font-mono text-primary font-bold">{progress}%</span>
+                <span className="font-mono text-primary font-bold">
+                  {progress}%
+                </span>
               </div>
               <div
                 role="progressbar"

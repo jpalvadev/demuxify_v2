@@ -14,3 +14,6 @@ Canonical 5-role triage vocabulary. See `docs/agents/triage-labels.md`.
 
 Single-context layout (`GLOSSARY.md` and `docs/adr/`). See `docs/agents/domain.md`.
 
+### Coding standards
+
+Enforced conventions and architectural guardrails. See `CODING_STANDARDS.md`.

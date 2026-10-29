@@ -1,9 +1,9 @@
-import '@testing-library/jest-dom';
-import 'fake-indexeddb/auto';
-import { vi } from 'vitest';
+import "@testing-library/jest-dom";
+import "fake-indexeddb/auto";
+import { vi } from "vitest";
 
-if (typeof window !== 'undefined') {
-  if (typeof Blob !== 'undefined' && !Blob.prototype.arrayBuffer) {
+if (typeof window !== "undefined") {
+  if (typeof Blob !== "undefined" && !Blob.prototype.arrayBuffer) {
     Blob.prototype.arrayBuffer = function (this: Blob) {
       return new Promise<ArrayBuffer>((resolve, reject) => {
         const reader = new FileReader();
@@ -14,14 +14,16 @@ if (typeof window !== 'undefined') {
     };
   }
 
-  if (typeof URL.createObjectURL === 'undefined') {
-    URL.createObjectURL = vi.fn((_blob: Blob) => `blob:mock-url-${Math.random()}`);
+  if (typeof URL.createObjectURL === "undefined") {
+    URL.createObjectURL = vi.fn(
+      (_blob: Blob) => `blob:mock-url-${Math.random()}`
+    );
   }
-  if (typeof URL.revokeObjectURL === 'undefined') {
+  if (typeof URL.revokeObjectURL === "undefined") {
     URL.revokeObjectURL = vi.fn();
   }
 
-  if (typeof HTMLAnchorElement !== 'undefined') {
+  if (typeof HTMLAnchorElement !== "undefined") {
     HTMLAnchorElement.prototype.click = vi.fn();
   }
 
@@ -57,7 +59,7 @@ if (typeof window !== 'undefined') {
   if (!window.AudioContext) {
     class MockAudioContext {
       currentTime = 0;
-      state = 'running';
+      state = "running";
       destination = { connect: vi.fn(), disconnect: vi.fn() };
       resume = vi.fn().mockResolvedValue(undefined);
       suspend = vi.fn().mockResolvedValue(undefined);
@@ -86,7 +88,10 @@ if (typeof window !== 'undefined') {
         };
       }
       createBuffer(channels: number, length: number, sampleRate: number) {
-        const channelArrays = Array.from({ length: channels }, () => new Float32Array(length));
+        const channelArrays = Array.from(
+          { length: channels },
+          () => new Float32Array(length)
+        );
         return {
           numberOfChannels: channels,
           length,
@@ -98,14 +103,36 @@ if (typeof window !== 'undefined') {
           }),
         };
       }
-      decodeAudioData = vi.fn();
+      decodeAudioData = vi
+        .fn()
+        .mockImplementation((_arrayBuffer: ArrayBuffer) => {
+          const length = 44100;
+          const channelData = [
+            new Float32Array(length),
+            new Float32Array(length),
+          ];
+          return Promise.resolve({
+            duration: 1.0,
+            sampleRate: 44100,
+            numberOfChannels: 2,
+            length,
+            getChannelData: (ch: number) =>
+              channelData[ch] || new Float32Array(length),
+            copyToChannel: (src: Float32Array, ch: number) => {
+              if (channelData[ch]) channelData[ch].set(src);
+            },
+          });
+        });
     }
     window.AudioContext = MockAudioContext as any;
   }
 
-  if (typeof HTMLCanvasElement !== 'undefined') {
-    HTMLCanvasElement.prototype.getContext = function (this: HTMLCanvasElement, contextType: string) {
-      if (contextType === '2d') {
+  if (typeof HTMLCanvasElement !== "undefined") {
+    HTMLCanvasElement.prototype.getContext = function (
+      this: HTMLCanvasElement,
+      contextType: string
+    ) {
+      if (contextType === "2d") {
         return {
           canvas: this,
           clearRect: vi.fn(),
@@ -129,15 +156,14 @@ if (typeof window !== 'undefined') {
           }),
           setLineDash: vi.fn(),
           lineWidth: 1,
-          fillStyle: '#000',
-          strokeStyle: '#000',
-          font: '10px sans-serif',
-          textAlign: 'left',
-          textBaseline: 'top',
+          fillStyle: "#000",
+          strokeStyle: "#000",
+          font: "10px sans-serif",
+          textAlign: "left",
+          textBaseline: "top",
         };
       }
       return null;
     } as any;
   }
 }
-

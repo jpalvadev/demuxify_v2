@@ -1,9 +1,15 @@
-import React, { useRef, useEffect, useState, useMemo, useCallback } from 'react';
-import { Mic, Drum, Radio, Music, Volume2, VolumeX } from 'lucide-react';
-import { StemName } from '../lib/chunkOverlapAdd';
-import { WaveformPeaks, computeWaveformPeaks } from '../lib/waveformPeaks';
-import { StemMixerSettings } from '../lib/sessionStore';
-import { cn } from '../lib/utils';
+import React, {
+  useRef,
+  useEffect,
+  useState,
+  useMemo,
+  useCallback,
+} from "react";
+import { Mic, Drum, Radio, Music, Volume2, VolumeX } from "lucide-react";
+import { StemName } from "../lib/chunkOverlapAdd";
+import { WaveformPeaks, computeWaveformPeaks } from "../lib/waveformPeaks";
+import { StemMixerSettings } from "../lib/sessionStore";
+import { cn } from "../lib/utils";
 
 export interface StemStripProps {
   stem: StemName;
@@ -35,32 +41,32 @@ const STEM_CONFIG: Record<
   }
 > = {
   vocals: {
-    label: 'Vocals',
+    label: "Vocals",
     icon: Mic,
-    badgeClass: 'bg-cyan-500/15 text-cyan-400 border-cyan-500/30',
-    activeColor: '#38bdf8', // sky-400
-    inactiveColor: 'rgba(56, 189, 248, 0.25)',
+    badgeClass: "bg-cyan-500/15 text-cyan-400 border-cyan-500/30",
+    activeColor: "#38bdf8", // sky-400
+    inactiveColor: "rgba(56, 189, 248, 0.25)",
   },
   drums: {
-    label: 'Drums',
+    label: "Drums",
     icon: Drum,
-    badgeClass: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
-    activeColor: '#fbbf24', // amber-400
-    inactiveColor: 'rgba(251, 191, 36, 0.25)',
+    badgeClass: "bg-amber-500/15 text-amber-400 border-amber-500/30",
+    activeColor: "#fbbf24", // amber-400
+    inactiveColor: "rgba(251, 191, 36, 0.25)",
   },
   bass: {
-    label: 'Bass',
+    label: "Bass",
     icon: Radio,
-    badgeClass: 'bg-purple-500/15 text-purple-400 border-purple-500/30',
-    activeColor: '#c084fc', // purple-400
-    inactiveColor: 'rgba(192, 132, 252, 0.25)',
+    badgeClass: "bg-purple-500/15 text-purple-400 border-purple-500/30",
+    activeColor: "#c084fc", // purple-400
+    inactiveColor: "rgba(192, 132, 252, 0.25)",
   },
   other: {
-    label: 'Other',
+    label: "Other",
     icon: Music,
-    badgeClass: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
-    activeColor: '#34d399', // emerald-400
-    inactiveColor: 'rgba(52, 211, 153, 0.25)',
+    badgeClass: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
+    activeColor: "#34d399", // emerald-400
+    inactiveColor: "rgba(52, 211, 153, 0.25)",
   },
 };
 
@@ -97,7 +103,9 @@ export const StemStrip: React.FC<StemStripProps> = ({
   const effectivePeaks = useMemo(() => {
     if (providedPeaks) return providedPeaks;
     if (audioBuffer) {
-      return computeWaveformPeaks(audioBuffer, { targetBins: Math.max(150, Math.floor(containerWidth)) });
+      return computeWaveformPeaks(audioBuffer, {
+        targetBins: Math.max(150, Math.floor(containerWidth)),
+      });
     }
     return null;
   }, [providedPeaks, audioBuffer, containerWidth]);
@@ -116,7 +124,7 @@ export const StemStrip: React.FC<StemStripProps> = ({
 
     updateWidth();
 
-    if (typeof ResizeObserver !== 'undefined') {
+    if (typeof ResizeObserver !== "undefined") {
       const observer = new ResizeObserver((entries) => {
         for (const entry of entries) {
           if (entry.contentRect.width > 0) {
@@ -134,7 +142,7 @@ export const StemStrip: React.FC<StemStripProps> = ({
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
     const dpr = window.devicePixelRatio || 1;
@@ -149,15 +157,16 @@ export const StemStrip: React.FC<StemStripProps> = ({
 
     // Background fill
     ctx.clearRect(0, 0, width, canvasHeight);
-    ctx.fillStyle = isSilenced ? '#080a10' : '#0c101a';
+    ctx.fillStyle = isSilenced ? "#080a10" : "#0c101a";
     ctx.fillRect(0, 0, width, canvasHeight);
 
-    const playheadRatio = duration > 0 ? Math.max(0, Math.min(1, currentTime / duration)) : 0;
+    const playheadRatio =
+      duration > 0 ? Math.max(0, Math.min(1, currentTime / duration)) : 0;
     const playheadX = playheadRatio * width;
     const midY = canvasHeight / 2;
 
     // Center guide line
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.04)";
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(0, midY);
@@ -180,7 +189,7 @@ export const StemStrip: React.FC<StemStripProps> = ({
         const barHeight = Math.max(1, yBottom - yTop);
 
         if (isSilenced) {
-          ctx.fillStyle = 'rgba(100, 116, 139, 0.2)'; // Grayed out when silenced
+          ctx.fillStyle = "rgba(100, 116, 139, 0.2)"; // Grayed out when silenced
         } else if (x <= playheadX) {
           ctx.fillStyle = config.activeColor;
         } else {
@@ -193,7 +202,7 @@ export const StemStrip: React.FC<StemStripProps> = ({
 
     // Draw playhead cursor
     if (duration > 0) {
-      ctx.strokeStyle = isSilenced ? 'rgba(255, 255, 255, 0.3)' : '#ffffff';
+      ctx.strokeStyle = isSilenced ? "rgba(255, 255, 255, 0.3)" : "#ffffff";
       ctx.lineWidth = 1.5;
       ctx.beginPath();
       ctx.moveTo(playheadX, 0);
@@ -202,7 +211,15 @@ export const StemStrip: React.FC<StemStripProps> = ({
     }
 
     ctx.restore();
-  }, [effectivePeaks, duration, currentTime, containerWidth, height, isSilenced, config]);
+  }, [
+    effectivePeaks,
+    duration,
+    currentTime,
+    containerWidth,
+    height,
+    isSilenced,
+    config,
+  ]);
 
   const handleWaveformClick = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
@@ -221,8 +238,8 @@ export const StemStrip: React.FC<StemStripProps> = ({
       role="group"
       aria-label={`${config.label} Stem`}
       className={cn(
-        'group flex flex-col sm:flex-row items-stretch sm:items-center gap-3 rounded-xl border border-border bg-card/60 p-3 transition-colors shadow-xs',
-        isSilenced && 'opacity-65 bg-card/30',
+        "group flex flex-col sm:flex-row items-stretch sm:items-center gap-3 rounded-xl border border-border bg-card/60 p-3 transition-colors shadow-xs",
+        isSilenced && "opacity-65 bg-card/30",
         className
       )}
     >
@@ -230,7 +247,7 @@ export const StemStrip: React.FC<StemStripProps> = ({
       <div className="flex items-center gap-2 sm:w-32 shrink-0">
         <div
           className={cn(
-            'flex items-center gap-2 rounded-lg border px-2.5 py-1 text-xs font-semibold shadow-xs',
+            "flex items-center gap-2 rounded-lg border px-2.5 py-1 text-xs font-semibold shadow-xs",
             config.badgeClass
           )}
         >
@@ -260,10 +277,10 @@ export const StemStrip: React.FC<StemStripProps> = ({
             onClick={onToggleMute}
             title={`Mute ${config.label}`}
             className={cn(
-              'h-8 w-8 rounded-lg border text-xs font-bold transition-all flex items-center justify-center',
+              "h-8 w-8 rounded-lg border text-xs font-bold transition-all flex items-center justify-center",
               muted
-                ? 'border-destructive/60 bg-destructive text-destructive-foreground shadow-xs'
-                : 'border-border/70 bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground'
+                ? "border-destructive/60 bg-destructive text-destructive-foreground shadow-xs"
+                : "border-border/70 bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground"
             )}
           >
             M
@@ -275,10 +292,10 @@ export const StemStrip: React.FC<StemStripProps> = ({
             onClick={onToggleSolo}
             title={`Solo ${config.label}`}
             className={cn(
-              'h-8 w-8 rounded-lg border text-xs font-bold transition-all flex items-center justify-center',
+              "h-8 w-8 rounded-lg border text-xs font-bold transition-all flex items-center justify-center",
               solo
-                ? 'border-amber-500/60 bg-amber-500 text-black shadow-xs font-black'
-                : 'border-border/70 bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground'
+                ? "border-amber-500/60 bg-amber-500 text-black shadow-xs font-black"
+                : "border-border/70 bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground"
             )}
           >
             S
@@ -310,7 +327,3 @@ export const StemStrip: React.FC<StemStripProps> = ({
     </div>
   );
 };
-
-// Backwards compatibility aliases
-export const StemTrack = StemStrip;
-export type StemTrackProps = StemStripProps;

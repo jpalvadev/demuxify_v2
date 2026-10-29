@@ -1,12 +1,24 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { Play, Pause, RotateCcw, Volume2, Layers, Trash2, Download, Gauge, Music, Plus, Minus } from 'lucide-react';
-import { StemName, STEM_NAMES } from '../lib/chunkOverlapAdd';
-import { StemPlayerEngine, StemMixerStates } from '../lib/stemPlayerEngine';
-import { StemStrip } from './StemStrip';
-import { MasterWaveform } from './MasterWaveform';
-import { ExportDialog } from './ExportDialog';
-import { WaveformPeaks } from '../lib/waveformPeaks';
-import { cn } from '../lib/utils';
+import React, { useEffect, useState, useRef, useCallback } from "react";
+import {
+  Play,
+  Pause,
+  RotateCcw,
+  Volume2,
+  Layers,
+  Trash2,
+  Download,
+  Gauge,
+  Music,
+  Plus,
+  Minus,
+} from "lucide-react";
+import { StemName, STEM_NAMES } from "../lib/chunkOverlapAdd";
+import { StemPlayerEngine, StemMixerStates } from "../lib/stemPlayerEngine";
+import { StemStrip } from "./StemStrip";
+import { MasterWaveform } from "./MasterWaveform";
+import { ExportDialog } from "./ExportDialog";
+import { WaveformPeaks } from "../lib/waveformPeaks";
+import { cn } from "../lib/utils";
 
 export interface StemPlayerProps {
   stems: Record<StemName, Float32Array[] | AudioBuffer>;
@@ -16,20 +28,23 @@ export interface StemPlayerProps {
   masterPeaks?: WaveformPeaks | null;
   audioContext?: AudioContext;
   sourceMixTitle?: string;
-  songTitle?: string; // backwards compatibility alias
   className?: string;
   initialMixerStates?: StemMixerStates;
   initialMasterVolume?: number;
   initialCurrentTime?: number;
-  onMixerChange?: (mixer: { stems: StemMixerStates; masterVolume: number; currentTime: number }) => void;
+  onMixerChange?: (mixer: {
+    stems: StemMixerStates;
+    masterVolume: number;
+    currentTime: number;
+  }) => void;
   onPurgeSession?: () => void;
 }
 
 function formatTime(totalSeconds: number): string {
-  if (isNaN(totalSeconds) || totalSeconds < 0) return '00:00';
+  if (isNaN(totalSeconds) || totalSeconds < 0) return "00:00";
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = Math.floor(totalSeconds % 60);
-  return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  return `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
 }
 
 export const StemPlayer: React.FC<StemPlayerProps> = ({
@@ -39,8 +54,7 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
   sourceMixBuffer,
   masterPeaks,
   audioContext,
-  sourceMixTitle: propSourceMixTitle,
-  songTitle: propSongTitle,
+  sourceMixTitle = "source_mix",
   className,
   initialMixerStates,
   initialMasterVolume,
@@ -48,7 +62,6 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
   onMixerChange,
   onPurgeSession,
 }) => {
-  const sourceMixTitle = propSourceMixTitle || propSongTitle || 'source_mix';
   const engineRef = useRef<StemPlayerEngine | null>(null);
 
   const [isPlaying, setIsPlaying] = useState(false);
@@ -118,24 +131,24 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
       const target = e.target as HTMLElement | null;
       if (
         target &&
-        typeof (target as any).getAttribute === 'function' &&
-        (target.tagName === 'INPUT' ||
-          target.tagName === 'TEXTAREA' ||
+        typeof (target as any).getAttribute === "function" &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
           target.isContentEditable ||
-          target.getAttribute('role') === 'textbox')
+          target.getAttribute("role") === "textbox")
       ) {
         return;
       }
 
-      if (e.code === 'Space' || e.key === ' ') {
+      if (e.code === "Space" || e.key === " ") {
         e.preventDefault();
         togglePlayPause();
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown);
     return () => {
-      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener("keydown", handleKeyDown);
     };
   }, []);
 
@@ -152,66 +165,81 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
     }
   }, []);
 
-  const handleSeek = useCallback((seekTime: number) => {
-    const engine = engineRef.current;
-    if (!engine) return;
-    engine.seek(seekTime);
-    setCurrentTime(seekTime);
-    onMixerChange?.({
-      stems: engine.getAllStemStates(),
-      masterVolume: engine.getMasterVolume(),
-      currentTime: seekTime,
-    });
-  }, [onMixerChange]);
+  const handleSeek = useCallback(
+    (seekTime: number) => {
+      const engine = engineRef.current;
+      if (!engine) return;
+      engine.seek(seekTime);
+      setCurrentTime(seekTime);
+      onMixerChange?.({
+        stems: engine.getAllStemStates(),
+        masterVolume: engine.getMasterVolume(),
+        currentTime: seekTime,
+      });
+    },
+    [onMixerChange]
+  );
 
   const handleReset = useCallback(() => {
     handleSeek(0);
   }, [handleSeek]);
 
-  const handleVolumeChange = useCallback((stem: StemName, volume: number) => {
-    const engine = engineRef.current;
-    if (!engine) return;
-    engine.setStemVolume(stem, volume);
-    onMixerChange?.({
-      stems: engine.getAllStemStates(),
-      masterVolume: engine.getMasterVolume(),
-      currentTime: engine.getCurrentTime(),
-    });
-  }, [onMixerChange]);
+  const handleVolumeChange = useCallback(
+    (stem: StemName, volume: number) => {
+      const engine = engineRef.current;
+      if (!engine) return;
+      engine.setStemVolume(stem, volume);
+      onMixerChange?.({
+        stems: engine.getAllStemStates(),
+        masterVolume: engine.getMasterVolume(),
+        currentTime: engine.getCurrentTime(),
+      });
+    },
+    [onMixerChange]
+  );
 
-  const handleToggleMute = useCallback((stem: StemName) => {
-    const engine = engineRef.current;
-    if (!engine) return;
-    engine.toggleStemMute(stem);
-    onMixerChange?.({
-      stems: engine.getAllStemStates(),
-      masterVolume: engine.getMasterVolume(),
-      currentTime: engine.getCurrentTime(),
-    });
-  }, [onMixerChange]);
+  const handleToggleMute = useCallback(
+    (stem: StemName) => {
+      const engine = engineRef.current;
+      if (!engine) return;
+      engine.toggleStemMute(stem);
+      onMixerChange?.({
+        stems: engine.getAllStemStates(),
+        masterVolume: engine.getMasterVolume(),
+        currentTime: engine.getCurrentTime(),
+      });
+    },
+    [onMixerChange]
+  );
 
-  const handleToggleSolo = useCallback((stem: StemName) => {
-    const engine = engineRef.current;
-    if (!engine) return;
-    engine.toggleStemSolo(stem);
-    onMixerChange?.({
-      stems: engine.getAllStemStates(),
-      masterVolume: engine.getMasterVolume(),
-      currentTime: engine.getCurrentTime(),
-    });
-  }, [onMixerChange]);
+  const handleToggleSolo = useCallback(
+    (stem: StemName) => {
+      const engine = engineRef.current;
+      if (!engine) return;
+      engine.toggleStemSolo(stem);
+      onMixerChange?.({
+        stems: engine.getAllStemStates(),
+        masterVolume: engine.getMasterVolume(),
+        currentTime: engine.getCurrentTime(),
+      });
+    },
+    [onMixerChange]
+  );
 
-  const handleMasterVolumeChange = useCallback((volume: number) => {
-    const engine = engineRef.current;
-    if (!engine) return;
-    engine.setMasterVolume(volume);
-    setMasterVolume(volume);
-    onMixerChange?.({
-      stems: engine.getAllStemStates(),
-      masterVolume: volume,
-      currentTime: engine.getCurrentTime(),
-    });
-  }, [onMixerChange]);
+  const handleMasterVolumeChange = useCallback(
+    (volume: number) => {
+      const engine = engineRef.current;
+      if (!engine) return;
+      engine.setMasterVolume(volume);
+      setMasterVolume(volume);
+      onMixerChange?.({
+        stems: engine.getAllStemStates(),
+        masterVolume: volume,
+        currentTime: engine.getCurrentTime(),
+      });
+    },
+    [onMixerChange]
+  );
 
   const handleTempoChange = useCallback((newTempo: number) => {
     engineRef.current?.setTempo(newTempo);
@@ -253,7 +281,7 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
       role="region"
       aria-label="Stem Player"
       className={cn(
-        'w-full rounded-2xl border border-border bg-card/70 p-4 sm:p-6 shadow-md backdrop-blur-md space-y-6',
+        "w-full rounded-2xl border border-border bg-card/70 p-4 sm:p-6 shadow-md backdrop-blur-md space-y-6",
         className
       )}
     >
@@ -277,9 +305,13 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
         <div className="flex flex-wrap items-center justify-between md:justify-end gap-3 sm:gap-4">
           {/* Time Display */}
           <div className="flex items-center gap-1 font-mono text-sm bg-secondary/60 px-3 py-1.5 rounded-xl border border-border/60">
-            <span className="text-primary font-bold">{formatTime(currentTime)}</span>
+            <span className="text-primary font-bold">
+              {formatTime(currentTime)}
+            </span>
             <span className="text-muted-foreground/60">/</span>
-            <span className="text-muted-foreground">{formatTime(duration)}</span>
+            <span className="text-muted-foreground">
+              {formatTime(duration)}
+            </span>
           </div>
 
           {/* Transport Controls */}
@@ -296,8 +328,8 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
 
             <button
               type="button"
-              aria-label={isPlaying ? 'Pause' : 'Play'}
-              title={isPlaying ? 'Pause (Space)' : 'Play (Space)'}
+              aria-label={isPlaying ? "Pause" : "Play"}
+              title={isPlaying ? "Pause (Space)" : "Play (Space)"}
               onClick={togglePlayPause}
               className="flex h-10 px-5 items-center justify-center gap-2 rounded-xl bg-primary text-primary-foreground font-semibold shadow-sm hover:bg-primary/90 active:scale-95 transition-all"
             >
@@ -349,7 +381,9 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
               max={1}
               step={0.01}
               value={masterVolume}
-              onChange={(e) => handleMasterVolumeChange(parseFloat(e.target.value))}
+              onChange={(e) =>
+                handleMasterVolumeChange(parseFloat(e.target.value))
+              }
               aria-label="Master Volume"
               className="w-24 accent-primary cursor-pointer h-1.5 bg-secondary rounded-lg appearance-none"
             />
@@ -380,9 +414,12 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
               <Gauge className="h-4 w-4" />
             </div>
             <div>
-              <h4 className="text-sm font-semibold text-foreground">Time-Stretch & Pitch</h4>
+              <h4 className="text-sm font-semibold text-foreground">
+                Time-Stretch & Pitch
+              </h4>
               <p className="text-[11px] text-muted-foreground">
-                Independent real-time tempo (0.5x–2.0x) and pitch transposition (-12 to +12 st)
+                Independent real-time tempo (0.5x–2.0x) and pitch transposition
+                (-12 to +12 st)
               </p>
             </div>
           </div>
@@ -417,7 +454,9 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
             </div>
 
             <div className="flex items-center gap-3">
-              <span className="text-[11px] font-mono text-muted-foreground">0.5x</span>
+              <span className="text-[11px] font-mono text-muted-foreground">
+                0.5x
+              </span>
               <input
                 type="range"
                 min="0.5"
@@ -428,7 +467,9 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
                 aria-label="Playback Tempo"
                 className="w-full accent-primary cursor-pointer h-1.5 bg-secondary rounded-lg appearance-none"
               />
-              <span className="text-[11px] font-mono text-muted-foreground">2.0x</span>
+              <span className="text-[11px] font-mono text-muted-foreground">
+                2.0x
+              </span>
             </div>
 
             <div className="flex items-center justify-between gap-1.5 pt-0.5">
@@ -442,10 +483,10 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
                     aria-label={`Tempo preset ${label}`}
                     onClick={() => handleTempoChange(preset)}
                     className={cn(
-                      'flex-1 py-1 rounded-md text-[11px] font-semibold border transition-all',
+                      "flex-1 py-1 rounded-md text-[11px] font-semibold border transition-all",
                       isSelected
-                        ? 'bg-primary text-primary-foreground border-primary shadow-sm'
-                        : 'bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground border-border/60'
+                        ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                        : "bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground border-border/60"
                     )}
                   >
                     {label}
@@ -467,9 +508,11 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
                 className="font-mono text-xs font-bold text-foreground bg-secondary px-2 py-0.5 rounded-md border border-border"
               >
                 {pitch === 0
-                  ? '0 st'
-                  : `${pitch > 0 ? '+' : ''}${
-                      Number.isInteger(pitch) ? pitch : pitch.toFixed(2).replace(/\.?0+$/, '')
+                  ? "0 st"
+                  : `${pitch > 0 ? "+" : ""}${
+                      Number.isInteger(pitch)
+                        ? pitch
+                        : pitch.toFixed(2).replace(/\.?0+$/, "")
                     } st`}
               </span>
             </div>
@@ -487,18 +530,24 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
               </button>
 
               <div className="flex-1 flex items-center gap-2">
-                <span className="text-[11px] font-mono text-muted-foreground">-12</span>
+                <span className="text-[11px] font-mono text-muted-foreground">
+                  -12
+                </span>
                 <input
                   type="range"
                   min="-12"
                   max="12"
                   step="0.01"
                   value={pitch}
-                  onChange={(e) => handlePitchChange(parseFloat(e.target.value))}
+                  onChange={(e) =>
+                    handlePitchChange(parseFloat(e.target.value))
+                  }
                   aria-label="Pitch Shift"
                   className="w-full accent-primary cursor-pointer h-1.5 bg-secondary rounded-lg appearance-none"
                 />
-                <span className="text-[11px] font-mono text-muted-foreground">+12</span>
+                <span className="text-[11px] font-mono text-muted-foreground">
+                  +12
+                </span>
               </div>
 
               <button
@@ -533,7 +582,9 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
 
         {STEM_NAMES.map((stem) => {
           const state = mixerStates[stem];
-          const isSilenced = hasAnySolo ? (!state.solo || state.muted) : state.muted;
+          const isSilenced = hasAnySolo
+            ? !state.solo || state.muted
+            : state.muted;
           const stemBuffer = engineRef.current?.getStemBuffer(stem);
 
           return (

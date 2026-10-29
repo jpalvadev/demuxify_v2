@@ -1,20 +1,23 @@
-import React, { useEffect, useState, useRef, ChangeEvent } from 'react';
-import { AlertCircle, Loader2, CheckCircle2, Music } from 'lucide-react';
-import { Header } from './components/Header';
-import { SourceMixDropzone } from './components/SourceMixDropzone';
-import { FallbackAdvisory } from './components/FallbackAdvisory';
-import { SourceMixCard } from './components/SourceMixCard';
-import { MasterWaveform } from './components/MasterWaveform';
-import { StemPlayer } from './components/StemPlayer';
-import { SessionRecovery } from './components/SessionRecovery';
-import { SeparationProgress, SeparationPhase } from './components/SeparationProgress';
-import { ToastContainer } from './components/Toast';
-import { detectWebGPUCapability, WebGPUCapability } from './lib/webgpu';
-import { decodeAudio, DecodedSourceMix } from './lib/audioDecoder';
-import { computeWaveformPeaks, WaveformPeaks } from './lib/waveformPeaks';
-import { InferenceClient, ChunkProgress } from './lib/inferenceClient';
-import { DownloadProgress } from './lib/modelCache';
-import { StemName, STEM_NAMES } from './lib/chunkOverlapAdd';
+import React, { useEffect, useState, useRef, ChangeEvent } from "react";
+import { AlertCircle, Loader2, CheckCircle2, Music } from "lucide-react";
+import { Header } from "./components/Header";
+import { SourceMixDropzone } from "./components/SourceMixDropzone";
+import { FallbackAdvisory } from "./components/FallbackAdvisory";
+import { SourceMixCard } from "./components/SourceMixCard";
+import { MasterWaveform } from "./components/MasterWaveform";
+import { StemPlayer } from "./components/StemPlayer";
+import { SessionRecovery } from "./components/SessionRecovery";
+import {
+  SeparationProgress,
+  SeparationPhase,
+} from "./components/SeparationProgress";
+import { ToastContainer } from "./components/Toast";
+import { detectWebGPUCapability, WebGPUCapability } from "./lib/webgpu";
+import { decodeAudio, DecodedSourceMix } from "./lib/audioDecoder";
+import { computeWaveformPeaks, WaveformPeaks } from "./lib/waveformPeaks";
+import { InferenceClient, ChunkProgress } from "./lib/inferenceClient";
+import { DownloadProgress } from "./lib/modelCache";
+import { StemName, STEM_NAMES } from "./lib/chunkOverlapAdd";
 import {
   loadActiveSession,
   hasActiveSession,
@@ -22,45 +25,59 @@ import {
   createSessionAutoSaver,
   DemuxifySession,
   SessionMixerState,
-} from './lib/sessionStore';
-import { StemMixerStates } from './lib/stemPlayerEngine';
+} from "./lib/sessionStore";
+import { StemMixerStates } from "./lib/stemPlayerEngine";
 
-const SUPPORTED_EXTENSIONS = ['.mp3', '.wav', '.flac', '.ogg', '.aac', '.m4a'];
+const SUPPORTED_EXTENSIONS = [".mp3", ".wav", ".flac", ".ogg", ".aac", ".m4a"];
 const SUPPORTED_MIME_TYPES = [
-  'audio/mpeg',
-  'audio/wav',
-  'audio/x-wav',
-  'audio/flac',
-  'audio/ogg',
-  'audio/aac',
-  'audio/mp4',
-  'audio/*',
+  "audio/mpeg",
+  "audio/wav",
+  "audio/x-wav",
+  "audio/flac",
+  "audio/ogg",
+  "audio/aac",
+  "audio/mp4",
+  "audio/*",
 ];
 
 export const App: React.FC = () => {
-  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
+  const [theme, setTheme] = useState<"dark" | "light">("dark");
   const [capability, setCapability] = useState<WebGPUCapability | null>(null);
   const [isDetectingWebGPU, setIsDetectingWebGPU] = useState(true);
 
   // Source Mix State
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [decodedSourceMix, setDecodedSourceMix] = useState<DecodedSourceMix | null>(null);
-  const [waveformPeaks, setWaveformPeaks] = useState<WaveformPeaks | null>(null);
+  const [decodedSourceMix, setDecodedSourceMix] =
+    useState<DecodedSourceMix | null>(null);
+  const [waveformPeaks, setWaveformPeaks] = useState<WaveformPeaks | null>(
+    null
+  );
   const [currentTime, setCurrentTime] = useState(0);
   const [isDecoding, setIsDecoding] = useState(false);
   const [decodeError, setDecodeError] = useState<string | null>(null);
 
   // Inference Separation State
-  const [separationPhase, setSeparationPhase] = useState<SeparationPhase>('idle');
-  const [downloadProgress, setDownloadProgress] = useState<DownloadProgress | null>(null);
-  const [chunkProgress, setChunkProgress] = useState<ChunkProgress | null>(null);
+  const [separationPhase, setSeparationPhase] =
+    useState<SeparationPhase>("idle");
+  const [downloadProgress, setDownloadProgress] =
+    useState<DownloadProgress | null>(null);
+  const [chunkProgress, setChunkProgress] = useState<ChunkProgress | null>(
+    null
+  );
   const [separationError, setSeparationError] = useState<string | null>(null);
-  const [separatedStems, setSeparatedStems] = useState<Record<StemName, Float32Array[]> | null>(null);
+  const [separatedStems, setSeparatedStems] = useState<Record<
+    StemName,
+    Float32Array[]
+  > | null>(null);
 
   // Session Recovery & Persistence State
-  const [detectedSession, setDetectedSession] = useState<{ title: string; duration: number } | null>(null);
+  const [detectedSession, setDetectedSession] = useState<{
+    title: string;
+    duration: number;
+  } | null>(null);
   const [isResumingSession, setIsResumingSession] = useState(false);
-  const [restoredMixerState, setRestoredMixerState] = useState<SessionMixerState | null>(null);
+  const [restoredMixerState, setRestoredMixerState] =
+    useState<SessionMixerState | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const inferenceClientRef = useRef<InferenceClient | null>(null);
@@ -122,17 +139,17 @@ export const App: React.FC = () => {
 
   useEffect(() => {
     const root = document.documentElement;
-    if (theme === 'dark') {
-      root.classList.add('dark');
-      root.classList.remove('light');
+    if (theme === "dark") {
+      root.classList.add("dark");
+      root.classList.remove("light");
     } else {
-      root.classList.add('light');
-      root.classList.remove('dark');
+      root.classList.add("light");
+      root.classList.remove("dark");
     }
   }, [theme]);
 
   const handleToggleTheme = () => {
-    setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
+    setTheme((prev) => (prev === "dark" ? "light" : "dark"));
   };
 
   const processAudioFile = async (file: File) => {
@@ -140,7 +157,7 @@ export const App: React.FC = () => {
     setIsDecoding(true);
     setDecodeError(null);
     setCurrentTime(0);
-    setSeparationPhase('idle');
+    setSeparationPhase("idle");
     setSeparatedStems(null);
 
     try {
@@ -178,14 +195,14 @@ export const App: React.FC = () => {
     setWaveformPeaks(null);
     setCurrentTime(0);
     setDecodeError(null);
-    setSeparationPhase('idle');
+    setSeparationPhase("idle");
     setSeparatedStems(null);
     setDownloadProgress(null);
     setChunkProgress(null);
     setSeparationError(null);
     setRestoredMixerState(null);
     if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+      fileInputRef.current.value = "";
     }
   };
 
@@ -205,11 +222,16 @@ export const App: React.FC = () => {
 
       const AudioCtx =
         window.AudioContext ||
-        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+        (window as unknown as { webkitAudioContext: typeof AudioContext })
+          .webkitAudioContext;
       const audioCtx = new AudioCtx();
       const numChannels = session.sourceMix.channels.length;
       const length = session.sourceMix.channels[0]?.length ?? 0;
-      const buffer = audioCtx.createBuffer(numChannels, length, session.metadata.sampleRate);
+      const buffer = audioCtx.createBuffer(
+        numChannels,
+        length,
+        session.metadata.sampleRate
+      );
       for (let c = 0; c < numChannels; c++) {
         buffer.getChannelData(c).set(session.sourceMix.channels[c]);
       }
@@ -230,10 +252,10 @@ export const App: React.FC = () => {
       setSeparatedStems(session.stems);
       setRestoredMixerState(session.mixer);
       setCurrentTime(session.mixer.currentTime ?? 0);
-      setSeparationPhase('completed');
+      setSeparationPhase("completed");
       setDetectedSession(null);
     } catch (err) {
-      setDecodeError('Failed to resume previous session.');
+      setDecodeError("Failed to resume previous session.");
     } finally {
       setIsResumingSession(false);
     }
@@ -253,7 +275,11 @@ export const App: React.FC = () => {
     handleClearSourceMix();
   };
 
-  const handleMixerChange = (mixer: { stems: StemMixerStates; masterVolume: number; currentTime: number }) => {
+  const handleMixerChange = (mixer: {
+    stems: StemMixerStates;
+    masterVolume: number;
+    currentTime: number;
+  }) => {
     if (!cachedSessionRef.current) return;
     const updatedSession: DemuxifySession = {
       ...cachedSessionRef.current,
@@ -287,7 +313,7 @@ export const App: React.FC = () => {
     if (!decodedSourceMix) return;
 
     try {
-      setSeparationPhase('downloading');
+      setSeparationPhase("downloading");
       setSeparationError(null);
       setSeparatedStems(null);
 
@@ -296,17 +322,18 @@ export const App: React.FC = () => {
       }
       const client = inferenceClientRef.current;
 
-      const isTestEnv = typeof process !== 'undefined' && process.env?.NODE_ENV === 'test';
+      const isTestEnv =
+        typeof process !== "undefined" && process.env?.NODE_ENV === "test";
 
       await client.init({
         useMock: isTestEnv,
         onDownloadProgress: (p) => {
           setDownloadProgress(p);
-          setSeparationPhase('downloading');
+          setSeparationPhase("downloading");
         },
       });
 
-      setSeparationPhase('separating');
+      setSeparationPhase("separating");
 
       const numChannels = decodedSourceMix.buffer.numberOfChannels;
       const audio: Float32Array[] = [];
@@ -314,14 +341,18 @@ export const App: React.FC = () => {
         audio.push(decodedSourceMix.buffer.getChannelData(c));
       }
 
-      const result = await client.separate(audio, decodedSourceMix.buffer.sampleRate, {
-        onChunkProgress: (p) => {
-          setChunkProgress(p);
-        },
-      });
+      const result = await client.separate(
+        audio,
+        decodedSourceMix.buffer.sampleRate,
+        {
+          onChunkProgress: (p) => {
+            setChunkProgress(p);
+          },
+        }
+      );
 
       setSeparatedStems(result.stems);
-      setSeparationPhase('completed');
+      setSeparationPhase("completed");
 
       const initialMixerState: SessionMixerState = {
         stems: {
@@ -342,7 +373,7 @@ export const App: React.FC = () => {
           id: `session-${Date.now()}`,
           createdAt: Date.now(),
           updatedAt: Date.now(),
-          title: decodedSourceMix.metadata.fileName.replace(/\.[^/.]+$/, ''),
+          title: decodedSourceMix.metadata.fileName.replace(/\.[^/.]+$/, ""),
           filename: decodedSourceMix.metadata.fileName,
           duration: decodedSourceMix.metadata.duration,
           sampleRate: decodedSourceMix.metadata.sampleRate,
@@ -359,11 +390,11 @@ export const App: React.FC = () => {
       autoSaverRef.current.debounceSave(sessionToSave);
     } catch (err) {
       if (err instanceof Error && /cancelled/i.test(err.message)) {
-        setSeparationPhase('idle');
+        setSeparationPhase("idle");
       } else {
         const message = err instanceof Error ? err.message : String(err);
         setSeparationError(message);
-        setSeparationPhase('error');
+        setSeparationPhase("error");
       }
     }
   };
@@ -372,7 +403,7 @@ export const App: React.FC = () => {
     if (inferenceClientRef.current) {
       inferenceClientRef.current.cancel();
     }
-    setSeparationPhase('idle');
+    setSeparationPhase("idle");
     setChunkProgress(null);
     setDownloadProgress(null);
   };
@@ -387,9 +418,7 @@ export const App: React.FC = () => {
       />
 
       <main className="flex-1 mx-auto w-full max-w-4xl px-4 py-8 sm:px-6 sm:py-12 flex flex-col gap-8">
-        {capability?.isFallback && (
-          <FallbackAdvisory capability={capability} />
-        )}
+        {capability?.isFallback && <FallbackAdvisory capability={capability} />}
 
         <section className="space-y-4">
           <div className="space-y-1">
@@ -397,7 +426,8 @@ export const App: React.FC = () => {
               Separate Music Into Stems
             </h2>
             <p className="text-sm text-muted-foreground sm:text-base">
-              Extract Vocals, Drums, Bass, and Other instruments locally in your browser using Demucs v4.
+              Extract Vocals, Drums, Bass, and Other instruments locally in your
+              browser using Demucs v4.
             </p>
           </div>
 
@@ -410,7 +440,9 @@ export const App: React.FC = () => {
               <AlertCircle className="h-5 w-5 shrink-0 mt-0.5" />
               <div className="flex-1">
                 <h4 className="font-semibold">Unable to Decode Audio</h4>
-                <p className="mt-0.5 text-xs text-destructive/90">{decodeError}</p>
+                <p className="mt-0.5 text-xs text-destructive/90">
+                  {decodeError}
+                </p>
               </div>
               <button
                 type="button"
@@ -428,7 +460,11 @@ export const App: React.FC = () => {
             type="file"
             id="app-source-mix-input"
             aria-label="Change Source Mix file"
-            accept={SUPPORTED_EXTENSIONS.join(',') + ',' + SUPPORTED_MIME_TYPES.join(',')}
+            accept={
+              SUPPORTED_EXTENSIONS.join(",") +
+              "," +
+              SUPPORTED_MIME_TYPES.join(",")
+            }
             className="sr-only"
             onChange={handleFileInputChange}
           />
@@ -448,9 +484,12 @@ export const App: React.FC = () => {
           {isDecoding && (
             <div className="flex flex-col items-center justify-center rounded-2xl border border-border bg-card/60 p-12 text-center shadow-sm">
               <Loader2 className="h-8 w-8 animate-spin text-primary mb-3" />
-              <h3 className="text-base font-semibold text-foreground">Decoding Audio Buffer</h3>
+              <h3 className="text-base font-semibold text-foreground">
+                Decoding Audio Buffer
+              </h3>
               <p className="text-xs text-muted-foreground mt-1">
-                Extracting PCM data and computing peak envelopes for waveform rendering...
+                Extracting PCM data and computing peak envelopes for waveform
+                rendering...
               </p>
             </div>
           )}
@@ -485,7 +524,7 @@ export const App: React.FC = () => {
               />
 
               {/* Stems Separated Banner (Visible on completion) */}
-              {separationPhase === 'completed' && separatedStems && (
+              {separationPhase === "completed" && separatedStems && (
                 <div
                   role="region"
                   aria-label="Separation Complete"
@@ -509,7 +548,8 @@ export const App: React.FC = () => {
                             {stem}
                           </div>
                           <div className="text-[10px] text-muted-foreground">
-                            {separatedStems[stem][0]?.length.toLocaleString()} samples
+                            {separatedStems[stem][0]?.length.toLocaleString()}{" "}
+                            samples
                           </div>
                         </div>
                       </div>
@@ -519,7 +559,7 @@ export const App: React.FC = () => {
               )}
 
               {/* Render Stem Player when separation completes; otherwise render Source Mix Master Waveform */}
-              {separationPhase === 'completed' && separatedStems ? (
+              {separationPhase === "completed" && separatedStems ? (
                 <StemPlayer
                   stems={separatedStems}
                   sampleRate={decodedSourceMix.metadata.sampleRate}
@@ -532,7 +572,6 @@ export const App: React.FC = () => {
                   onMixerChange={handleMixerChange}
                   onPurgeSession={handlePurgeSession}
                   sourceMixTitle={decodedSourceMix.metadata.fileName}
-                  songTitle={decodedSourceMix.metadata.fileName}
                 />
               ) : (
                 <MasterWaveform
@@ -551,7 +590,10 @@ export const App: React.FC = () => {
       <ToastContainer />
 
       <footer className="border-t border-border/60 py-6 text-center text-xs text-muted-foreground">
-        <p>Demuxify Web • 100% Client-Side Audio Source Separation • Powered by Demucs v4 &amp; WebGPU</p>
+        <p>
+          Demuxify Web • 100% Client-Side Audio Source Separation • Powered by
+          Demucs v4 &amp; WebGPU
+        </p>
       </footer>
     </div>
   );
