@@ -4,7 +4,7 @@
 
 **Blocked by:** 02: Source Mix Ingestion & Master Waveform Overview
 
-**Status:** ready-for-agent
+**Status:** claimed
 
 - [ ] Model Cache integration using Cache API / OPFS to persist ONNX model weights across browser sessions without re-downloading.
 - [ ] Dedicated Inference Engine Web Worker hosting ONNX Runtime Web with WebGPU execution provider and WASM CPU fallback.
