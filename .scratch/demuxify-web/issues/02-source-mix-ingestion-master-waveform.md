@@ -4,7 +4,7 @@
 
 **Blocked by:** 01: Project Skeleton, PWA Shell & WebGPU Capability Detection
 
-**Status:** ready-for-agent
+**Status:** claimed
 
 - [ ] File dropzone and file picker accept common audio formats (MP3, WAV, FLAC, AAC, OGG) as a Source Mix.
 - [ ] Client-side audio decoding into normalized AudioBuffer data with error handling for corrupted files.
