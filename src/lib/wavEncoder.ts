@@ -13,11 +13,17 @@ export interface WavEncodeOptions {
  */
 export function encodeWav(
   channels: Float32Array[],
-  options?: WavEncodeOptions
+  optionsOrSampleRate?: WavEncodeOptions | number,
+  bitDepthParam?: 16 | 24
 ): Uint8Array {
   if (!channels || channels.length === 0) {
     throw new Error('encodeWav requires at least one channel');
   }
+
+  const options: WavEncodeOptions =
+    typeof optionsOrSampleRate === 'number'
+      ? { sampleRate: optionsOrSampleRate, bitDepth: bitDepthParam }
+      : optionsOrSampleRate ?? {};
 
   const numChannels = channels.length;
   const numSamples = channels[0].length;

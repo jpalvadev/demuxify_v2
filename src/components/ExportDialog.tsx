@@ -14,8 +14,9 @@ import { encodeMp3, createMp3Blob, Mp3Bitrate, VALID_MP3_BITRATES } from '../lib
 import {
   createStemBundleZip,
   formatStemFileName,
-  sanitizeSongTitle,
+  sanitizeSourceMixTitle,
 } from '../lib/bundleZip';
+import { toast } from '../lib/toast';
 import { cn } from '../lib/utils';
 
 export interface ExportDialogProps {
@@ -23,7 +24,8 @@ export interface ExportDialogProps {
   onClose: () => void;
   stems: Record<StemName, Float32Array[] | AudioBuffer>;
   sampleRate?: number;
-  songTitle?: string;
+  sourceMixTitle?: string;
+  songTitle?: string; // backwards compatibility alias
   onExportComplete?: (fileName: string) => void;
 }
 
@@ -59,9 +61,11 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
   onClose,
   stems,
   sampleRate = 44100,
-  songTitle = 'track',
+  sourceMixTitle: propSourceMixTitle,
+  songTitle: propSongTitle,
   onExportComplete,
 }) => {
+  const sourceMixTitle = propSourceMixTitle || propSongTitle || 'source_mix';
   const [mode, setMode] = useState<ExportMode>('single');
   const [selectedStem, setSelectedStem] = useState<StemName>('vocals');
   const [format, setFormat] = useState<ExportFormat>('wav');
@@ -117,7 +121,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
         if (format === 'wav') {
           setProgress(30);
           blob = createWavBlob(channels, { sampleRate, bitDepth });
-          fileName = formatStemFileName(songTitle, selectedStem, 'wav');
+          fileName = formatStemFileName(sourceMixTitle, selectedStem, 'wav');
           setProgress(100);
         } else {
           blob = await createMp3Blob(channels, {
@@ -125,7 +129,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
             bitrate,
             onProgress: (p) => setProgress(Math.round(p * 100)),
           });
-          fileName = formatStemFileName(songTitle, selectedStem, 'mp3');
+          fileName = formatStemFileName(sourceMixTitle, selectedStem, 'mp3');
           setProgress(100);
         }
 
@@ -133,6 +137,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
         triggerDownload(blob, fileName);
         const successMsg = `Export complete! Downloaded ${fileName}`;
         setSuccessNotification(successMsg);
+        toast.success(successMsg);
         onExportComplete?.(fileName);
       } else {
         // Full Export Bundle (ZIP)
@@ -167,26 +172,29 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
 
         setStatusMessage('Packaging ZIP bundle...');
         const zipBlob = await createStemBundleZip(encodedStems, {
-          songTitle,
+          sourceMixTitle,
           format,
           onProgress: (zipPct) => {
             setProgress(Math.round(75 + zipPct * 0.25));
           },
         });
 
-        const zipFileName = `${sanitizeSongTitle(songTitle)}_stems.zip`;
+        const zipFileName = `${sanitizeSourceMixTitle(sourceMixTitle)}_stems.zip`;
         setStatusMessage('Triggering download...');
         triggerDownload(zipBlob, zipFileName);
         const successMsg = `Export complete! Downloaded ${zipFileName}`;
         setSuccessNotification(successMsg);
+        toast.success(successMsg);
         onExportComplete?.(zipFileName);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      const errText = err instanceof Error ? err.message : String(err);
+      setError(errText);
+      toast.error(errText);
     } finally {
       setIsExporting(false);
     }
-  }, [mode, selectedStem, format, bitDepth, bitrate, stems, sampleRate, songTitle, onExportComplete]);
+  }, [mode, selectedStem, format, bitDepth, bitrate, stems, sampleRate, sourceMixTitle, onExportComplete]);
 
   if (!isOpen) return null;
 
@@ -215,7 +223,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
                 Export Audio Stems
               </h2>
               <p className="text-xs text-muted-foreground">
-                Save isolated tracks as pristine WAV or compressed MP3 files
+                Save isolated stems as pristine WAV or compressed MP3 files
               </p>
             </div>
           </div>

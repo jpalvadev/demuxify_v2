@@ -1,4 +1,5 @@
 import { StemName, STEM_NAMES } from './chunkOverlapAdd';
+import { createAudioContext } from './audioContext';
 import {
   registerWsolaAudioWorklet,
   WSOLA_WORKLET_PROCESSOR_NAME,
@@ -76,13 +77,7 @@ export class StemPlayerEngine {
     if (options?.audioContext) {
       this.audioContext = options.audioContext;
     } else {
-      const AudioCtx =
-        window.AudioContext ||
-        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-      if (!AudioCtx) {
-        throw new Error('Web Audio API (AudioContext) is not supported in this browser.');
-      }
-      this.audioContext = new AudioCtx();
+      this.audioContext = createAudioContext();
       this.isOwnContext = true;
     }
 

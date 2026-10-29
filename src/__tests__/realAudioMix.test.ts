@@ -14,7 +14,11 @@ import { encodeWav } from '../lib/wavEncoder';
 import { createStemBundleZip } from '../lib/bundleZip';
 
 describe('Real Audio Ingestion & Processing Pipeline (audioslave_stone.mp3)', () => {
-  const filePath = path.resolve(process.cwd(), 'audioslave_stone.mp3');
+  const candidatePaths = [
+    path.resolve(process.cwd(), 'audioslave_stone.mp3'),
+    path.resolve(process.cwd(), '..', '..', 'audioslave_stone.mp3'),
+  ];
+  const filePath = candidatePaths.find((p) => fs.existsSync(p)) || candidatePaths[0];
 
   it('verifies the real MP3 file exists on disk and has valid file size', () => {
     expect(fs.existsSync(filePath)).toBe(true);
