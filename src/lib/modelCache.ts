@@ -7,7 +7,7 @@
 
 export const MODEL_CACHE_NAME = "demuxify-model-cache-v1";
 export const DEFAULT_MODEL_URL =
-  "https://huggingface.co/StemSplitio/htdemucs-onnx/resolve/main/htdemucs_fp16weights.onnx";
+  "https://huggingface.co/MrCitron/demucs-v4-onnx/resolve/main/htdemucs_ft.onnx";
 
 export interface DownloadProgress {
   loadedBytes: number;

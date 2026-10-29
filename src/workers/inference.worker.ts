@@ -9,10 +9,9 @@ import {
 ort.env.wasm.wasmPaths =
   "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.31.1/dist/";
 
-// Thread safety: if cross-origin isolation (SharedArrayBuffer) is unavailable, constrain to 1 thread
-if (typeof crossOriginIsolated === "undefined" || !crossOriginIsolated) {
-  ort.env.wasm.numThreads = 1;
-}
+// Memory & thread safety: constrain to 1 thread to prevent 32-bit WASM heap fragmentation
+// when allocating large models (>300 MB).
+ort.env.wasm.numThreads = 1;
 import {
   createChunkSegments,
   reconstructStemsFromChunks,
@@ -80,9 +79,21 @@ async function handleInit(
       } satisfies WorkerOutMessage);
     });
 
+    const weightsBytes = new Uint8Array(weightsBuffer);
+
+    // Disable graph optimization and CPU memory arena to prevent duplicate buffer
+    // allocations and memory pool reservation that trigger std::bad_alloc in 32-bit WASM
+    const baseSessionOptions: ort.InferenceSession.SessionOptions = {
+      graphOptimizationLevel: "disabled",
+      enableCpuMemArena: false,
+      enableMemPattern: false,
+      executionMode: "sequential",
+    };
+
     let backend: "webgpu" | "wasm" = "webgpu";
     try {
-      session = await ort.InferenceSession.create(weightsBuffer, {
+      session = await ort.InferenceSession.create(weightsBytes, {
+        ...baseSessionOptions,
         executionProviders: ["webgpu"],
       });
       backend = "webgpu";
@@ -91,7 +102,8 @@ async function handleInit(
         "WebGPU EP initialization failed in Worker, falling back to WASM:",
         gpuErr
       );
-      session = await ort.InferenceSession.create(weightsBuffer, {
+      session = await ort.InferenceSession.create(weightsBytes, {
+        ...baseSessionOptions,
         executionProviders: ["wasm"],
       });
       backend = "wasm";
@@ -101,7 +113,15 @@ async function handleInit(
     postMsg({ type: "init_complete", backend } satisfies WorkerOutMessage);
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : String(err);
-    postMsg({ type: "error", error: errorMessage } satisfies WorkerOutMessage);
+    let userFacingMessage = errorMessage;
+    if (errorMessage.includes("std::bad_alloc")) {
+      userFacingMessage =
+        "Memory allocation failed (std::bad_alloc). The browser ran out of WASM heap space loading the Demucs model (~300 MB). Close background browser tabs or restart your browser to free memory.";
+    }
+    postMsg({
+      type: "error",
+      error: userFacingMessage,
+    } satisfies WorkerOutMessage);
   }
 }
 
