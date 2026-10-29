@@ -4,7 +4,7 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** claimed
 
 - [ ] Modern web project initialized with TypeScript, Tailwind CSS, and ShadCN UI primitives.
 - [ ] PWA manifest and service worker configured for offline capability and installability.
