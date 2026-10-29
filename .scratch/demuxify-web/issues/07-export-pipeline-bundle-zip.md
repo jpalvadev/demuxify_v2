@@ -4,12 +4,12 @@
 
 **Blocked by:** 04: Multi-Track Stem Player with Synchronized Playback, Solo & Mute Controls
 
-**Status:** claimed
+**Status:** resolved
 
-- [ ] Export dialog in the Stem Player allowing selection of export format (WAV PCM 16/24-bit or MP3) and bitrate (128, 192, 256, 320 kbps).
-- [ ] Dedicated audio export worker encoding MP3 using LameJS off the main UI thread.
-- [ ] Direct single-click download for any individual Stem (e.g., `SongTitle_vocals.wav` or `SongTitle_drums.mp3`).
-- [ ] Export Bundle packaging creating a single ZIP file containing all 4 Stems with standardized naming conventions.
-- [ ] Progress toast notifications indicating encoding and packaging percentage with error recovery.
-- [ ] Automated tests asserting WAV header compliance, MP3 bitstream headers, and ZIP archive contents.
+- [x] Export dialog in the Stem Player allowing selection of export format (WAV PCM 16/24-bit or MP3) and bitrate (128, 192, 256, 320 kbps).
+- [x] Dedicated audio export worker encoding MP3 using LameJS off the main UI thread.
+- [x] Direct single-click download for any individual Stem (e.g., `SongTitle_vocals.wav` or `SongTitle_drums.mp3`).
+- [x] Export Bundle packaging creating a single ZIP file containing all 4 Stems with standardized naming conventions.
+- [x] Progress toast notifications indicating encoding and packaging percentage with error recovery.
+- [x] Automated tests asserting WAV header compliance, MP3 bitstream headers, and ZIP archive contents.
 

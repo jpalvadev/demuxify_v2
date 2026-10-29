@@ -357,6 +357,7 @@ export const App: React.FC = () => {
                   duration={decodedSourceMix.metadata.duration}
                   sourceMixBuffer={decodedSourceMix.buffer}
                   masterPeaks={waveformPeaks}
+                  songTitle={decodedSourceMix.metadata.fileName}
                 />
               ) : (
                 <MasterWaveform
