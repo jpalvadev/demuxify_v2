@@ -668,9 +668,7 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
         sourceMixTitle={sourceMixTitle}
         initialMixerStates={mixerStates}
         initialMasterVolume={masterVolume}
-        activeTempo={tempo}
-        activePitch={pitch}
-        activeFormantPreservation={formantPreservation}
+        activeTimeStretch={{ tempo, pitch, formantPreservation }}
       />
     </section>
   );

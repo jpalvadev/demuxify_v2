@@ -15,7 +15,7 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { StemName, STEM_NAMES } from "../lib/chunkOverlapAdd";
-import { StemMixerStates } from "../lib/stemPlayerEngine";
+import { StemMixerStates, TimeStretchState } from "../lib/stemPlayerEngine";
 import { encodeWav, createWavBlob } from "../lib/wavEncoder";
 import {
   encodeMp3,
@@ -42,6 +42,7 @@ export interface ExportDialogProps {
   initialMixerStates?: StemMixerStates;
   initialMasterVolume?: number;
   onExportComplete?: (fileName: string) => void;
+  activeTimeStretch?: TimeStretchState;
   activeTempo?: number;
   activePitch?: number;
   activeFormantPreservation?: boolean;
@@ -144,10 +145,16 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
   initialMixerStates,
   initialMasterVolume,
   onExportComplete,
-  activeTempo,
-  activePitch,
-  activeFormantPreservation,
+  activeTimeStretch,
+  activeTempo: propTempo,
+  activePitch: propPitch,
+  activeFormantPreservation: propFormant,
 }) => {
+  const activeTempo = activeTimeStretch?.tempo ?? propTempo;
+  const activePitch = activeTimeStretch?.pitch ?? propPitch;
+  const activeFormantPreservation =
+    activeTimeStretch?.formantPreservation ?? propFormant;
+
   const [mode, setMode] = useState<ExportMode>("single");
   const [selectedStem, setSelectedStem] = useState<StemName>("vocals");
   const [format, setFormat] = useState<ExportFormat>("wav");
@@ -257,12 +264,26 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
       let exportStems = stems;
       if (applyAdjustments && hasActiveAdjustments) {
         setStatusMessage("Applying active pitch and tempo adjustments...");
-        exportStems = await renderOfflineStems(stems, {
+        let stemsToRender: Partial<
+          Record<StemName, Float32Array[] | AudioBuffer>
+        > = stems;
+        if (mode === "single") {
+          stemsToRender = { [selectedStem]: stems[selectedStem] };
+        } else if (mode === "mixdown") {
+          stemsToRender = {};
+          for (const name of STEM_NAMES) {
+            if (stemControls[name]?.enabled) {
+              stemsToRender[name] = stems[name];
+            }
+          }
+        }
+        const rendered = await renderOfflineStems(stemsToRender as any, {
           sampleRate,
           tempo: activeTempo ?? 1.0,
           pitch: activePitch ?? 0,
           formantPreservation: activeFormantPreservation ?? true,
         });
+        exportStems = { ...stems, ...rendered };
       }
 
       if (mode === "single") {

@@ -567,6 +567,13 @@ export class StemPlayerEngine {
     this.stopPositionLoop();
     const tick = () => {
       if (this.playing) {
+        const curTime = this.getCurrentTime();
+        if (this.duration > 0 && curTime >= this.duration) {
+          this.pause();
+          this.currentOffset = 0;
+          this.notifyPosition();
+          return;
+        }
         this.notifyPosition();
         if (
           typeof window !== "undefined" &&

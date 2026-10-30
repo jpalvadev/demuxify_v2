@@ -72,7 +72,10 @@ export interface MultiTrackStretchNode {
 export function isSignalsmithStretchSupported(
   audioContext?: AudioContext | OfflineAudioContext
 ): boolean {
-  if (typeof window === "undefined" || typeof WebAssembly === "undefined") {
+  if (typeof window === "undefined" && typeof globalThis === "undefined") {
+    return false;
+  }
+  if (typeof WebAssembly === "undefined") {
     return false;
   }
   if (!audioContext) {
@@ -84,16 +87,20 @@ export function isSignalsmithStretchSupported(
   ) {
     return false;
   }
-  // In synthetic Node/Vitest test environments where AudioWorkletNode is a custom spy double,
-  // native WASM worklets are not available unless explicitly enabled.
-  if (
-    typeof process !== "undefined" &&
-    process.env?.NODE_ENV === "test" &&
-    !(audioContext as any).__enableSignalsmith
-  ) {
+  // Allow explicit enablement on test doubles
+  if ((audioContext as any).__enableSignalsmith) {
+    return true;
+  }
+  const WorkletNode =
+    (typeof window !== "undefined" ? (window as any).AudioWorkletNode : null) ||
+    (typeof globalThis !== "undefined"
+      ? (globalThis as any).AudioWorkletNode
+      : null);
+  if (!WorkletNode || typeof WorkletNode !== "function") {
     return false;
   }
-  return true;
+  // Check if AudioWorkletNode is native
+  return WorkletNode.toString().includes("[native code]");
 }
 
 function extractChannels(
@@ -415,14 +422,7 @@ export async function createMultiTrackStretchAdapter(
 
     const stemNodes: Partial<Record<StemName, StretchNodeInterface>> = {};
     for (const stem of STEM_NAMES) {
-      const nodePromise = factory(options.audioContext, stem);
-      const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(
-          () => reject(new Error("SignalsmithStretch initialization timeout")),
-          150
-        )
-      );
-      stemNodes[stem] = await Promise.race([nodePromise, timeoutPromise]);
+      stemNodes[stem] = await factory(options.audioContext, stem);
     }
 
     return new WasmMultiTrackStretchAdapter(
@@ -465,6 +465,14 @@ export async function renderOfflineStems(
 
   const isNeutral = Math.abs(tempo - 1.0) < 1e-4 && Math.abs(pitch) < 1e-4;
 
+  const OfflineCtxClass =
+    typeof OfflineAudioContext !== "undefined"
+      ? OfflineAudioContext
+      : (globalThis as any).OfflineAudioContext;
+  const isOfflineWasmSupported =
+    Boolean(OfflineCtxClass) &&
+    isSignalsmithStretchSupported(new OfflineCtxClass(2, 128, sampleRate));
+
   for (const stem of STEM_NAMES) {
     const raw = stems[stem];
     if (!raw) continue;
@@ -479,15 +487,7 @@ export async function renderOfflineStems(
     const inLength = channels[0].length;
     const targetLength = Math.max(1, Math.round(inLength / tempo));
 
-    const OfflineCtxClass =
-      typeof OfflineAudioContext !== "undefined"
-        ? OfflineAudioContext
-        : (globalThis as any).OfflineAudioContext;
-
-    if (
-      OfflineCtxClass &&
-      isSignalsmithStretchSupported(new OfflineCtxClass(2, 128, sampleRate))
-    ) {
+    if (isOfflineWasmSupported && OfflineCtxClass) {
       try {
         const offlineCtx = new OfflineCtxClass(
           channels.length,
@@ -525,12 +525,13 @@ export async function renderOfflineStems(
 
     // Fallback: deterministic offline transform for test/mock environments
     if (!rendered) {
+      const pitchRatio = Math.pow(2, pitch / 12);
       rendered = channels.map((ch) => {
         const len = ch.length;
         const outLen = Math.max(1, Math.round(len / tempo));
         const out = new Float32Array(outLen);
         for (let i = 0; i < outLen; i++) {
-          const pos = i * tempo;
+          const pos = (i * tempo * pitchRatio) % len;
           const idx = Math.floor(pos);
           const frac = pos - idx;
           const v0 = ch[idx] ?? 0;
