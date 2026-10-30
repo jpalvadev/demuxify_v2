@@ -242,13 +242,18 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
   );
 
   const handleTempoChange = useCallback((newTempo: number) => {
-    engineRef.current?.setTempo(newTempo);
-    setTempo(newTempo);
+    const quantized = Math.max(
+      0.5,
+      Math.min(2.0, Math.round(newTempo * 4) / 4)
+    );
+    engineRef.current?.setTempo(quantized);
+    setTempo(quantized);
   }, []);
 
   const handlePitchChange = useCallback((newPitch: number) => {
-    engineRef.current?.setPitch(newPitch);
-    setPitch(newPitch);
+    const quantized = Math.max(-12, Math.min(12, Math.round(newPitch)));
+    engineRef.current?.setPitch(quantized);
+    setPitch(quantized);
   }, []);
 
   const handleIncrementPitch = useCallback(() => {
@@ -429,7 +434,7 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
             aria-label="Reset Time-Stretch"
             title="Reset pitch to 0 and tempo to 1.0x"
             onClick={handleResetTimeStretch}
-            disabled={tempo === 1.0 && pitch === 0}
+            disabled={Math.abs(tempo - 1.0) < 0.001 && pitch === 0}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-border/80 bg-secondary/80 text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-secondary transition-all disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <RotateCcw className="h-3.5 w-3.5" />
@@ -455,25 +460,25 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
 
             <div className="flex items-center gap-3">
               <span className="text-[11px] font-mono text-muted-foreground">
-                0.5x
+                0.50x
               </span>
               <input
                 type="range"
                 min="0.5"
-                max="2.0"
-                step="0.05"
+                max="2"
+                step="0.25"
                 value={tempo}
                 onChange={(e) => handleTempoChange(parseFloat(e.target.value))}
                 aria-label="Playback Tempo"
                 className="w-full accent-primary cursor-pointer h-1.5 bg-secondary rounded-lg appearance-none"
               />
               <span className="text-[11px] font-mono text-muted-foreground">
-                2.0x
+                2.00x
               </span>
             </div>
 
-            <div className="flex items-center justify-between gap-1.5 pt-0.5">
-              {[0.75, 1.0, 1.25, 1.5].map((preset) => {
+            <div className="flex items-center justify-between gap-1 sm:gap-1.5 pt-0.5">
+              {[0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0].map((preset) => {
                 const label = `${preset.toFixed(2)}x`;
                 const isSelected = Math.abs(tempo - preset) < 0.01;
                 return (
@@ -481,9 +486,10 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
                     key={preset}
                     type="button"
                     aria-label={`Tempo preset ${label}`}
+                    aria-pressed={isSelected}
                     onClick={() => handleTempoChange(preset)}
                     className={cn(
-                      "flex-1 py-1 rounded-md text-[11px] font-semibold border transition-all",
+                      "flex-1 py-1 rounded-md text-[10px] sm:text-[11px] font-semibold border transition-all",
                       isSelected
                         ? "bg-primary text-primary-foreground border-primary shadow-sm"
                         : "bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground border-border/60"
@@ -537,7 +543,7 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
                   type="range"
                   min="-12"
                   max="12"
-                  step="0.01"
+                  step="1"
                   value={pitch}
                   onChange={(e) =>
                     handlePitchChange(parseFloat(e.target.value))
