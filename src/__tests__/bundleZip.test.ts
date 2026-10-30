@@ -105,6 +105,30 @@ describe("bundleZip", () => {
       );
     });
 
+    it("includes bundle manifest when model profile metadata is provided", async () => {
+      const mockStems: Record<StemName, Uint8Array> = {
+        vocals: new Uint8Array([1]),
+        drums: new Uint8Array([2]),
+        bass: new Uint8Array([3]),
+        other: new Uint8Array([4]),
+      };
+
+      const zipBlob = await createStemBundleZip(mockStems, {
+        sourceMixTitle: "RockTrack",
+        format: "wav",
+        modelProfileId: "mdx-net-4stem",
+        modelProfileName: "MDX-Net 4-Stem",
+      });
+
+      const zip = await JSZip.loadAsync(zipBlob);
+      const manifestFile = zip.file("bundle_manifest.json");
+      expect(manifestFile).not.toBeNull();
+      const content = JSON.parse(await manifestFile!.async("text"));
+      expect(content.modelProfileId).toBe("mdx-net-4stem");
+      expect(content.modelProfileName).toBe("MDX-Net 4-Stem");
+      expect(content.stems).toEqual(["vocals", "drums", "bass", "other"]);
+    });
+
     it("throws error if any of the 4 stems are missing", async () => {
       const incomplete = {
         vocals: new Uint8Array([1]),

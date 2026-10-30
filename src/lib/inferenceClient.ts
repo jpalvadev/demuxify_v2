@@ -1,5 +1,6 @@
 import { StemName, ChunkOptions } from "./chunkOverlapAdd";
 import { DownloadProgress, DEFAULT_MODEL_URL } from "./modelCache";
+import { ModelId } from "./modelConfig";
 import { diagnostics } from "./diagnostics";
 import type {
   WorkerInMessage,
@@ -31,6 +32,7 @@ export interface SeparationResult {
 
 export interface InitOptions {
   modelUrl?: string;
+  modelProfileId?: ModelId;
   useMock?: boolean;
   preferredBackend?: "webgpu" | "wasm";
   onDownloadProgress?: (progress: DownloadProgress) => void;
@@ -206,6 +208,7 @@ export class InferenceClient {
       const message: WorkerInMessage = {
         type: "init",
         modelUrl: options.modelUrl ?? DEFAULT_MODEL_URL,
+        modelProfileId: options.modelProfileId,
         useMock: options.useMock ?? false,
         preferredBackend: options.preferredBackend,
       };

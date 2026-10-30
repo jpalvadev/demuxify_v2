@@ -1,4 +1,9 @@
 import { diagnostics } from "./diagnostics";
+import {
+  resolveModelProfile,
+  ALL_MODEL_CACHE_NAMES,
+  BS_ROFORMER_PROFILE,
+} from "./modelConfig";
 
 /**
  * Model Cache module for persistent storage of ONNX model weights.
@@ -14,8 +19,21 @@ export const OBSOLETE_CACHE_NAMES = [
   "demuxify-model-cache-v4",
 ] as const;
 
-export const MODEL_CACHE_NAME = "demuxify-roformer-cache-v1";
-export const DEFAULT_MODEL_URL = "/models/bs_roformer_4stem_webgpu.onnx";
+export const MODEL_CACHE_NAME = BS_ROFORMER_PROFILE.cacheName;
+export const DEFAULT_MODEL_URL = BS_ROFORMER_PROFILE.modelUrl;
+
+/**
+ * Resolves the cache partition name for a given model URL or explicitly provided cache partition.
+ */
+export function resolveModelCacheName(
+  url: string = DEFAULT_MODEL_URL,
+  explicitCacheName?: string
+): string {
+  if (explicitCacheName) {
+    return explicitCacheName;
+  }
+  return resolveModelProfile(url).cacheName;
+}
 
 export interface DownloadProgress {
   loadedBytes: number;
@@ -38,13 +56,15 @@ function isCacheStorageAvailable(): boolean {
  * Checks if model weights are already stored in Model Cache.
  */
 export async function isModelCached(
-  url: string = DEFAULT_MODEL_URL
+  url: string = DEFAULT_MODEL_URL,
+  cacheName?: string
 ): Promise<boolean> {
   if (!isCacheStorageAvailable()) {
     return false;
   }
   try {
-    const cache = await globalThis.caches.open(MODEL_CACHE_NAME);
+    const targetCache = resolveModelCacheName(url, cacheName);
+    const cache = await globalThis.caches.open(targetCache);
     const match = await cache.match(url);
     return Boolean(match);
   } catch {
@@ -53,18 +73,35 @@ export async function isModelCached(
 }
 
 /**
- * Deletes model weights from Model Cache, or deletes entire cache if no url provided.
+ * Deletes model weights from Model Cache, or deletes all model cache partitions if no url or cacheName provided.
  */
-export async function clearModelCache(url?: string): Promise<boolean> {
+export async function clearModelCache(
+  url?: string,
+  cacheName?: string
+): Promise<boolean> {
   if (!isCacheStorageAvailable()) {
     return false;
   }
   try {
-    if (url) {
-      const cache = await globalThis.caches.open(MODEL_CACHE_NAME);
+    if (cacheName) {
+      if (url) {
+        const cache = await globalThis.caches.open(cacheName);
+        return await cache.delete(url);
+      } else {
+        return await globalThis.caches.delete(cacheName);
+      }
+    } else if (url) {
+      const targetCache = resolveModelCacheName(url);
+      const cache = await globalThis.caches.open(targetCache);
       return await cache.delete(url);
     } else {
-      return await globalThis.caches.delete(MODEL_CACHE_NAME);
+      // Purge all model cache partitions when called parameterless
+      let allDeleted = true;
+      for (const cName of ALL_MODEL_CACHE_NAMES) {
+        const deleted = await globalThis.caches.delete(cName);
+        if (!deleted) allDeleted = false;
+      }
+      return allDeleted;
     }
   } catch {
     return false;
@@ -78,8 +115,11 @@ export async function clearModelCache(url?: string): Promise<boolean> {
  */
 export async function getModelWeights(
   url: string = DEFAULT_MODEL_URL,
-  onProgress?: (progress: DownloadProgress) => void
+  onProgress?: (progress: DownloadProgress) => void,
+  cacheName?: string
 ): Promise<ArrayBuffer> {
+  const targetCacheName = resolveModelCacheName(url, cacheName);
+
   // 1. Try to fetch from Cache Storage
   if (isCacheStorageAvailable()) {
     try {
@@ -88,13 +128,13 @@ export async function getModelWeights(
         globalThis.caches.delete(obsoleteCache).catch(() => {});
       }
 
-      const cache = await globalThis.caches.open(MODEL_CACHE_NAME);
+      const cache = await globalThis.caches.open(targetCacheName);
       const cachedResponse = await cache.match(url);
       if (cachedResponse) {
         const buffer = await cachedResponse.arrayBuffer();
         diagnostics.info(
           "network",
-          `Model Cache hit for ${url} (${(buffer.byteLength / 1048576).toFixed(1)} MB)`
+          `Model Cache hit for ${url} in ${targetCacheName} (${(buffer.byteLength / 1048576).toFixed(1)} MB)`
         );
         onProgress?.({
           loadedBytes: buffer.byteLength,
@@ -171,7 +211,7 @@ export async function getModelWeights(
   // 3. Persist to cache
   if (isCacheStorageAvailable()) {
     try {
-      const cache = await globalThis.caches.open(MODEL_CACHE_NAME);
+      const cache = await globalThis.caches.open(targetCacheName);
       // Response constructor accepts ArrayBuffer
       const responseToCache = new Response(buffer.slice(0), {
         headers: {

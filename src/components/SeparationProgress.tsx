@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { DownloadProgress } from "../lib/modelCache";
 import { ChunkProgress, ChunkStartEvent } from "../lib/inferenceClient";
+import { ModelProfile, BS_ROFORMER_PROFILE } from "../lib/modelConfig";
 
 export type SeparationPhase =
   "idle" | "downloading" | "separating" | "completed" | "cancelled" | "error";
@@ -18,6 +19,7 @@ export interface SeparationProgressProps {
   downloadProgress?: DownloadProgress | null;
   chunkProgress?: ChunkProgress | null;
   chunkStart?: ChunkStartEvent | null;
+  modelProfile?: ModelProfile;
   error?: string | null;
   onCancel: () => void;
   onRetry?: () => void;
@@ -40,10 +42,12 @@ export const SeparationProgress: React.FC<SeparationProgressProps> = ({
   downloadProgress,
   chunkProgress,
   chunkStart,
+  modelProfile,
   error,
   onCancel,
   onRetry,
 }) => {
+  const activeProfile = modelProfile ?? BS_ROFORMER_PROFILE;
   const [activeSeconds, setActiveSeconds] = useState(0);
 
   useEffect(() => {
@@ -101,7 +105,7 @@ export const SeparationProgress: React.FC<SeparationProgressProps> = ({
 
           <div>
             <h3 className="text-base font-semibold text-foreground flex items-center gap-2">
-              {isDownloading && "Downloading BS-RoFormer Model Weights"}
+              {isDownloading && `Downloading ${activeProfile.name} Weights`}
               {isSeparating &&
                 totalChunksCount &&
                 `Separating Chunk ${currentChunkIndex} of ${totalChunksCount}`}
@@ -120,7 +124,7 @@ export const SeparationProgress: React.FC<SeparationProgressProps> = ({
             <p className="text-xs text-muted-foreground mt-0.5">
               {isDownloading && downloadProgress && (
                 <>
-                  Persisting BS-RoFormer 4-stem model into Model Cache (
+                  Persisting {activeProfile.name} into Model Cache (
                   {formatBytes(downloadProgress.loadedBytes)} /{" "}
                   {formatBytes(downloadProgress.totalBytes)})
                 </>
@@ -182,6 +186,25 @@ export const SeparationProgress: React.FC<SeparationProgressProps> = ({
         </div>
       </div>
 
+      {/* Model Advisory Badge */}
+      <div
+        role="status"
+        aria-label="Active Model Advisory"
+        className="mt-4 flex items-center justify-between rounded-xl border border-primary/20 bg-primary/5 px-3 py-2 text-xs"
+      >
+        <div className="flex items-center gap-2">
+          <span className="font-semibold text-primary">
+            {activeProfile.shortName} ({activeProfile.name})
+          </span>
+          <span className="text-muted-foreground hidden sm:inline">
+            • {activeProfile.explanation}
+          </span>
+        </div>
+        <span className="text-[10px] uppercase font-mono tracking-wider text-muted-foreground">
+          {activeProfile.deviceCategory}
+        </span>
+      </div>
+
       {/* Progress Bar */}
       {(isDownloading || isSeparating) && (
         <div className="mt-5 space-y-1.5">
@@ -201,7 +224,7 @@ export const SeparationProgress: React.FC<SeparationProgressProps> = ({
           <div className="flex justify-between text-[11px] text-muted-foreground">
             <span>
               {isDownloading
-                ? "BS-RoFormer Model Cache initialization"
+                ? `${activeProfile.name} Model Cache initialization`
                 : "Neural network chunk processing & overlap-add blending"}
             </span>
             <span>{percent}%</span>

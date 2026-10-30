@@ -13,6 +13,13 @@ import {
 } from "./components/SeparationProgress";
 import { ToastContainer } from "./components/Toast";
 import { DiagnosticsOverlay } from "./components/DiagnosticsOverlay";
+import { ModelSelector } from "./components/ModelSelector";
+import {
+  isMobileDevice,
+  getDefaultModelProfile,
+  getModelProfile,
+  ModelId,
+} from "./lib/modelConfig";
 import { diagnostics } from "./lib/diagnostics";
 import { detectWebGPUCapability, WebGPUCapability } from "./lib/webgpu";
 import { decodeAudio, DecodedSourceMix } from "./lib/audioDecoder";
@@ -50,6 +57,12 @@ export const App: React.FC = () => {
   const [theme, setTheme] = useState<"dark" | "light">("dark");
   const [capability, setCapability] = useState<WebGPUCapability | null>(null);
   const [isDetectingWebGPU, setIsDetectingWebGPU] = useState(true);
+
+  // Model Profile State
+  const [isMobile] = useState(() => isMobileDevice());
+  const [selectedModelId, setSelectedModelId] = useState<ModelId>(
+    () => getDefaultModelProfile().id
+  );
 
   // Source Mix State
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -269,6 +282,11 @@ export const App: React.FC = () => {
       setWaveformPeaks(peaks);
       setSeparatedStems(session.stems);
       setRestoredMixerState(session.mixer);
+      if (isMobile) {
+        setSelectedModelId("mdx-net-4stem");
+      } else if (session.metadata.modelProfileId) {
+        setSelectedModelId(session.metadata.modelProfileId);
+      }
       setCurrentTime(session.mixer.currentTime ?? 0);
       setSeparationPhase("completed");
       setDetectedSession(null);
@@ -340,10 +358,13 @@ export const App: React.FC = () => {
       }
       const client = inferenceClientRef.current;
 
+      const activeProfile = getModelProfile(selectedModelId);
       const isTestEnv =
         typeof process !== "undefined" && process.env?.NODE_ENV === "test";
 
       await client.init({
+        modelUrl: activeProfile.modelUrl,
+        modelProfileId: activeProfile.id,
         useMock: isTestEnv,
         preferredBackend: capability?.isFallback ? "wasm" : undefined,
         onDownloadProgress: (p) => {
@@ -400,6 +421,7 @@ export const App: React.FC = () => {
           duration: decodedSourceMix.metadata.duration,
           sampleRate: decodedSourceMix.metadata.sampleRate,
           size: decodedSourceMix.metadata.fileSize,
+          modelProfileId: selectedModelId,
         },
         sourceMix: {
           channels: audio,
@@ -450,7 +472,7 @@ export const App: React.FC = () => {
             </h2>
             <p className="text-sm text-muted-foreground sm:text-base">
               Extract Vocals, Drums, Bass, and Other instruments locally in your
-              browser using BS-RoFormer.
+              browser using neural network models.
             </p>
           </div>
 
@@ -517,6 +539,15 @@ export const App: React.FC = () => {
             </div>
           )}
 
+          {/* Model Profile Selector & Device Advisory */}
+          {separationPhase === "idle" && (
+            <ModelSelector
+              selectedModelId={selectedModelId}
+              onSelectModel={setSelectedModelId}
+              isMobile={isMobile}
+            />
+          )}
+
           {/* Render Source Mix Dropzone when no audio is loaded and not decoding */}
           {!isDecoding && !decodedSourceMix && (
             <SourceMixDropzone
@@ -542,6 +573,7 @@ export const App: React.FC = () => {
                 downloadProgress={downloadProgress}
                 chunkProgress={chunkProgress}
                 chunkStart={chunkStart}
+                modelProfile={getModelProfile(selectedModelId)}
                 error={separationError}
                 onCancel={handleCancelSeparation}
                 onRetry={handleStartSeparation}
@@ -617,7 +649,7 @@ export const App: React.FC = () => {
       <footer className="border-t border-border/60 py-6 text-center text-xs text-muted-foreground">
         <p>
           Demuxify Web • 100% Client-Side Audio Source Separation • Powered by
-          BS-RoFormer &amp; WebGPU
+          Client Neural Inference &amp; WebGPU
         </p>
       </footer>
     </div>

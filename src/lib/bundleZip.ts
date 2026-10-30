@@ -4,6 +4,8 @@ import { STEM_NAMES, StemName } from "./chunkOverlapAdd";
 export interface CreateStemBundleOptions {
   sourceMixTitle?: string;
   format?: "wav" | "mp3";
+  modelProfileId?: string;
+  modelProfileName?: string;
   onProgress?: (percent: number) => void;
 }
 
@@ -56,6 +58,17 @@ export async function createStemBundleZip(
     const fileName = formatStemFileName(title, stem, format);
     const data = stemFiles[stem];
     zip.file(fileName, data);
+  }
+
+  if (options?.modelProfileId || options?.modelProfileName) {
+    const manifest = {
+      sourceMixTitle: title,
+      modelProfileId: options.modelProfileId,
+      modelProfileName: options.modelProfileName,
+      stems: STEM_NAMES,
+      exportedAt: new Date().toISOString(),
+    };
+    zip.file("bundle_manifest.json", JSON.stringify(manifest, null, 2));
   }
 
   const zipBlob = await zip.generateAsync(

@@ -175,4 +175,35 @@ describe("Model Cache", () => {
       );
     }
   });
+
+  it("supports isolated cache partitions for different model profiles", async () => {
+    const roformerUrl = "/models/bs_roformer_4stem_webgpu.onnx";
+    const mdxnetUrl = "/models/mdx_net_4stem_mobile.onnx";
+    const mdxCacheName = "demuxify-mdxnet-cache-v1";
+    const roformerCacheName = "demuxify-roformer-cache-v1";
+
+    const mdxStore = new Map<string, Response>();
+    const mdxMockCache = {
+      match: vi.fn(async (req: string) => mdxStore.get(req)?.clone()),
+      put: vi.fn(async (req: string, res: Response) => {
+        mdxStore.set(req, res.clone());
+      }),
+      delete: vi.fn(async (req: string) => mdxStore.delete(req)),
+    };
+
+    (globalThis as any).caches.open = vi.fn(async (name: string) => {
+      if (name === mdxCacheName) return mdxMockCache;
+      return mockCache;
+    });
+
+    // Check caching MDX-Net into isolated partition
+    expect(await isModelCached(mdxnetUrl, mdxCacheName)).toBe(false);
+    expect((globalThis as any).caches.open).toHaveBeenCalledWith(mdxCacheName);
+
+    mdxStore.set(mdxnetUrl, new Response(dummyData.buffer));
+    expect(await isModelCached(mdxnetUrl, mdxCacheName)).toBe(true);
+
+    // Roformer partition remains unaffected
+    expect(await isModelCached(roformerUrl, roformerCacheName)).toBe(false);
+  });
 });
