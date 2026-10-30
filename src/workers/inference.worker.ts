@@ -223,12 +223,12 @@ async function handleStart(
     const effectiveOverlapSamples =
       options?.overlapSamples ??
       Math.round(activeProfile.chunkOverlapSec * sampleRate);
-
-    const chunks = createChunkSegments(audio, {
+    const effectiveChunkOptions: ChunkOptions = {
       chunkSamples: effectiveChunkSamples,
       overlapSamples: effectiveOverlapSamples,
-      ...options,
-    });
+    };
+
+    const chunks = createChunkSegments(audio, effectiveChunkOptions);
     const totalChunks = chunks.length;
     const results: ChunkInferenceResult[] = [];
 
@@ -491,7 +491,7 @@ async function handleStart(
     const reconstructed = reconstructStemsFromChunks(
       results,
       totalSamples,
-      options
+      effectiveChunkOptions
     );
 
     postMsg({

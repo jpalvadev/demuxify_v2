@@ -6,6 +6,7 @@ import {
   MODEL_PROFILES,
   BS_ROFORMER_PROFILE,
   HT_DEMUCS_PROFILE,
+  listModelProfiles,
 } from "../lib/modelConfig";
 
 export interface ModelSelectorProps {
@@ -61,7 +62,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
   }
 
   // On desktop browsers, render interactive Model Selector control
-  const profiles = [BS_ROFORMER_PROFILE, HT_DEMUCS_PROFILE];
+  const profiles = listModelProfiles();
 
   return (
     <div

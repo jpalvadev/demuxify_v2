@@ -18,6 +18,7 @@ import {
   isMobileDevice,
   getDefaultModelProfile,
   getModelProfile,
+  DEFAULT_MOBILE_MODEL_ID,
   ModelId,
 } from "./lib/modelConfig";
 import { diagnostics } from "./lib/diagnostics";
@@ -283,7 +284,7 @@ export const App: React.FC = () => {
       setSeparatedStems(session.stems);
       setRestoredMixerState(session.mixer);
       if (isMobile) {
-        setSelectedModelId("htdemucs-4stem");
+        setSelectedModelId(DEFAULT_MOBILE_MODEL_ID);
       } else if (session.metadata.modelProfileId) {
         setSelectedModelId(session.metadata.modelProfileId);
       }
