@@ -282,8 +282,10 @@ export const App: React.FC = () => {
       setWaveformPeaks(peaks);
       setSeparatedStems(session.stems);
       setRestoredMixerState(session.mixer);
-      if (session.metadata.modelProfileId) {
-        setSelectedModelId(session.metadata.modelProfileId as ModelId);
+      if (isMobile) {
+        setSelectedModelId("mdx-net-4stem");
+      } else if (session.metadata.modelProfileId) {
+        setSelectedModelId(session.metadata.modelProfileId);
       }
       setCurrentTime(session.mixer.currentTime ?? 0);
       setSeparationPhase("completed");
@@ -647,7 +649,7 @@ export const App: React.FC = () => {
       <footer className="border-t border-border/60 py-6 text-center text-xs text-muted-foreground">
         <p>
           Demuxify Web • 100% Client-Side Audio Source Separation • Powered by
-          BS-RoFormer &amp; WebGPU
+          Client Neural Inference &amp; WebGPU
         </p>
       </footer>
     </div>

@@ -1,4 +1,9 @@
 import { diagnostics } from "./diagnostics";
+import {
+  resolveModelProfile,
+  ALL_MODEL_CACHE_NAMES,
+  BS_ROFORMER_PROFILE,
+} from "./modelConfig";
 
 /**
  * Model Cache module for persistent storage of ONNX model weights.
@@ -14,8 +19,8 @@ export const OBSOLETE_CACHE_NAMES = [
   "demuxify-model-cache-v4",
 ] as const;
 
-export const MODEL_CACHE_NAME = "demuxify-roformer-cache-v1";
-export const DEFAULT_MODEL_URL = "/models/bs_roformer_4stem_webgpu.onnx";
+export const MODEL_CACHE_NAME = BS_ROFORMER_PROFILE.cacheName;
+export const DEFAULT_MODEL_URL = BS_ROFORMER_PROFILE.modelUrl;
 
 /**
  * Resolves the cache partition name for a given model URL or explicitly provided cache partition.
@@ -27,10 +32,7 @@ export function resolveModelCacheName(
   if (explicitCacheName) {
     return explicitCacheName;
   }
-  if (url.includes("mdx")) {
-    return "demuxify-mdxnet-cache-v1";
-  }
-  return MODEL_CACHE_NAME;
+  return resolveModelProfile(url).cacheName;
 }
 
 export interface DownloadProgress {
@@ -71,7 +73,7 @@ export async function isModelCached(
 }
 
 /**
- * Deletes model weights from Model Cache, or deletes entire cache if no url provided.
+ * Deletes model weights from Model Cache, or deletes all model cache partitions if no url or cacheName provided.
  */
 export async function clearModelCache(
   url?: string,
@@ -81,15 +83,25 @@ export async function clearModelCache(
     return false;
   }
   try {
-    const targetCache = resolveModelCacheName(
-      url || DEFAULT_MODEL_URL,
-      cacheName
-    );
-    if (url) {
+    if (cacheName) {
+      if (url) {
+        const cache = await globalThis.caches.open(cacheName);
+        return await cache.delete(url);
+      } else {
+        return await globalThis.caches.delete(cacheName);
+      }
+    } else if (url) {
+      const targetCache = resolveModelCacheName(url);
       const cache = await globalThis.caches.open(targetCache);
       return await cache.delete(url);
     } else {
-      return await globalThis.caches.delete(targetCache);
+      // Purge all model cache partitions when called parameterless
+      let allDeleted = true;
+      for (const cName of ALL_MODEL_CACHE_NAMES) {
+        const deleted = await globalThis.caches.delete(cName);
+        if (!deleted) allDeleted = false;
+      }
+      return allDeleted;
     }
   } catch {
     return false;

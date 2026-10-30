@@ -15,6 +15,7 @@ export interface ModelProfile {
   id: ModelId;
   name: string;
   shortName: string;
+  tagline: string;
   deviceCategory: DeviceCategory;
   explanation: string;
   modelUrl: string;
@@ -30,6 +31,7 @@ export const BS_ROFORMER_PROFILE: ModelProfile = {
   id: "bs-roformer-4stem",
   name: "BS-RoFormer 4-Stem",
   shortName: "Studio",
+  tagline: "Maximum acoustic isolation and studio fidelity",
   deviceCategory: "desktop",
   explanation:
     "Maximum acoustic isolation and studio-grade fidelity using BS-RoFormer neural network weights. Optimized for desktop workstations with WebGPU acceleration.",
@@ -47,6 +49,7 @@ export const MDX_NET_PROFILE: ModelProfile = {
   id: "mdx-net-4stem",
   name: "MDX-Net 4-Stem",
   shortName: "Fast",
+  tagline: "Rapid 4-stem separation with minimal memory footprint",
   deviceCategory: "mobile",
   explanation:
     "Lightweight, fast 4-stem separation model tailored for mobile devices and laptops. Prevents memory exhaustion and crashes on smartphones and tablets.",
@@ -65,17 +68,40 @@ export const MODEL_PROFILES: Record<ModelId, ModelProfile> = {
   "mdx-net-4stem": MDX_NET_PROFILE,
 };
 
+export const ALL_MODEL_CACHE_NAMES = [
+  BS_ROFORMER_PROFILE.cacheName,
+  MDX_NET_PROFILE.cacheName,
+] as const;
+
 export const DEFAULT_DESKTOP_MODEL_ID: ModelId = "bs-roformer-4stem";
 export const DEFAULT_MOBILE_MODEL_ID: ModelId = "mdx-net-4stem";
+
+/**
+ * Resolves a Model Profile by identifier or model URL without magic strings.
+ */
+export function resolveModelProfile(idOrUrl?: string): ModelProfile {
+  if (!idOrUrl) {
+    return MODEL_PROFILES[DEFAULT_DESKTOP_MODEL_ID];
+  }
+  if (idOrUrl in MODEL_PROFILES) {
+    return MODEL_PROFILES[idOrUrl as ModelId];
+  }
+  for (const profile of Object.values(MODEL_PROFILES)) {
+    if (profile.modelUrl === idOrUrl || profile.cacheName === idOrUrl) {
+      return profile;
+    }
+  }
+  if (idOrUrl.toLowerCase().includes("mdx")) {
+    return MODEL_PROFILES[DEFAULT_MOBILE_MODEL_ID];
+  }
+  return MODEL_PROFILES[DEFAULT_DESKTOP_MODEL_ID];
+}
 
 /**
  * Retrieves a Model Profile by identifier. Falls back to default desktop model if not found.
  */
 export function getModelProfile(id: ModelId | string): ModelProfile {
-  if (id in MODEL_PROFILES) {
-    return MODEL_PROFILES[id as ModelId];
-  }
-  return MODEL_PROFILES[DEFAULT_DESKTOP_MODEL_ID];
+  return resolveModelProfile(id);
 }
 
 /**

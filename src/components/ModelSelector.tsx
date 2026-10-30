@@ -87,7 +87,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
       >
         {profiles.map((profile) => {
           const isSelected = selectedModelId === profile.id;
-          const isStudio = profile.id === "bs-roformer-4stem";
+          const Icon = profile.deviceCategory === "desktop" ? Sparkles : Zap;
 
           return (
             <button
@@ -112,11 +112,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
                         : "bg-muted text-muted-foreground"
                     }`}
                   >
-                    {isStudio ? (
-                      <Sparkles className="h-4 w-4" />
-                    ) : (
-                      <Zap className="h-4 w-4" />
-                    )}
+                    <Icon className="h-4 w-4" />
                   </div>
                   <div>
                     <span className="text-sm font-semibold text-foreground">
@@ -140,9 +136,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
               </div>
 
               <div className="text-[11px] text-muted-foreground mt-0.5 line-clamp-2">
-                {isStudio
-                  ? "Maximum acoustic isolation and studio fidelity"
-                  : "Rapid 4-stem separation with minimal memory footprint"}
+                {profile.tagline}
               </div>
             </button>
           );

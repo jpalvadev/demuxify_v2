@@ -104,6 +104,7 @@ describe("SeparationProgress Component", () => {
       id: "mdx-net-4stem" as const,
       name: "MDX-Net 4-Stem",
       shortName: "Fast",
+      tagline: "Rapid 4-stem separation with minimal memory footprint",
       deviceCategory: "mobile" as const,
       explanation: "Optimized for mobile devices",
       modelUrl: "/models/mdx_net_4stem_mobile.onnx",

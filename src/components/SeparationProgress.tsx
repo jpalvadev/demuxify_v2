@@ -186,6 +186,25 @@ export const SeparationProgress: React.FC<SeparationProgressProps> = ({
         </div>
       </div>
 
+      {/* Model Advisory Badge */}
+      <div
+        role="status"
+        aria-label="Active Model Advisory"
+        className="mt-4 flex items-center justify-between rounded-xl border border-primary/20 bg-primary/5 px-3 py-2 text-xs"
+      >
+        <div className="flex items-center gap-2">
+          <span className="font-semibold text-primary">
+            {activeProfile.shortName} ({activeProfile.name})
+          </span>
+          <span className="text-muted-foreground hidden sm:inline">
+            • {activeProfile.explanation}
+          </span>
+        </div>
+        <span className="text-[10px] uppercase font-mono tracking-wider text-muted-foreground">
+          {activeProfile.deviceCategory}
+        </span>
+      </div>
+
       {/* Progress Bar */}
       {(isDownloading || isSeparating) && (
         <div className="mt-5 space-y-1.5">

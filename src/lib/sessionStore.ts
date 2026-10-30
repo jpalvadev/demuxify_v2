@@ -1,4 +1,5 @@
 import { StemName, STEM_NAMES } from "./chunkOverlapAdd";
+import { ModelId } from "./modelConfig";
 
 export class StorageQuotaError extends Error {
   constructor(
@@ -18,7 +19,7 @@ export interface SessionMetadata {
   duration: number;
   sampleRate: number;
   size?: number;
-  modelProfileId?: string;
+  modelProfileId?: ModelId;
 }
 
 export interface StemMixerSettings {

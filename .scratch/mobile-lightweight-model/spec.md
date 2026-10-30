@@ -1,6 +1,6 @@
 # Spec: Lightweight Mobile Model (MDX-Net) & Centralized Model Profiles
 
-Status: ready-for-agent
+Status: complete
 
 ## Problem Statement
 

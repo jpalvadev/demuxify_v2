@@ -5,8 +5,9 @@ import {
   DEFAULT_MODEL_URL,
 } from "../lib/modelCache";
 import {
-  getModelProfile,
+  resolveModelProfile,
   ModelProfile,
+  ModelId,
   BS_ROFORMER_PROFILE,
 } from "../lib/modelConfig";
 
@@ -36,7 +37,7 @@ export type WorkerInMessage =
   | {
       type: "init";
       modelUrl?: string;
-      modelProfileId?: string;
+      modelProfileId?: ModelId;
       useMock?: boolean;
       preferredBackend?: "webgpu" | "wasm";
     }
@@ -93,12 +94,9 @@ async function handleInit(
   useMock: boolean = false,
   preferredBackend?: "webgpu" | "wasm",
   postMsg: (msg: WorkerOutMessage) => void = (m) => self.postMessage(m),
-  modelProfileId?: string
+  modelProfileId?: ModelId
 ) {
-  activeProfile = getModelProfile(
-    modelProfileId ||
-      (modelUrl.includes("mdx") ? "mdx-net-4stem" : "bs-roformer-4stem")
-  );
+  activeProfile = resolveModelProfile(modelProfileId || modelUrl);
 
   if (useMock) {
     isMockSession = true;
@@ -197,13 +195,10 @@ async function handleInit(
     postMsg({ type: "init_complete", backend } satisfies WorkerOutMessage);
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : String(err);
-    const activeProfile = getModelProfile(
-      modelProfileId ||
-        (modelUrl.includes("mdx") ? "mdx-net-4stem" : "bs-roformer-4stem")
-    );
+    const profile = resolveModelProfile(modelProfileId || modelUrl);
     let userFacingMessage = errorMessage;
     if (errorMessage.includes("std::bad_alloc")) {
-      userFacingMessage = `Memory allocation failed (std::bad_alloc). The browser ran out of WASM heap space loading the ${activeProfile.name} (${activeProfile.memoryRequirementDescription}). Close background browser tabs or restart your browser to free memory.`;
+      userFacingMessage = `Memory allocation failed (std::bad_alloc). The browser ran out of WASM heap space loading the ${profile.name} (${profile.memoryRequirementDescription}). Close background browser tabs or restart your browser to free memory.`;
     }
     postMsg({
       type: "error",
@@ -236,18 +231,18 @@ async function handleStart(
       const chunkStart = Date.now();
       let chunkStems: Record<StemName, Float32Array[]>;
 
-      postMsg({
-        type: "chunk_start",
-        chunkIndex: i,
-        totalChunks,
-        stage: "stft",
-      } satisfies WorkerOutMessage);
-
       if (session && !isMockSession) {
         const chunkSamples = chunk.audio[0].length;
         const inputNames = session.inputNames;
         const isSpecModel =
           inputNames.includes("spec_real") && inputNames.includes("spec_imag");
+
+        postMsg({
+          type: "chunk_start",
+          chunkIndex: i,
+          totalChunks,
+          stage: isSpecModel ? "stft" : "waveform_prep",
+        } satisfies WorkerOutMessage);
 
         if (isSpecModel) {
           postMsg({
