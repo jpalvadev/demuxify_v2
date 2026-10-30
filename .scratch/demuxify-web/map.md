@@ -6,10 +6,11 @@ Implementation map for Demuxify Web.
 
 - Frontier begins with Ticket 01 (Project skeleton, PWA, WebGPU detection).
 - Ticket graph: 01 -> 02 -> 03 -> 04 -> [05, 06, 07] -> [08, 09, 10] -> 11.
-- Active Frontier: Ticket 09 (Transport/WSOLA sync), Ticket 10 (Purge Demucs legacy code).
+- Active Frontier: Ticket 09 (Transport/WSOLA sync).
 
 ## Decisions so far
 
+- [Ticket 10 Resolved](issues/10-purge-demucs-legacy-align-roformer-standards.md): Purged legacy Demucs code, obsolete cache keys (`demuxify-model-cache-v1`..`v4`), renamed constants to canonical domain terminology (`BS_ROFORMER_STEM_ORDER`), removed 1D time-domain dead code paths from inference worker, and reinforced glossary terminology guardrails.
 - [Ticket 11 Resolved](issues/11-mobile-web-inference-stability.md): Automatic Qualcomm Adreno GPU detection and multi-threaded CPU/WASM routing. Configured ONNX Runtime multi-threaded WASM execution (up to 4 CPU threads with SIMD) to bypass Adreno mobile GPU driver deadlocks.
 - [Ticket 08 Resolved](issues/08-in-app-mobile-diagnostics-overlay.md): Real-time diagnostic logging and mobile error overlay. `src/lib/diagnostics.ts` intercepting console, errors, worker events, and environment stats. `src/components/DiagnosticsOverlay.tsx` floating drawer with live log filters and markdown report export.
 - [Ticket 01 Resolved](issues/01-project-skeleton-pwa-webgpu.md): Vite + React + TS + Tailwind + Vitest + PWA manifest & SW. `detectWebGPUCapability()` checks `navigator.gpu` and requests adapter/device with cleanup. UI shell with WebGPU status indicator and Source Mix dropzone.

@@ -19,7 +19,13 @@ import {
   ChunkOptions,
   ChunkInferenceResult,
 } from "../lib/chunkOverlapAdd";
-import { computeStereoSTFT, computeBatchISTFT } from "../lib/stft";
+import {
+  computeStereoSTFT,
+  computeBatchISTFT,
+  BS_ROFORMER_STEM_ORDER,
+} from "../lib/stft";
+
+export { BS_ROFORMER_STEM_ORDER };
 
 export type WorkerInMessage =
   | {
@@ -72,8 +78,8 @@ let isMockSession = false;
 let isCancelled = false;
 let activeBackend: "webgpu" | "wasm" | "mock" = "webgpu";
 
-// HTDemucs stem order standard: [drums, bass, other, vocals]
-const DEMUCS_STEM_ORDER: StemName[] = ["drums", "bass", "other", "vocals"];
+// Canonical BS-RoFormer 4-stem order: [drums, bass, other, vocals]
+// (BS_ROFORMER_STEM_ORDER is imported from ../lib/stft)
 
 async function handleInit(
   modelUrl: string = DEFAULT_MODEL_URL,
@@ -180,7 +186,7 @@ async function handleInit(
     let userFacingMessage = errorMessage;
     if (errorMessage.includes("std::bad_alloc")) {
       userFacingMessage =
-        "Memory allocation failed (std::bad_alloc). The browser ran out of WASM heap space loading the Demucs model (~300 MB). Close background browser tabs or restart your browser to free memory.";
+        "Memory allocation failed (std::bad_alloc). The browser ran out of WASM heap space loading the BS-RoFormer model (~270 MB). Close background browser tabs or restart your browser to free memory.";
     }
     postMsg({
       type: "error",
@@ -226,173 +232,106 @@ async function handleStart(
         const isSpecModel =
           inputNames.includes("spec_real") && inputNames.includes("spec_imag");
 
-        if (isSpecModel) {
-          postMsg({
-            type: "worker_log",
-            level: "info",
-            message: `Chunk ${i + 1}/${totalChunks}: Computing STFT...`,
-          } satisfies WorkerOutMessage);
-
-          const stftStart = Date.now();
-          const { real, imag, F, T } = computeStereoSTFT(
-            chunk.audio[0],
-            chunk.audio[1],
-            chunkSamples
+        if (!isSpecModel) {
+          throw new Error(
+            `Unsupported model architecture: expected BS-RoFormer spectrogram inputs ('spec_real', 'spec_imag'), received: [${inputNames.join(", ")}]`
           );
-
-          postMsg({
-            type: "worker_log",
-            level: "info",
-            message: `Chunk ${i + 1}/${totalChunks}: STFT done in ${Date.now() - stftStart}ms`,
-          } satisfies WorkerOutMessage);
-
-          const realTensor = new ort.Tensor("float32", real, [1, 2, F, T]);
-          const imagTensor = new ort.Tensor("float32", imag, [1, 2, F, T]);
-
-          const feeds: Record<string, ort.Tensor> = {
-            spec_real: realTensor,
-            spec_imag: imagTensor,
-          };
-
-          const isFirstChunk = i === 0;
-          postMsg({
-            type: "chunk_start",
-            chunkIndex: i,
-            totalChunks,
-            stage:
-              activeBackend === "wasm"
-                ? "wasm_inference"
-                : isFirstChunk
-                  ? "webgpu_compiling"
-                  : "webgpu_inference",
-          } satisfies WorkerOutMessage);
-
-          postMsg({
-            type: "worker_log",
-            level: "info",
-            message: `Chunk ${i + 1}/${totalChunks}: Executing ${activeBackend.toUpperCase()} session.run()${isFirstChunk && activeBackend === "webgpu" ? " (compiling shaders in GPU driver)..." : activeBackend === "wasm" ? " (memory-safe SIMD)..." : "..."}`,
-          } satisfies WorkerOutMessage);
-
-          const inferStart = Date.now();
-          const outputFeeds = await session.run(feeds);
-          const inferElapsed = Date.now() - inferStart;
-
-          postMsg({
-            type: "worker_log",
-            level: "info",
-            message: `Chunk ${i + 1}/${totalChunks}: ${activeBackend.toUpperCase()} inference completed in ${inferElapsed}ms!`,
-          } satisfies WorkerOutMessage);
-
-          const outRealTensor =
-            outputFeeds["out_spec_real"] || outputFeeds[session.outputNames[0]];
-          const outImagTensor =
-            outputFeeds["out_spec_imag"] || outputFeeds[session.outputNames[1]];
-
-          const numStemsInOutput = outRealTensor.dims[1] || 6;
-          // .slice() ensures an owned copy in JS heap before disposing WebGPU tensor resources
-          const outReal = (outRealTensor.data as Float32Array).slice();
-          const outImag = (outImagTensor.data as Float32Array).slice();
-
-          realTensor.dispose();
-          imagTensor.dispose();
-          outRealTensor.dispose();
-          outImagTensor.dispose();
-
-          postMsg({
-            type: "chunk_start",
-            chunkIndex: i,
-            totalChunks,
-            stage: "istft",
-          } satisfies WorkerOutMessage);
-
-          const istftStart = Date.now();
-          chunkStems = computeBatchISTFT(
-            outReal,
-            outImag,
-            chunkSamples,
-            undefined,
-            undefined,
-            undefined,
-            numStemsInOutput
-          );
-
-          postMsg({
-            type: "worker_log",
-            level: "info",
-            message: `Chunk ${i + 1}/${totalChunks}: iSTFT completed in ${Date.now() - istftStart}ms`,
-          } satisfies WorkerOutMessage);
-        } else {
-          // Standard time-domain waveform model fallback
-          let sum = 0;
-          let sumSq = 0;
-          const totalChunkSamples = 2 * chunkSamples;
-          for (let sIdx = 0; sIdx < chunkSamples; sIdx++) {
-            const l = chunk.audio[0][sIdx];
-            const r = chunk.audio[1][sIdx];
-            sum += l + r;
-            sumSq += l * l + r * r;
-          }
-          const mean = sum / totalChunkSamples;
-          const variance = Math.max(
-            1e-8,
-            sumSq / totalChunkSamples - mean * mean
-          );
-          const std = Math.sqrt(variance);
-
-          const tensorData = new Float32Array(2 * chunkSamples);
-          for (let sIdx = 0; sIdx < chunkSamples; sIdx++) {
-            tensorData[sIdx] = (chunk.audio[0][sIdx] - mean) / std;
-            tensorData[chunkSamples + sIdx] =
-              (chunk.audio[1][sIdx] - mean) / std;
-          }
-
-          const inputName = session.inputNames[0];
-          const inputTensor = new ort.Tensor("float32", tensorData, [
-            1,
-            2,
-            chunkSamples,
-          ]);
-
-          const feeds: Record<string, ort.Tensor> = {
-            [inputName]: inputTensor,
-          };
-          const outputFeeds = await session.run(feeds);
-          const outputName = session.outputNames[0];
-          const outputTensor = outputFeeds[outputName];
-          const outData = outputTensor.data as Float32Array;
-
-          chunkStems = {
-            drums: [
-              new Float32Array(chunkSamples),
-              new Float32Array(chunkSamples),
-            ],
-            bass: [
-              new Float32Array(chunkSamples),
-              new Float32Array(chunkSamples),
-            ],
-            other: [
-              new Float32Array(chunkSamples),
-              new Float32Array(chunkSamples),
-            ],
-            vocals: [
-              new Float32Array(chunkSamples),
-              new Float32Array(chunkSamples),
-            ],
-          };
-
-          const stridePerStem = 2 * chunkSamples;
-          for (let s = 0; s < DEMUCS_STEM_ORDER.length; s++) {
-            const stemName = DEMUCS_STEM_ORDER[s];
-            const stemOffset = s * stridePerStem;
-            const leftTarget = chunkStems[stemName][0];
-            const rightTarget = chunkStems[stemName][1];
-            for (let sIdx = 0; sIdx < chunkSamples; sIdx++) {
-              leftTarget[sIdx] = outData[stemOffset + sIdx] * std + mean;
-              rightTarget[sIdx] =
-                outData[stemOffset + chunkSamples + sIdx] * std + mean;
-            }
-          }
         }
+
+        postMsg({
+          type: "worker_log",
+          level: "info",
+          message: `Chunk ${i + 1}/${totalChunks}: Computing STFT...`,
+        } satisfies WorkerOutMessage);
+
+        const stftStart = Date.now();
+        const { real, imag, F, T } = computeStereoSTFT(
+          chunk.audio[0],
+          chunk.audio[1],
+          chunkSamples
+        );
+
+        postMsg({
+          type: "worker_log",
+          level: "info",
+          message: `Chunk ${i + 1}/${totalChunks}: STFT done in ${Date.now() - stftStart}ms`,
+        } satisfies WorkerOutMessage);
+
+        const realTensor = new ort.Tensor("float32", real, [1, 2, F, T]);
+        const imagTensor = new ort.Tensor("float32", imag, [1, 2, F, T]);
+
+        const feeds: Record<string, ort.Tensor> = {
+          spec_real: realTensor,
+          spec_imag: imagTensor,
+        };
+
+        const isFirstChunk = i === 0;
+        postMsg({
+          type: "chunk_start",
+          chunkIndex: i,
+          totalChunks,
+          stage:
+            activeBackend === "wasm"
+              ? "wasm_inference"
+              : isFirstChunk
+                ? "webgpu_compiling"
+                : "webgpu_inference",
+        } satisfies WorkerOutMessage);
+
+        postMsg({
+          type: "worker_log",
+          level: "info",
+          message: `Chunk ${i + 1}/${totalChunks}: Executing ${activeBackend.toUpperCase()} session.run()${isFirstChunk && activeBackend === "webgpu" ? " (compiling shaders in GPU driver)..." : activeBackend === "wasm" ? " (memory-safe SIMD)..." : "..."}`,
+        } satisfies WorkerOutMessage);
+
+        const inferStart = Date.now();
+        const outputFeeds = await session.run(feeds);
+        const inferElapsed = Date.now() - inferStart;
+
+        postMsg({
+          type: "worker_log",
+          level: "info",
+          message: `Chunk ${i + 1}/${totalChunks}: ${activeBackend.toUpperCase()} inference completed in ${inferElapsed}ms!`,
+        } satisfies WorkerOutMessage);
+
+        const outRealTensor =
+          outputFeeds["out_spec_real"] || outputFeeds[session.outputNames[0]];
+        const outImagTensor =
+          outputFeeds["out_spec_imag"] || outputFeeds[session.outputNames[1]];
+
+        const numStemsInOutput = outRealTensor.dims[1] || 6;
+        // .slice() ensures an owned copy in JS heap before disposing WebGPU tensor resources
+        const outReal = (outRealTensor.data as Float32Array).slice();
+        const outImag = (outImagTensor.data as Float32Array).slice();
+
+        realTensor.dispose();
+        imagTensor.dispose();
+        outRealTensor.dispose();
+        outImagTensor.dispose();
+
+        postMsg({
+          type: "chunk_start",
+          chunkIndex: i,
+          totalChunks,
+          stage: "istft",
+        } satisfies WorkerOutMessage);
+
+        const istftStart = Date.now();
+        chunkStems = computeBatchISTFT(
+          outReal,
+          outImag,
+          chunkSamples,
+          undefined,
+          undefined,
+          undefined,
+          numStemsInOutput
+        );
+
+        postMsg({
+          type: "worker_log",
+          level: "info",
+          message: `Chunk ${i + 1}/${totalChunks}: iSTFT completed in ${Date.now() - istftStart}ms`,
+        } satisfies WorkerOutMessage);
       } else {
         // Mock / simulation mode: deterministic DSP filter separation
         await new Promise((resolve) => setTimeout(resolve, 5));

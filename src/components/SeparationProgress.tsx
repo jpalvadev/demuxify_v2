@@ -101,7 +101,7 @@ export const SeparationProgress: React.FC<SeparationProgressProps> = ({
 
           <div>
             <h3 className="text-base font-semibold text-foreground flex items-center gap-2">
-              {isDownloading && "Downloading Model Weights"}
+              {isDownloading && "Downloading BS-RoFormer Model Weights"}
               {isSeparating &&
                 totalChunksCount &&
                 `Separating Chunk ${currentChunkIndex} of ${totalChunksCount}`}
@@ -201,7 +201,7 @@ export const SeparationProgress: React.FC<SeparationProgressProps> = ({
           <div className="flex justify-between text-[11px] text-muted-foreground">
             <span>
               {isDownloading
-                ? "Model Cache initialization"
+                ? "BS-RoFormer Model Cache initialization"
                 : "Neural network chunk processing & overlap-add blending"}
             </span>
             <span>{percent}%</span>

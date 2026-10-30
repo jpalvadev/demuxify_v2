@@ -21,7 +21,7 @@ export default defineConfig({
         name: "Demuxify Web",
         short_name: "Demuxify",
         description:
-          "In-browser client-side music source separation and multi-track player powered by Demucs v4 and WebGPU.",
+          "In-browser client-side music source separation and multi-track player powered by BS-RoFormer and WebGPU.",
         theme_color: "#09090b",
         background_color: "#09090b",
         display: "standalone",

@@ -17,7 +17,14 @@ describe("SeparationProgress Component", () => {
       />
     );
 
-    expect(screen.getByText(/downloading model weights/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/downloading bs-roformer model weights/i)
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/persisting bs-roformer 4-stem model into model cache/i)
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/htdemucs/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/demucs/i)).not.toBeInTheDocument();
     expect(screen.getAllByText(/50%/i).length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText(/25.0 MB \/ 50.0 MB/i)).toBeInTheDocument();
 

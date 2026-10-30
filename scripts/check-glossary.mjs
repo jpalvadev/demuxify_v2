@@ -14,6 +14,16 @@ const FORBIDDEN_PATTERNS = [
     pattern: /\bsongTitle\b/g,
     reason: "GLOSSARY.md rule: Avoid 'song'. Use 'sourceMixTitle'.",
   },
+  {
+    pattern: /\bHTDemucs\b/gi,
+    reason:
+      "GLOSSARY.md rule: Avoid legacy 'HTDemucs'. Demuxify Web uses BS-RoFormer.",
+  },
+  {
+    pattern: /\bDemucs\b/g,
+    reason:
+      "GLOSSARY.md rule: Avoid legacy 'Demucs'. Demuxify Web uses BS-RoFormer.",
+  },
 ];
 
 const IGNORED_FILES = [

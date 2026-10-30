@@ -96,7 +96,7 @@ export async function decodeAudio(
       }
     });
 
-    // Ensure decoded buffer is strictly 44100 Hz for Demucs neural network
+    // Ensure decoded buffer is strictly 44100 Hz for BS-RoFormer neural network
     if (
       decodedBuffer.sampleRate !== 44100 &&
       typeof window !== "undefined" &&

@@ -1,7 +1,7 @@
 {
   "name": "Demuxify Web",
   "short_name": "Demuxify",
-  "description": "In-browser client-side music source separation and multi-track player powered by Demucs v4 and WebGPU.",
+  "description": "In-browser client-side music source separation and multi-track player powered by BS-RoFormer and WebGPU.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#09090b",

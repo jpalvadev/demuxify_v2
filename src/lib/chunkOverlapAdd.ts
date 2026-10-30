@@ -1,5 +1,5 @@
 /**
- * Chunk segmentation and overlap-add blending module for Demucs audio separation.
+ * Chunk segmentation and overlap-add blending module for BS-RoFormer audio separation.
  *
  * Implements smooth windowing across sequential Chunk Segments to prevent
  * boundary artifacts and reconstructs 4 discrete isolated Stems.

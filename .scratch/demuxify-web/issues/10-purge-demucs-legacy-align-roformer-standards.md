@@ -4,9 +4,9 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** complete
 
-- [ ] Update `SeparationProgress.tsx` messages to accurately indicate BS-RoFormer model weights download rather than HTDemucs.
-- [ ] Rename `DEMUCS_STEM_ORDER` and legacy Demucs constants in `inference.worker.ts` and related helpers to canonical domain terminology.
-- [ ] Clean up obsolete cache references and legacy fallback dead code across `modelCache.ts` and worker initialization.
-- [ ] Verify `npm run check:glossary` and test suite pass with zero deprecated terminology violations.
+- [x] Update `SeparationProgress.tsx` messages to accurately indicate BS-RoFormer model weights download rather than HTDemucs.
+- [x] Rename `DEMUCS_STEM_ORDER` and legacy Demucs constants in `inference.worker.ts` and related helpers to canonical domain terminology.
+- [x] Clean up obsolete cache references and legacy fallback dead code across `modelCache.ts` and worker initialization.
+- [x] Verify `npm run check:glossary` and test suite pass with zero deprecated terminology violations.

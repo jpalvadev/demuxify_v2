@@ -450,7 +450,7 @@ export const App: React.FC = () => {
             </h2>
             <p className="text-sm text-muted-foreground sm:text-base">
               Extract Vocals, Drums, Bass, and Other instruments locally in your
-              browser using Demucs v4.
+              browser using BS-RoFormer.
             </p>
           </div>
 
@@ -617,7 +617,7 @@ export const App: React.FC = () => {
       <footer className="border-t border-border/60 py-6 text-center text-xs text-muted-foreground">
         <p>
           Demuxify Web • 100% Client-Side Audio Source Separation • Powered by
-          Demucs v4 &amp; WebGPU
+          BS-RoFormer &amp; WebGPU
         </p>
       </footer>
     </div>

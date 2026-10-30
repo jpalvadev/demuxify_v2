@@ -7,7 +7,14 @@ import { diagnostics } from "./diagnostics";
  * across browser sessions, supporting stream progress reporting.
  */
 
-export const MODEL_CACHE_NAME = "demuxify-model-cache-v4";
+export const OBSOLETE_CACHE_NAMES = [
+  "demuxify-model-cache-v1",
+  "demuxify-model-cache-v2",
+  "demuxify-model-cache-v3",
+  "demuxify-model-cache-v4",
+] as const;
+
+export const MODEL_CACHE_NAME = "demuxify-roformer-cache-v1";
 export const DEFAULT_MODEL_URL = "/models/bs_roformer_4stem_webgpu.onnx";
 
 export interface DownloadProgress {
@@ -76,10 +83,10 @@ export async function getModelWeights(
   // 1. Try to fetch from Cache Storage
   if (isCacheStorageAvailable()) {
     try {
-      // Purge obsolete caches if found
-      globalThis.caches.delete("demuxify-model-cache-v1").catch(() => {});
-      globalThis.caches.delete("demuxify-model-cache-v2").catch(() => {});
-      globalThis.caches.delete("demuxify-model-cache-v3").catch(() => {});
+      // Purge obsolete legacy caches if found
+      for (const obsoleteCache of OBSOLETE_CACHE_NAMES) {
+        globalThis.caches.delete(obsoleteCache).catch(() => {});
+      }
 
       const cache = await globalThis.caches.open(MODEL_CACHE_NAME);
       const cachedResponse = await cache.match(url);
