@@ -7,6 +7,12 @@ import {
   CheckCircle2,
   AlertTriangle,
   Loader2,
+  SlidersHorizontal,
+  Mic,
+  Drum,
+  Radio,
+  ShieldCheck,
+  RotateCcw,
 } from "lucide-react";
 import { StemName, STEM_NAMES } from "../lib/chunkOverlapAdd";
 import { encodeWav, createWavBlob } from "../lib/wavEncoder";
@@ -21,6 +27,7 @@ import {
   formatStemFileName,
   sanitizeSourceMixTitle,
 } from "../lib/bundleZip";
+import { mixAudioStems, formatMixdownFileName } from "../lib/customMixdown";
 import { toast } from "../lib/toast";
 import { cn } from "../lib/utils";
 
@@ -33,8 +40,35 @@ export interface ExportDialogProps {
   onExportComplete?: (fileName: string) => void;
 }
 
-export type ExportMode = "single" | "bundle";
+export type ExportMode = "single" | "bundle" | "mixdown";
 export type ExportFormat = "wav" | "mp3";
+
+export interface StemControlState {
+  enabled: boolean;
+  volume: number;
+}
+
+export type MixdownPresetId = "karaoke" | "acapella" | "minus_drums" | "reset";
+
+export interface MixdownPresetConfig {
+  id: MixdownPresetId;
+  label: string;
+  icon?: React.ComponentType<{ className?: string }>;
+}
+
+export const MIXDOWN_PRESETS: MixdownPresetConfig[] = [
+  { id: "karaoke", label: "Karaoke / Instrumental" },
+  { id: "acapella", label: "Acapella" },
+  { id: "minus_drums", label: "Minus Drums" },
+  { id: "reset", label: "Reset", icon: RotateCcw },
+];
+
+const DEFAULT_STEM_CONTROLS: Record<StemName, StemControlState> = {
+  vocals: { enabled: true, volume: 1.0 },
+  drums: { enabled: true, volume: 1.0 },
+  bass: { enabled: true, volume: 1.0 },
+  other: { enabled: true, volume: 1.0 },
+};
 
 function extractChannels(source: Float32Array[] | AudioBuffer): Float32Array[] {
   if ("numberOfChannels" in source) {
@@ -60,6 +94,16 @@ function triggerDownload(blob: Blob, filename: string): void {
   }, 1000);
 }
 
+const STEM_ICONS: Record<
+  StemName,
+  React.ComponentType<{ className?: string }>
+> = {
+  vocals: Mic,
+  drums: Drum,
+  bass: Radio,
+  other: Music,
+};
+
 export const ExportDialog: React.FC<ExportDialogProps> = ({
   isOpen,
   onClose,
@@ -74,6 +118,13 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
   const [bitDepth, setBitDepth] = useState<16 | 24>(16);
   const [bitrate, setBitrate] = useState<Mp3Bitrate>(192);
 
+  // Custom Mixdown state
+  const [stemControls, setStemControls] = useState<
+    Record<StemName, StemControlState>
+  >(DEFAULT_STEM_CONTROLS);
+  const [masterGain, setMasterGain] = useState<number>(1.0);
+  const [antiClipping, setAntiClipping] = useState<boolean>(true);
+
   // Export execution state
   const [isExporting, setIsExporting] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -82,6 +133,46 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
   const [successNotification, setSuccessNotification] = useState<string | null>(
     null
   );
+
+  const isMixdownExportDisabled =
+    mode === "mixdown" &&
+    !STEM_NAMES.some(
+      (s) => stemControls[s].enabled && stemControls[s].volume > 0
+    );
+
+  const handleApplyPreset = (preset: MixdownPresetId) => {
+    switch (preset) {
+      case "karaoke":
+        setStemControls({
+          vocals: { enabled: false, volume: 0 },
+          drums: { enabled: true, volume: 1.0 },
+          bass: { enabled: true, volume: 1.0 },
+          other: { enabled: true, volume: 1.0 },
+        });
+        break;
+      case "acapella":
+        setStemControls({
+          vocals: { enabled: true, volume: 1.0 },
+          drums: { enabled: false, volume: 0 },
+          bass: { enabled: false, volume: 0 },
+          other: { enabled: false, volume: 0 },
+        });
+        break;
+      case "minus_drums":
+        setStemControls({
+          vocals: { enabled: true, volume: 1.0 },
+          drums: { enabled: false, volume: 0 },
+          bass: { enabled: true, volume: 1.0 },
+          other: { enabled: true, volume: 1.0 },
+        });
+        break;
+      case "reset":
+        setStemControls(DEFAULT_STEM_CONTROLS);
+        setMasterGain(1.0);
+        setAntiClipping(true);
+        break;
+    }
+  };
 
   // Escape key handler
   useEffect(() => {
@@ -143,7 +234,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
         setSuccessNotification(successMsg);
         toast.success(successMsg);
         onExportComplete?.(fileName);
-      } else {
+      } else if (mode === "bundle") {
         // Full Export Bundle (ZIP)
         setStatusMessage("Encoding all 4 stems for bundle packaging...");
         const encodedStems: Record<StemName, Uint8Array> = {} as any;
@@ -193,6 +284,47 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
         setSuccessNotification(successMsg);
         toast.success(successMsg);
         onExportComplete?.(zipFileName);
+      } else {
+        // Custom Mixdown
+        setStatusMessage("Summing stems & applying mixdown...");
+        const stemGains: Partial<Record<StemName, number>> = {};
+        for (const name of STEM_NAMES) {
+          const ctrl = stemControls[name];
+          stemGains[name] = ctrl.enabled ? ctrl.volume : 0;
+        }
+
+        const mixResult = mixAudioStems(stems, {
+          stemGains,
+          masterGain,
+          antiClipping,
+          sourceMixTitle,
+          format,
+        });
+
+        let blob: Blob;
+        const fileName =
+          mixResult.fileName ||
+          formatMixdownFileName(sourceMixTitle, mixResult.descriptor, format);
+
+        if (format === "wav") {
+          setProgress(30);
+          blob = createWavBlob(mixResult.audio, { sampleRate, bitDepth });
+          setProgress(100);
+        } else {
+          blob = await createMp3Blob(mixResult.audio, {
+            sampleRate,
+            bitrate,
+            onProgress: (p) => setProgress(Math.round(p * 100)),
+          });
+          setProgress(100);
+        }
+
+        setStatusMessage("Triggering download...");
+        triggerDownload(blob, fileName);
+        const successMsg = `Export complete! Downloaded ${fileName}`;
+        setSuccessNotification(successMsg);
+        toast.success(successMsg);
+        onExportComplete?.(fileName);
       }
     } catch (err) {
       const errText = err instanceof Error ? err.message : String(err);
@@ -210,6 +342,9 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
     stems,
     sampleRate,
     sourceMixTitle,
+    stemControls,
+    masterGain,
+    antiClipping,
     onExportComplete,
   ]);
 
@@ -226,7 +361,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
         role="dialog"
         aria-modal="true"
         aria-labelledby="export-dialog-title"
-        className="w-full max-w-lg rounded-2xl border border-border bg-card p-6 shadow-2xl space-y-6 relative"
+        className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl border border-border bg-card p-6 shadow-2xl space-y-6 relative"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -265,10 +400,10 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
             <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               Export Mode
             </label>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
               <label
                 className={cn(
-                  "flex items-center gap-3 p-3.5 rounded-xl border cursor-pointer transition-all",
+                  "flex items-center gap-2.5 p-3 rounded-xl border cursor-pointer transition-all",
                   mode === "single"
                     ? "border-primary bg-primary/10 text-foreground font-medium shadow-xs"
                     : "border-border bg-secondary/40 text-muted-foreground hover:bg-secondary/70"
@@ -283,15 +418,17 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
                   disabled={isExporting}
                   className="accent-primary"
                 />
-                <div className="flex items-center gap-2">
-                  <Music className="h-4 w-4 text-primary" />
-                  <span className="text-sm">Single Stem</span>
+                <div className="flex items-center gap-1.5 truncate">
+                  <Music className="h-4 w-4 text-primary shrink-0" />
+                  <span className="text-xs sm:text-sm font-medium truncate">
+                    Single Stem
+                  </span>
                 </div>
               </label>
 
               <label
                 className={cn(
-                  "flex items-center gap-3 p-3.5 rounded-xl border cursor-pointer transition-all",
+                  "flex items-center gap-2.5 p-3 rounded-xl border cursor-pointer transition-all",
                   mode === "bundle"
                     ? "border-primary bg-primary/10 text-foreground font-medium shadow-xs"
                     : "border-border bg-secondary/40 text-muted-foreground hover:bg-secondary/70"
@@ -306,9 +443,36 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
                   disabled={isExporting}
                   className="accent-primary"
                 />
-                <div className="flex items-center gap-2">
-                  <FileArchive className="h-4 w-4 text-primary" />
-                  <span className="text-sm">Full Export Bundle</span>
+                <div className="flex items-center gap-1.5 truncate">
+                  <FileArchive className="h-4 w-4 text-primary shrink-0" />
+                  <span className="text-xs sm:text-sm font-medium truncate">
+                    Full Export Bundle
+                  </span>
+                </div>
+              </label>
+
+              <label
+                className={cn(
+                  "flex items-center gap-2.5 p-3 rounded-xl border cursor-pointer transition-all",
+                  mode === "mixdown"
+                    ? "border-primary bg-primary/10 text-foreground font-medium shadow-xs"
+                    : "border-border bg-secondary/40 text-muted-foreground hover:bg-secondary/70"
+                )}
+              >
+                <input
+                  type="radio"
+                  name="export-mode"
+                  value="mixdown"
+                  checked={mode === "mixdown"}
+                  onChange={() => setMode("mixdown")}
+                  disabled={isExporting}
+                  className="accent-primary"
+                />
+                <div className="flex items-center gap-1.5 truncate">
+                  <SlidersHorizontal className="h-4 w-4 text-primary shrink-0" />
+                  <span className="text-xs sm:text-sm font-medium truncate">
+                    Custom Mixdown
+                  </span>
                 </div>
               </label>
             </div>
@@ -341,6 +505,158 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
                   </option>
                 ))}
               </select>
+            </div>
+          )}
+
+          {/* Custom Mixdown Controls (Visible only in Custom Mixdown mode) */}
+          {mode === "mixdown" && (
+            <div className="space-y-4">
+              {/* Presets */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Mixdown Presets
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {MIXDOWN_PRESETS.map((preset) => {
+                    const PresetIcon = preset.icon;
+                    return (
+                      <button
+                        key={preset.id}
+                        type="button"
+                        onClick={() => handleApplyPreset(preset.id)}
+                        disabled={isExporting}
+                        className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-lg border border-border bg-secondary/50 text-foreground hover:bg-secondary hover:border-primary/40 active:scale-95 transition-all text-center disabled:opacity-50"
+                      >
+                        {PresetIcon && <PresetIcon className="h-3 w-3" />}
+                        <span>{preset.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Stem Controls: Checkboxes & Volume Sliders */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Stem Controls
+                </label>
+                <div className="space-y-2 rounded-xl border border-border bg-secondary/20 p-3">
+                  {STEM_NAMES.map((stem) => {
+                    const Icon = STEM_ICONS[stem];
+                    const { enabled, volume } = stemControls[stem];
+                    return (
+                      <div
+                        key={stem}
+                        className={cn(
+                          "flex items-center gap-3 p-2 rounded-lg transition-colors",
+                          enabled
+                            ? "bg-card/70 border border-border/50"
+                            : "opacity-50 bg-secondary/30"
+                        )}
+                      >
+                        <label className="flex items-center gap-2 cursor-pointer select-none shrink-0 w-24">
+                          <input
+                            type="checkbox"
+                            aria-label={`${stem} stem`}
+                            checked={enabled}
+                            onChange={(e) =>
+                              setStemControls((prev) => ({
+                                ...prev,
+                                [stem]: {
+                                  ...prev[stem],
+                                  enabled: e.target.checked,
+                                },
+                              }))
+                            }
+                            disabled={isExporting}
+                            className="accent-primary h-4 w-4 rounded cursor-pointer"
+                          />
+                          <div className="flex items-center gap-1.5">
+                            <Icon className="h-3.5 w-3.5 text-primary" />
+                            <span className="text-xs font-semibold capitalize text-foreground">
+                              {stem}
+                            </span>
+                          </div>
+                        </label>
+
+                        <div className="flex items-center gap-2 flex-1">
+                          <input
+                            type="range"
+                            min={0}
+                            max={1}
+                            step={0.01}
+                            value={volume}
+                            onChange={(e) =>
+                              setStemControls((prev) => ({
+                                ...prev,
+                                [stem]: {
+                                  ...prev[stem],
+                                  volume: parseFloat(e.target.value),
+                                },
+                              }))
+                            }
+                            aria-label={`${stem} volume`}
+                            disabled={!enabled || isExporting}
+                            className="w-full accent-primary cursor-pointer h-1.5 bg-secondary rounded-lg appearance-none disabled:opacity-50"
+                          />
+                          <span className="text-[11px] font-mono text-muted-foreground w-8 text-right">
+                            {Math.round((enabled ? volume : 0) * 100)}%
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Master Volume and Anti-Clipping controls */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                <div className="space-y-1.5 rounded-xl border border-border bg-secondary/20 p-3">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-semibold text-foreground">
+                      Master Volume
+                    </span>
+                    <span className="font-mono text-muted-foreground font-semibold">
+                      {Math.round(masterGain * 100)}%
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    value={masterGain}
+                    onChange={(e) => setMasterGain(parseFloat(e.target.value))}
+                    aria-label="Master Mixdown Volume"
+                    disabled={isExporting}
+                    className="w-full accent-primary cursor-pointer h-1.5 bg-secondary rounded-lg appearance-none"
+                  />
+                </div>
+
+                <div className="flex items-center rounded-xl border border-border bg-secondary/20 p-3">
+                  <label className="flex items-start gap-2.5 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      id="anti-clipping-toggle"
+                      aria-label="Anti-Clipping Protection"
+                      checked={antiClipping}
+                      onChange={(e) => setAntiClipping(e.target.checked)}
+                      disabled={isExporting}
+                      className="accent-primary h-4 w-4 rounded mt-0.5 cursor-pointer"
+                    />
+                    <div>
+                      <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                        <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
+                        <span>Anti-Clipping Protection</span>
+                      </div>
+                      <p className="text-[10px] text-muted-foreground leading-tight mt-0.5">
+                        Automatic -0.3 dBFS safety ceiling prevents digital
+                        clipping
+                      </p>
+                    </div>
+                  </label>
+                </div>
+              </div>
             </div>
           )}
 
@@ -532,7 +848,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
           <button
             type="button"
             onClick={handleExport}
-            disabled={isExporting}
+            disabled={isExporting || isMixdownExportDisabled}
             className="flex items-center gap-2 px-5 py-2 text-sm font-semibold rounded-xl bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 active:scale-95 transition-all disabled:opacity-50"
           >
             {isExporting ? (

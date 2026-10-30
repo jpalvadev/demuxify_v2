@@ -1,8 +1,9 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { ExportDialog } from "../components/ExportDialog";
 import { StemName } from "../lib/chunkOverlapAdd";
+import * as customMixdown from "../lib/customMixdown";
 
 describe("ExportDialog", () => {
   const mockStems: Record<StemName, Float32Array[]> = {
@@ -47,6 +48,9 @@ describe("ExportDialog", () => {
       screen.getByRole("radio", { name: /full export bundle/i })
     ).toBeInTheDocument();
     expect(
+      screen.getByRole("radio", { name: /custom mixdown/i })
+    ).toBeInTheDocument();
+    expect(
       screen.getByRole("button", { name: /export & download/i })
     ).toBeInTheDocument();
   });
@@ -74,6 +78,294 @@ describe("ExportDialog", () => {
     expect(bundleRadio).toBeChecked();
     // In full bundle mode, single stem select should not be visible
     expect(screen.queryByLabelText(/select stem/i)).not.toBeInTheDocument();
+  });
+
+  it("renders Custom Mixdown mode controls and presets correctly", async () => {
+    const user = userEvent.setup();
+    render(
+      <ExportDialog
+        isOpen={true}
+        onClose={vi.fn()}
+        stems={mockStems}
+        sourceMixTitle="audioslave_stone.mp3"
+      />
+    );
+
+    // Switch to Custom Mixdown mode
+    const mixdownRadio = screen.getByRole("radio", {
+      name: /custom mixdown/i,
+    });
+    await user.click(mixdownRadio);
+    expect(mixdownRadio).toBeChecked();
+
+    // Single stem select should not be visible in Custom Mixdown
+    expect(screen.queryByLabelText(/select stem/i)).not.toBeInTheDocument();
+
+    // Verify preset buttons are present
+    expect(
+      screen.getByRole("button", { name: /karaoke \/ instrumental/i })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /acapella/i })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /minus drums/i })
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /reset/i })).toBeInTheDocument();
+
+    // Verify individual stem checkboxes and volume sliders
+    for (const stem of ["vocals", "drums", "bass", "other"]) {
+      const checkbox = screen.getByRole("checkbox", {
+        name: new RegExp(`${stem} stem`, "i"),
+      });
+      expect(checkbox).toBeChecked();
+      const slider = screen.getByRole("slider", {
+        name: new RegExp(`${stem} volume`, "i"),
+      });
+      expect(slider).toBeInTheDocument();
+      expect(slider).toHaveValue("1");
+    }
+
+    // Verify Master Volume slider and Anti-Clipping toggle
+    const masterSlider = screen.getByRole("slider", {
+      name: /master mixdown volume/i,
+    });
+    expect(masterSlider).toBeInTheDocument();
+    expect(masterSlider).toHaveValue("1");
+
+    const antiClippingCheckbox = screen.getByRole("checkbox", {
+      name: /anti-clipping/i,
+    });
+    expect(antiClippingCheckbox).toBeChecked();
+  });
+
+  it("updates stem selection and volumes when preset buttons are clicked", async () => {
+    const user = userEvent.setup();
+    render(
+      <ExportDialog
+        isOpen={true}
+        onClose={vi.fn()}
+        stems={mockStems}
+        sourceMixTitle="audioslave_stone.mp3"
+      />
+    );
+
+    await user.click(screen.getByRole("radio", { name: /custom mixdown/i }));
+
+    const vocalsCheckbox = screen.getByRole("checkbox", {
+      name: /vocals stem/i,
+    });
+    const drumsCheckbox = screen.getByRole("checkbox", { name: /drums stem/i });
+    const bassCheckbox = screen.getByRole("checkbox", { name: /bass stem/i });
+    const otherCheckbox = screen.getByRole("checkbox", { name: /other stem/i });
+
+    // Click Karaoke / Instrumental: vocals muted/unchecked, drums/bass/other checked
+    await user.click(
+      screen.getByRole("button", { name: /karaoke \/ instrumental/i })
+    );
+    expect(vocalsCheckbox).not.toBeChecked();
+    expect(drumsCheckbox).toBeChecked();
+    expect(bassCheckbox).toBeChecked();
+    expect(otherCheckbox).toBeChecked();
+
+    // Click Acapella: vocals checked, drums/bass/other unchecked
+    await user.click(screen.getByRole("button", { name: /acapella/i }));
+    expect(vocalsCheckbox).toBeChecked();
+    expect(drumsCheckbox).not.toBeChecked();
+    expect(bassCheckbox).not.toBeChecked();
+    expect(otherCheckbox).not.toBeChecked();
+
+    // Click Minus Drums: drums unchecked, vocals/bass/other checked
+    await user.click(screen.getByRole("button", { name: /minus drums/i }));
+    expect(vocalsCheckbox).toBeChecked();
+    expect(drumsCheckbox).not.toBeChecked();
+    expect(bassCheckbox).toBeChecked();
+    expect(otherCheckbox).toBeChecked();
+
+    // Click Reset: all checked at 100%
+    await user.click(screen.getByRole("button", { name: /reset/i }));
+    expect(vocalsCheckbox).toBeChecked();
+    expect(drumsCheckbox).toBeChecked();
+    expect(bassCheckbox).toBeChecked();
+    expect(otherCheckbox).toBeChecked();
+  });
+
+  it("disables export button when no stems are selected or when active stem volumes are zero", async () => {
+    const user = userEvent.setup();
+    render(
+      <ExportDialog
+        isOpen={true}
+        onClose={vi.fn()}
+        stems={mockStems}
+        sourceMixTitle="audioslave_stone.mp3"
+      />
+    );
+
+    await user.click(screen.getByRole("radio", { name: /custom mixdown/i }));
+    const exportBtn = screen.getByRole("button", {
+      name: /export & download/i,
+    });
+    expect(exportBtn).not.toBeDisabled();
+
+    const vocalsCheckbox = screen.getByRole("checkbox", {
+      name: /vocals stem/i,
+    });
+    const drumsCheckbox = screen.getByRole("checkbox", { name: /drums stem/i });
+    const bassCheckbox = screen.getByRole("checkbox", { name: /bass stem/i });
+    const otherCheckbox = screen.getByRole("checkbox", { name: /other stem/i });
+
+    // Uncheck all stems
+    await user.click(vocalsCheckbox);
+    await user.click(drumsCheckbox);
+    await user.click(bassCheckbox);
+    await user.click(otherCheckbox);
+
+    // Export button should now be disabled
+    expect(exportBtn).toBeDisabled();
+
+    // Re-check vocals stem with volume 1.0 -> button becomes enabled
+    await user.click(vocalsCheckbox);
+    expect(exportBtn).not.toBeDisabled();
+
+    // Set vocals volume slider to 0 -> button becomes disabled again
+    const vocalsSlider = screen.getByRole("slider", { name: /vocals volume/i });
+    fireEvent.change(vocalsSlider, { target: { value: "0" } });
+    expect(exportBtn).toBeDisabled();
+
+    // Bring vocals volume back up to 0.5 -> button becomes enabled
+    fireEvent.change(vocalsSlider, { target: { value: "0.5" } });
+    expect(exportBtn).not.toBeDisabled();
+  });
+
+  it("exports custom mixdown as WAV with anti-clipping protection", async () => {
+    const user = userEvent.setup();
+    const handleExportComplete = vi.fn();
+
+    render(
+      <ExportDialog
+        isOpen={true}
+        onClose={vi.fn()}
+        stems={mockStems}
+        sourceMixTitle="audioslave_stone.mp3"
+        onExportComplete={handleExportComplete}
+      />
+    );
+
+    // Switch to Custom Mixdown
+    await user.click(screen.getByRole("radio", { name: /custom mixdown/i }));
+
+    // Click Karaoke preset (mutes vocals)
+    await user.click(
+      screen.getByRole("button", { name: /karaoke \/ instrumental/i })
+    );
+
+    // Click Export & Download
+    await user.click(
+      screen.getByRole("button", { name: /export & download/i })
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText(/export complete/i)).toBeInTheDocument();
+    });
+
+    // Descriptor for minus vocals is "karaoke"
+    expect(handleExportComplete).toHaveBeenCalledWith(
+      "audioslave_stone_karaoke.wav"
+    );
+  });
+
+  it("exports custom mixdown as MP3 with selected bitrate", async () => {
+    const user = userEvent.setup();
+    const handleExportComplete = vi.fn();
+
+    render(
+      <ExportDialog
+        isOpen={true}
+        onClose={vi.fn()}
+        stems={mockStems}
+        sourceMixTitle="audioslave_stone.mp3"
+        onExportComplete={handleExportComplete}
+      />
+    );
+
+    // Switch to Custom Mixdown
+    await user.click(screen.getByRole("radio", { name: /custom mixdown/i }));
+
+    // Click Acapella preset (solo vocals)
+    await user.click(screen.getByRole("button", { name: /acapella/i }));
+
+    // Switch to MP3
+    await user.click(screen.getByRole("radio", { name: /^mp3/i }));
+
+    // Select 320 kbps
+    const bitrateSelect = screen.getByLabelText(/bitrate/i);
+    await user.selectOptions(bitrateSelect, "320");
+
+    // Click Export & Download
+    await user.click(
+      screen.getByRole("button", { name: /export & download/i })
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText(/export complete/i)).toBeInTheDocument();
+    });
+
+    // Descriptor for vocals only is "acapella"
+    expect(handleExportComplete).toHaveBeenCalledWith(
+      "audioslave_stone_acapella.mp3"
+    );
+  });
+
+  it("passes custom master volume and antiClipping options to mixAudioStems and WAV encoder", async () => {
+    const user = userEvent.setup();
+    const mixAudioStemsSpy = vi.spyOn(customMixdown, "mixAudioStems");
+
+    render(
+      <ExportDialog
+        isOpen={true}
+        onClose={vi.fn()}
+        stems={mockStems}
+        sourceMixTitle="audioslave_stone.mp3"
+      />
+    );
+
+    await user.click(screen.getByRole("radio", { name: /custom mixdown/i }));
+
+    // Select 24-bit PCM
+    const bitDepthSelect = screen.getByLabelText(/bit depth/i);
+    await user.selectOptions(bitDepthSelect, "24");
+
+    // Adjust master volume to 0.75
+    const masterSlider = screen.getByRole("slider", {
+      name: /master mixdown volume/i,
+    });
+    fireEvent.change(masterSlider, { target: { value: "0.75" } });
+
+    // Toggle anti-clipping off
+    const antiClippingCheckbox = screen.getByRole("checkbox", {
+      name: /anti-clipping/i,
+    });
+    await user.click(antiClippingCheckbox);
+    expect(antiClippingCheckbox).not.toBeChecked();
+
+    // Export & Download
+    await user.click(
+      screen.getByRole("button", { name: /export & download/i })
+    );
+
+    await waitFor(() => {
+      expect(mixAudioStemsSpy).toHaveBeenCalledWith(
+        mockStems,
+        expect.objectContaining({
+          masterGain: 0.75,
+          antiClipping: false,
+          format: "wav",
+          sourceMixTitle: "audioslave_stone.mp3",
+        })
+      );
+    });
+
+    mixAudioStemsSpy.mockRestore();
   });
 
   it("allows selecting format and sub-parameters (WAV bit-depth & MP3 bitrate)", async () => {
