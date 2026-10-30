@@ -1,7 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import {
+  render,
+  screen,
+  fireEvent,
+  within,
+  waitFor,
+} from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { StemPlayer } from "../components/StemPlayer";
 import { StemName } from "../lib/chunkOverlapAdd";
+import * as customMixdown from "../lib/customMixdown";
 
 // Mock Web Audio API
 function createMockAudioContext() {
@@ -286,5 +294,182 @@ describe("StemPlayer UI Component", () => {
     fireEvent.click(exportBtn);
 
     expect(screen.getByRole("dialog", { name: /export/i })).toBeInTheDocument();
+  });
+
+  it("synchronizes stem player mixer levels and master volume into Custom Mixdown export dialog", async () => {
+    const user = userEvent.setup();
+    render(
+      <StemPlayer
+        stems={dummyStems}
+        sampleRate={sampleRate}
+        audioContext={mockCtx}
+        sourceMixTitle="audioslave_stone.mp3"
+      />
+    );
+
+    // 1. Adjust Master Volume to 0.75
+    const masterSlider = screen.getByRole("slider", { name: /master volume/i });
+    fireEvent.change(masterSlider, { target: { value: "0.75" } });
+
+    // 2. Adjust Drums volume fader to 0.4
+    const drumsSlider = screen.getByRole("slider", { name: /drums volume/i });
+    fireEvent.change(drumsSlider, { target: { value: "0.4" } });
+
+    // 3. Mute Vocals
+    const vocalsMuteBtn = screen.getByRole("button", { name: /mute vocals/i });
+    await user.click(vocalsMuteBtn);
+
+    // 4. Open ExportDialog
+    const exportBtn = screen.getByRole("button", { name: /export stems/i });
+    await user.click(exportBtn);
+
+    const dialog = screen.getByRole("dialog", { name: /export/i });
+    expect(dialog).toBeInTheDocument();
+    const dialogScope = within(dialog);
+
+    // 5. Switch to Custom Mixdown mode
+    const mixdownRadio = dialogScope.getByRole("radio", {
+      name: /custom mixdown/i,
+    });
+    await user.click(mixdownRadio);
+
+    // 6. Verify synchronized mixer states in Custom Mixdown:
+    // Vocals was muted -> unchecked, volume preserved at 1.0
+    expect(
+      dialogScope.getByRole("checkbox", { name: /vocals stem/i })
+    ).not.toBeChecked();
+
+    // Drums was set to 0.4 -> checked, volume 0.4
+    expect(
+      dialogScope.getByRole("checkbox", { name: /drums stem/i })
+    ).toBeChecked();
+    expect(
+      dialogScope.getByRole("slider", { name: /drums volume/i })
+    ).toHaveValue("0.4");
+
+    // Bass and Other remained unmuted & 1.0 -> checked, volume 1.0
+    expect(
+      dialogScope.getByRole("checkbox", { name: /bass stem/i })
+    ).toBeChecked();
+    expect(
+      dialogScope.getByRole("slider", { name: /bass volume/i })
+    ).toHaveValue("1");
+
+    expect(
+      dialogScope.getByRole("checkbox", { name: /other stem/i })
+    ).toBeChecked();
+    expect(
+      dialogScope.getByRole("slider", { name: /other volume/i })
+    ).toHaveValue("1");
+
+    // Master Mixdown Volume synchronized to 0.75
+    expect(
+      dialogScope.getByRole("slider", { name: /master mixdown volume/i })
+    ).toHaveValue("0.75");
+  });
+
+  it("synchronizes solo states into Custom Mixdown export dialog", async () => {
+    const user = userEvent.setup();
+    render(
+      <StemPlayer
+        stems={dummyStems}
+        sampleRate={sampleRate}
+        audioContext={mockCtx}
+        sourceMixTitle="audioslave_stone.mp3"
+      />
+    );
+
+    // Solo Vocals stem in Stem Player
+    const vocalsSoloBtn = screen.getByRole("button", { name: /solo vocals/i });
+    await user.click(vocalsSoloBtn);
+
+    // Open ExportDialog
+    const exportBtn = screen.getByRole("button", { name: /export stems/i });
+    await user.click(exportBtn);
+
+    const dialog = screen.getByRole("dialog", { name: /export/i });
+    expect(dialog).toBeInTheDocument();
+    const dialogScope = within(dialog);
+
+    // Switch to Custom Mixdown mode
+    await user.click(
+      dialogScope.getByRole("radio", { name: /custom mixdown/i })
+    );
+
+    // Vocals is soloed -> checked
+    expect(
+      dialogScope.getByRole("checkbox", { name: /vocals stem/i })
+    ).toBeChecked();
+
+    // Drums, Bass, Other are silenced by solo -> unchecked
+    expect(
+      dialogScope.getByRole("checkbox", { name: /drums stem/i })
+    ).not.toBeChecked();
+    expect(
+      dialogScope.getByRole("checkbox", { name: /bass stem/i })
+    ).not.toBeChecked();
+    expect(
+      dialogScope.getByRole("checkbox", { name: /other stem/i })
+    ).not.toBeChecked();
+  });
+
+  it("completes full roundtrip workflow from fader adjustments to Custom Mixdown export", async () => {
+    const user = userEvent.setup();
+    const mixAudioStemsSpy = vi.spyOn(customMixdown, "mixAudioStems");
+
+    render(
+      <StemPlayer
+        stems={dummyStems}
+        sampleRate={sampleRate}
+        audioContext={mockCtx}
+        sourceMixTitle="audioslave_stone.mp3"
+      />
+    );
+
+    // Set master volume to 0.65
+    const masterSlider = screen.getByRole("slider", { name: /master volume/i });
+    fireEvent.change(masterSlider, { target: { value: "0.65" } });
+
+    // Set vocals volume to 0.7
+    const vocalsSlider = screen.getByRole("slider", { name: /vocals volume/i });
+    fireEvent.change(vocalsSlider, { target: { value: "0.7" } });
+
+    // Mute drums
+    const drumsMuteBtn = screen.getByRole("button", { name: /mute drums/i });
+    await user.click(drumsMuteBtn);
+
+    // Open ExportDialog
+    const exportBtn = screen.getByRole("button", { name: /export stems/i });
+    await user.click(exportBtn);
+
+    const dialog = screen.getByRole("dialog", { name: /export/i });
+    const dialogScope = within(dialog);
+
+    // Switch to Custom Mixdown mode
+    await user.click(
+      dialogScope.getByRole("radio", { name: /custom mixdown/i })
+    );
+
+    // Click Export & Download
+    await user.click(
+      dialogScope.getByRole("button", { name: /export & download/i })
+    );
+
+    await waitFor(() => {
+      expect(mixAudioStemsSpy).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          masterGain: 0.65,
+          stemGains: expect.objectContaining({
+            vocals: 0.7,
+            drums: 0,
+            bass: 1.0,
+            other: 1.0,
+          }),
+        })
+      );
+    });
+
+    mixAudioStemsSpy.mockRestore();
   });
 });

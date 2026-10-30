@@ -612,6 +612,8 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
         stems={stems}
         sampleRate={sampleRate}
         sourceMixTitle={sourceMixTitle}
+        initialMixerStates={mixerStates}
+        initialMasterVolume={masterVolume}
       />
     </section>
   );

@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import {
   X,
   Download,
@@ -15,6 +15,7 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { StemName, STEM_NAMES } from "../lib/chunkOverlapAdd";
+import { StemMixerStates } from "../lib/stemPlayerEngine";
 import { encodeWav, createWavBlob } from "../lib/wavEncoder";
 import {
   encodeMp3,
@@ -37,6 +38,8 @@ export interface ExportDialogProps {
   stems: Record<StemName, Float32Array[] | AudioBuffer>;
   sampleRate?: number;
   sourceMixTitle?: string;
+  initialMixerStates?: StemMixerStates;
+  initialMasterVolume?: number;
   onExportComplete?: (fileName: string) => void;
 }
 
@@ -69,6 +72,30 @@ const DEFAULT_STEM_CONTROLS: Record<StemName, StemControlState> = {
   bass: { enabled: true, volume: 1.0 },
   other: { enabled: true, volume: 1.0 },
 };
+
+export function computeInitialStemControls(
+  initialMixerStates?: StemMixerStates
+): Record<StemName, StemControlState> {
+  if (!initialMixerStates) {
+    return DEFAULT_STEM_CONTROLS;
+  }
+  const hasAnySolo = STEM_NAMES.some((s) => initialMixerStates[s]?.solo);
+  const controls: Record<StemName, StemControlState> = {} as any;
+  for (const stem of STEM_NAMES) {
+    const state = initialMixerStates[stem];
+    const isHeard = state
+      ? hasAnySolo
+        ? Boolean(state.solo && !state.muted)
+        : Boolean(!state.muted)
+      : true;
+    const vol = state ? state.volume : 1.0;
+    controls[stem] = {
+      enabled: isHeard,
+      volume: vol,
+    };
+  }
+  return controls;
+}
 
 function extractChannels(source: Float32Array[] | AudioBuffer): Float32Array[] {
   if ("numberOfChannels" in source) {
@@ -110,6 +137,8 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
   stems,
   sampleRate = 44100,
   sourceMixTitle = "source_mix",
+  initialMixerStates,
+  initialMasterVolume,
   onExportComplete,
 }) => {
   const [mode, setMode] = useState<ExportMode>("single");
@@ -121,8 +150,10 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
   // Custom Mixdown state
   const [stemControls, setStemControls] = useState<
     Record<StemName, StemControlState>
-  >(DEFAULT_STEM_CONTROLS);
-  const [masterGain, setMasterGain] = useState<number>(1.0);
+  >(() => computeInitialStemControls(initialMixerStates));
+  const [masterGain, setMasterGain] = useState<number>(
+    initialMasterVolume ?? 1.0
+  );
   const [antiClipping, setAntiClipping] = useState<boolean>(true);
 
   // Export execution state
@@ -186,15 +217,20 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, isExporting, onClose]);
 
-  // Reset notifications on opening or changing mode
+  const prevOpenRef = useRef(false);
+
+  // Reset notifications & sync mixer settings on opening
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && !prevOpenRef.current) {
       setError(null);
       setSuccessNotification(null);
       setProgress(0);
       setStatusMessage("");
+      setStemControls(computeInitialStemControls(initialMixerStates));
+      setMasterGain(initialMasterVolume ?? 1.0);
     }
-  }, [isOpen]);
+    prevOpenRef.current = isOpen;
+  }, [isOpen, initialMixerStates, initialMasterVolume]);
 
   const handleExport = useCallback(async () => {
     setIsExporting(true);

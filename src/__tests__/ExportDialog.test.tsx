@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { ExportDialog } from "../components/ExportDialog";
 import { StemName } from "../lib/chunkOverlapAdd";
+import { StemMixerStates } from "../lib/stemPlayerEngine";
 import * as customMixdown from "../lib/customMixdown";
 
 describe("ExportDialog", () => {
@@ -502,6 +503,211 @@ describe("ExportDialog", () => {
     await waitFor(() => {
       expect(screen.getByRole("alert")).toBeInTheDocument();
       expect(screen.getByText(/export failed/i)).toBeInTheDocument();
+    });
+  });
+
+  describe("Stem Player Mixer Synchronization", () => {
+    it("pre-populates Custom Mixdown controls from initialMixerStates and initialMasterVolume", async () => {
+      const user = userEvent.setup();
+      const initialMixerStates: StemMixerStates = {
+        vocals: { volume: 0.75, muted: false, solo: false },
+        drums: { volume: 0.6, muted: true, solo: false },
+        bass: { volume: 0.9, muted: false, solo: false },
+        other: { volume: 0.4, muted: false, solo: false },
+      };
+
+      render(
+        <ExportDialog
+          isOpen={true}
+          onClose={vi.fn()}
+          stems={mockStems}
+          sourceMixTitle="audioslave_stone.mp3"
+          initialMixerStates={initialMixerStates}
+          initialMasterVolume={0.8}
+        />
+      );
+
+      await user.click(screen.getByRole("radio", { name: /custom mixdown/i }));
+
+      // Vocals: unmuted, vol 0.75 -> enabled & vol 0.75
+      const vocalsCheckbox = screen.getByRole("checkbox", {
+        name: /vocals stem/i,
+      });
+      expect(vocalsCheckbox).toBeChecked();
+      const vocalsSlider = screen.getByRole("slider", {
+        name: /vocals volume/i,
+      });
+      expect(vocalsSlider).toHaveValue("0.75");
+
+      // Drums: muted, vol 0.6 -> unchecked/disabled in mix & vol 0.6
+      const drumsCheckbox = screen.getByRole("checkbox", {
+        name: /drums stem/i,
+      });
+      expect(drumsCheckbox).not.toBeChecked();
+      const drumsSlider = screen.getByRole("slider", { name: /drums volume/i });
+      expect(drumsSlider).toHaveValue("0.6");
+
+      // Bass: unmuted, vol 0.9 -> enabled & vol 0.9
+      const bassCheckbox = screen.getByRole("checkbox", { name: /bass stem/i });
+      expect(bassCheckbox).toBeChecked();
+      const bassSlider = screen.getByRole("slider", { name: /bass volume/i });
+      expect(bassSlider).toHaveValue("0.9");
+
+      // Other: unmuted, vol 0.4 -> enabled & vol 0.4
+      const otherCheckbox = screen.getByRole("checkbox", {
+        name: /other stem/i,
+      });
+      expect(otherCheckbox).toBeChecked();
+      const otherSlider = screen.getByRole("slider", { name: /other volume/i });
+      expect(otherSlider).toHaveValue("0.4");
+
+      // Master Volume: 0.8
+      const masterSlider = screen.getByRole("slider", {
+        name: /master mixdown volume/i,
+      });
+      expect(masterSlider).toHaveValue("0.8");
+    });
+
+    it("reflects solo states by only enabling soloed stems in Custom Mixdown", async () => {
+      const user = userEvent.setup();
+      const initialMixerStates: StemMixerStates = {
+        vocals: { volume: 0.85, muted: false, solo: true },
+        drums: { volume: 0.7, muted: false, solo: false },
+        bass: { volume: 0.95, muted: false, solo: false },
+        other: { volume: 0.5, muted: false, solo: false },
+      };
+
+      render(
+        <ExportDialog
+          isOpen={true}
+          onClose={vi.fn()}
+          stems={mockStems}
+          sourceMixTitle="audioslave_stone.mp3"
+          initialMixerStates={initialMixerStates}
+        />
+      );
+
+      await user.click(screen.getByRole("radio", { name: /custom mixdown/i }));
+
+      // Only vocals was soloed, so only vocals is enabled; others are silenced
+      expect(
+        screen.getByRole("checkbox", { name: /vocals stem/i })
+      ).toBeChecked();
+      expect(
+        screen.getByRole("checkbox", { name: /drums stem/i })
+      ).not.toBeChecked();
+      expect(
+        screen.getByRole("checkbox", { name: /bass stem/i })
+      ).not.toBeChecked();
+      expect(
+        screen.getByRole("checkbox", { name: /other stem/i })
+      ).not.toBeChecked();
+    });
+
+    it("allows on-the-fly adjustment inside the dialog without being overwritten", async () => {
+      const user = userEvent.setup();
+      const initialMixerStates: StemMixerStates = {
+        vocals: { volume: 0.5, muted: false, solo: false },
+        drums: { volume: 0.5, muted: false, solo: false },
+        bass: { volume: 0.5, muted: false, solo: false },
+        other: { volume: 0.5, muted: false, solo: false },
+      };
+
+      render(
+        <ExportDialog
+          isOpen={true}
+          onClose={vi.fn()}
+          stems={mockStems}
+          sourceMixTitle="audioslave_stone.mp3"
+          initialMixerStates={initialMixerStates}
+          initialMasterVolume={0.5}
+        />
+      );
+
+      await user.click(screen.getByRole("radio", { name: /custom mixdown/i }));
+
+      // Uncheck vocals
+      const vocalsCheckbox = screen.getByRole("checkbox", {
+        name: /vocals stem/i,
+      });
+      await user.click(vocalsCheckbox);
+      expect(vocalsCheckbox).not.toBeChecked();
+
+      // Change master volume slider
+      const masterSlider = screen.getByRole("slider", {
+        name: /master mixdown volume/i,
+      });
+      fireEvent.change(masterSlider, { target: { value: "0.85" } });
+      expect(masterSlider).toHaveValue("0.85");
+    });
+
+    it("re-synchronizes with new mixer settings when closed and re-opened", async () => {
+      const user = userEvent.setup();
+      const initialMixerStates1: StemMixerStates = {
+        vocals: { volume: 0.5, muted: false, solo: false },
+        drums: { volume: 0.5, muted: false, solo: false },
+        bass: { volume: 0.5, muted: false, solo: false },
+        other: { volume: 0.5, muted: false, solo: false },
+      };
+
+      const { rerender } = render(
+        <ExportDialog
+          isOpen={true}
+          onClose={vi.fn()}
+          stems={mockStems}
+          sourceMixTitle="audioslave_stone.mp3"
+          initialMixerStates={initialMixerStates1}
+          initialMasterVolume={0.5}
+        />
+      );
+
+      await user.click(screen.getByRole("radio", { name: /custom mixdown/i }));
+      expect(
+        screen.getByRole("slider", { name: /master mixdown volume/i })
+      ).toHaveValue("0.5");
+
+      // Close dialog
+      rerender(
+        <ExportDialog
+          isOpen={false}
+          onClose={vi.fn()}
+          stems={mockStems}
+          sourceMixTitle="audioslave_stone.mp3"
+          initialMixerStates={initialMixerStates1}
+          initialMasterVolume={0.5}
+        />
+      );
+
+      // Re-open with new mixer states
+      const initialMixerStates2: StemMixerStates = {
+        vocals: { volume: 0.9, muted: true, solo: false },
+        drums: { volume: 0.8, muted: false, solo: false },
+        bass: { volume: 0.7, muted: false, solo: false },
+        other: { volume: 0.6, muted: false, solo: false },
+      };
+
+      rerender(
+        <ExportDialog
+          isOpen={true}
+          onClose={vi.fn()}
+          stems={mockStems}
+          sourceMixTitle="audioslave_stone.mp3"
+          initialMixerStates={initialMixerStates2}
+          initialMasterVolume={0.75}
+        />
+      );
+
+      await user.click(screen.getByRole("radio", { name: /custom mixdown/i }));
+
+      expect(
+        screen.getByRole("checkbox", { name: /vocals stem/i })
+      ).not.toBeChecked();
+      expect(
+        screen.getByRole("slider", { name: /vocals volume/i })
+      ).toHaveValue("0.9");
+      expect(
+        screen.getByRole("slider", { name: /master mixdown volume/i })
+      ).toHaveValue("0.75");
     });
   });
 });

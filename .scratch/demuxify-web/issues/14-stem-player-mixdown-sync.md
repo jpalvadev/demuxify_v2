@@ -4,9 +4,9 @@
 
 **Blocked by:** 13: Custom Mixdown Export Mode & Presets in ExportDialog
 
-**Status:** ready-for-agent
+**Status:** complete
 
-- [ ] Pass current stem player mixer levels (individual stem volumes, mutes, solos) and master volume into the export modal upon opening.
-- [ ] Pre-populate Custom Mixdown controls with these initial listening settings while still permitting on-the-fly adjustment inside the dialog.
-- [ ] Ensure full roundtrip workflow from transport controls and fader adjustments to export modal download.
-- [ ] Verify that existing single stem, ZIP bundle, and stem player tests continue to pass with zero regressions.
+- [x] Pass current stem player mixer levels (individual stem volumes, mutes, solos) and master volume into the export modal upon opening.
+- [x] Pre-populate Custom Mixdown controls with these initial listening settings while still permitting on-the-fly adjustment inside the dialog.
+- [x] Ensure full roundtrip workflow from transport controls and fader adjustments to export modal download.
+- [x] Verify that existing single stem, ZIP bundle, and stem player tests continue to pass with zero regressions.
