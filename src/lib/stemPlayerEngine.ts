@@ -397,22 +397,7 @@ export class StemPlayerEngine {
       });
       this.workletNode.port.postMessage({ type: "play" });
     } else {
-      const sources: AudioBufferSourceNode[] = [];
-      for (const stem of STEM_NAMES) {
-        const source = this.audioContext.createBufferSource();
-        source.buffer = this.stemBuffers[stem];
-        if (source.playbackRate) {
-          source.playbackRate.setValueAtTime(this.tempo, startTime);
-        }
-        source.connect(this.stemGainNodes[stem]);
-
-        // Synchronized start across all stems
-        source.start(startTime, offset);
-        sources.push(source);
-      }
-
-      this.activeSources = sources;
-      this.setupSourcesEndedListener(sources);
+      this.startFallbackSources(offset, startTime);
     }
 
     this.playing = true;
@@ -450,22 +435,26 @@ export class StemPlayerEngine {
         this.workletNode.port.postMessage({ type: "play" });
       }
     } else if (this.playing) {
-      const sources: AudioBufferSourceNode[] = [];
-      for (const stem of STEM_NAMES) {
-        const source = this.audioContext.createBufferSource();
-        source.buffer = this.stemBuffers[stem];
-        if (source.playbackRate) {
-          source.playbackRate.setValueAtTime(this.tempo, startTime);
-        }
-        source.connect(this.stemGainNodes[stem]);
-        source.start(startTime, clampedTime);
-        sources.push(source);
-      }
-      this.activeSources = sources;
-      this.setupSourcesEndedListener(sources);
+      this.startFallbackSources(clampedTime, startTime);
     }
 
     this.notifyPosition();
+  }
+
+  private startFallbackSources(offset: number, startTime: number): void {
+    const sources: AudioBufferSourceNode[] = [];
+    for (const stem of STEM_NAMES) {
+      const source = this.audioContext.createBufferSource();
+      source.buffer = this.stemBuffers[stem];
+      if (source.playbackRate) {
+        source.playbackRate.setValueAtTime(this.tempo, startTime);
+      }
+      source.connect(this.stemGainNodes[stem]);
+      source.start(startTime, offset);
+      sources.push(source);
+    }
+    this.activeSources = sources;
+    this.setupSourcesEndedListener(sources);
   }
 
   private setupSourcesEndedListener(sources: AudioBufferSourceNode[]): void {
@@ -483,6 +472,7 @@ export class StemPlayerEngine {
   private stopActiveSources(): void {
     for (const source of this.activeSources) {
       try {
+        source.onended = null;
         source.stop();
         source.disconnect();
       } catch {
@@ -625,10 +615,6 @@ export class StemPlayerEngine {
 
   public isUsingWorklet(): boolean {
     return this.useWorklet && this.workletNode !== null;
-  }
-
-  public getWorkletNode(): AudioWorkletNode | null {
-    return this.workletNode;
   }
 
   public getActiveSources(): AudioBufferSourceNode[] {
