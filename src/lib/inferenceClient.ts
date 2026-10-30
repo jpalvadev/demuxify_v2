@@ -31,6 +31,7 @@ export interface SeparationResult {
 
 export interface InitOptions {
   modelUrl?: string;
+  modelProfileId?: string;
   useMock?: boolean;
   preferredBackend?: "webgpu" | "wasm";
   onDownloadProgress?: (progress: DownloadProgress) => void;
@@ -206,6 +207,7 @@ export class InferenceClient {
       const message: WorkerInMessage = {
         type: "init",
         modelUrl: options.modelUrl ?? DEFAULT_MODEL_URL,
+        modelProfileId: options.modelProfileId,
         useMock: options.useMock ?? false,
         preferredBackend: options.preferredBackend,
       };

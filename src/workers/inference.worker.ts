@@ -4,7 +4,11 @@ import {
   DownloadProgress,
   DEFAULT_MODEL_URL,
 } from "../lib/modelCache";
-import { getModelProfile } from "../lib/modelConfig";
+import {
+  getModelProfile,
+  ModelProfile,
+  BS_ROFORMER_PROFILE,
+} from "../lib/modelConfig";
 
 // Configure ONNX Runtime WASM binary paths to matching version
 ort.env.wasm.wasmPaths =
@@ -79,6 +83,7 @@ let session: ort.InferenceSession | null = null;
 let isMockSession = false;
 let isCancelled = false;
 let activeBackend: "webgpu" | "wasm" | "mock" = "webgpu";
+let activeProfile: ModelProfile = BS_ROFORMER_PROFILE;
 
 // Canonical BS-RoFormer 4-stem order: [drums, bass, other, vocals]
 // (BS_ROFORMER_STEM_ORDER is imported from ../lib/stft)
@@ -90,6 +95,11 @@ async function handleInit(
   postMsg: (msg: WorkerOutMessage) => void = (m) => self.postMessage(m),
   modelProfileId?: string
 ) {
+  activeProfile = getModelProfile(
+    modelProfileId ||
+      (modelUrl.includes("mdx") ? "mdx-net-4stem" : "bs-roformer-4stem")
+  );
+
   if (useMock) {
     isMockSession = true;
     session = null;
@@ -109,7 +119,8 @@ async function handleInit(
           type: "download_progress",
           ...progress,
         } satisfies WorkerOutMessage);
-      }
+      },
+      activeProfile.cacheName
     );
 
     let weightsBytes: Uint8Array | null = new Uint8Array(weightsBuffer);
@@ -238,106 +249,172 @@ async function handleStart(
         const isSpecModel =
           inputNames.includes("spec_real") && inputNames.includes("spec_imag");
 
-        if (!isSpecModel) {
-          throw new Error(
-            `Unsupported model architecture: expected BS-RoFormer spectrogram inputs ('spec_real', 'spec_imag'), received: [${inputNames.join(", ")}]`
+        if (isSpecModel) {
+          postMsg({
+            type: "worker_log",
+            level: "info",
+            message: `Chunk ${i + 1}/${totalChunks}: Computing STFT...`,
+          } satisfies WorkerOutMessage);
+
+          const stftStart = Date.now();
+          const { real, imag, F, T } = computeStereoSTFT(
+            chunk.audio[0],
+            chunk.audio[1],
+            chunkSamples
           );
+
+          postMsg({
+            type: "worker_log",
+            level: "info",
+            message: `Chunk ${i + 1}/${totalChunks}: STFT done in ${Date.now() - stftStart}ms`,
+          } satisfies WorkerOutMessage);
+
+          const realTensor = new ort.Tensor("float32", real, [1, 2, F, T]);
+          const imagTensor = new ort.Tensor("float32", imag, [1, 2, F, T]);
+
+          const feeds: Record<string, ort.Tensor> = {
+            spec_real: realTensor,
+            spec_imag: imagTensor,
+          };
+
+          const isFirstChunk = i === 0;
+          postMsg({
+            type: "chunk_start",
+            chunkIndex: i,
+            totalChunks,
+            stage:
+              activeBackend === "wasm"
+                ? "wasm_inference"
+                : isFirstChunk
+                  ? "webgpu_compiling"
+                  : "webgpu_inference",
+          } satisfies WorkerOutMessage);
+
+          postMsg({
+            type: "worker_log",
+            level: "info",
+            message: `Chunk ${i + 1}/${totalChunks}: Executing ${activeBackend.toUpperCase()} session.run()${isFirstChunk && activeBackend === "webgpu" ? " (compiling shaders in GPU driver)..." : activeBackend === "wasm" ? " (memory-safe SIMD)..." : "..."}`,
+          } satisfies WorkerOutMessage);
+
+          const inferStart = Date.now();
+          const outputFeeds = await session.run(feeds);
+          const inferElapsed = Date.now() - inferStart;
+
+          postMsg({
+            type: "worker_log",
+            level: "info",
+            message: `Chunk ${i + 1}/${totalChunks}: ${activeBackend.toUpperCase()} inference completed in ${inferElapsed}ms!`,
+          } satisfies WorkerOutMessage);
+
+          const outRealTensor =
+            outputFeeds["out_spec_real"] || outputFeeds[session.outputNames[0]];
+          const outImagTensor =
+            outputFeeds["out_spec_imag"] || outputFeeds[session.outputNames[1]];
+
+          const numStemsInOutput = outRealTensor.dims[1] || 6;
+          // .slice() ensures an owned copy in JS heap before disposing WebGPU tensor resources
+          const outReal = (outRealTensor.data as Float32Array).slice();
+          const outImag = (outImagTensor.data as Float32Array).slice();
+
+          realTensor.dispose();
+          imagTensor.dispose();
+          outRealTensor.dispose();
+          outImagTensor.dispose();
+
+          postMsg({
+            type: "chunk_start",
+            chunkIndex: i,
+            totalChunks,
+            stage: "istft",
+          } satisfies WorkerOutMessage);
+
+          const istftStart = Date.now();
+          chunkStems = computeBatchISTFT(
+            outReal,
+            outImag,
+            chunkSamples,
+            undefined,
+            undefined,
+            undefined,
+            numStemsInOutput
+          );
+
+          postMsg({
+            type: "worker_log",
+            level: "info",
+            message: `Chunk ${i + 1}/${totalChunks}: iSTFT completed in ${Date.now() - istftStart}ms`,
+          } satisfies WorkerOutMessage);
+        } else {
+          // Polymorphic tensor adapter for MDX-Net (Direct Waveform / Magnitude Tensor input)
+          postMsg({
+            type: "worker_log",
+            level: "info",
+            message: `Chunk ${i + 1}/${totalChunks}: Preparing MDX-Net waveform tensor...`,
+          } satisfies WorkerOutMessage);
+
+          const inputBuffer = new Float32Array(2 * chunkSamples);
+          inputBuffer.set(chunk.audio[0], 0);
+          inputBuffer.set(chunk.audio[1], chunkSamples);
+
+          const inputTensorName = session.inputNames[0] || "input";
+          const inputTensor = new ort.Tensor("float32", inputBuffer, [
+            1,
+            2,
+            chunkSamples,
+          ]);
+
+          const feeds: Record<string, ort.Tensor> = {
+            [inputTensorName]: inputTensor,
+          };
+
+          const isFirstChunk = i === 0;
+          postMsg({
+            type: "chunk_start",
+            chunkIndex: i,
+            totalChunks,
+            stage:
+              activeBackend === "wasm"
+                ? "wasm_inference"
+                : isFirstChunk
+                  ? "webgpu_compiling"
+                  : "webgpu_inference",
+          } satisfies WorkerOutMessage);
+
+          const inferStart = Date.now();
+          const outputFeeds = await session.run(feeds);
+          const inferElapsed = Date.now() - inferStart;
+
+          postMsg({
+            type: "worker_log",
+            level: "info",
+            message: `Chunk ${i + 1}/${totalChunks}: MDX-Net ${activeBackend.toUpperCase()} inference completed in ${inferElapsed}ms!`,
+          } satisfies WorkerOutMessage);
+
+          const outputTensorName = session.outputNames[0] || "output";
+          const outputTensor = outputFeeds[outputTensorName];
+          const outData = (outputTensor.data as Float32Array).slice();
+
+          inputTensor.dispose();
+          outputTensor.dispose();
+
+          // Canonical 4-Stem layout: [batch=1, stems=4, channels=2, samples=chunkSamples]
+          const MDX_NET_STEM_ORDER: StemName[] = [
+            "vocals",
+            "drums",
+            "bass",
+            "other",
+          ];
+          chunkStems = {} as Record<StemName, Float32Array[]>;
+
+          for (let s = 0; s < 4; s++) {
+            const stemName = MDX_NET_STEM_ORDER[s];
+            const leftStart = s * 2 * chunkSamples;
+            const rightStart = (s * 2 + 1) * chunkSamples;
+            const left = outData.slice(leftStart, leftStart + chunkSamples);
+            const right = outData.slice(rightStart, rightStart + chunkSamples);
+            chunkStems[stemName] = [left, right];
+          }
         }
-
-        postMsg({
-          type: "worker_log",
-          level: "info",
-          message: `Chunk ${i + 1}/${totalChunks}: Computing STFT...`,
-        } satisfies WorkerOutMessage);
-
-        const stftStart = Date.now();
-        const { real, imag, F, T } = computeStereoSTFT(
-          chunk.audio[0],
-          chunk.audio[1],
-          chunkSamples
-        );
-
-        postMsg({
-          type: "worker_log",
-          level: "info",
-          message: `Chunk ${i + 1}/${totalChunks}: STFT done in ${Date.now() - stftStart}ms`,
-        } satisfies WorkerOutMessage);
-
-        const realTensor = new ort.Tensor("float32", real, [1, 2, F, T]);
-        const imagTensor = new ort.Tensor("float32", imag, [1, 2, F, T]);
-
-        const feeds: Record<string, ort.Tensor> = {
-          spec_real: realTensor,
-          spec_imag: imagTensor,
-        };
-
-        const isFirstChunk = i === 0;
-        postMsg({
-          type: "chunk_start",
-          chunkIndex: i,
-          totalChunks,
-          stage:
-            activeBackend === "wasm"
-              ? "wasm_inference"
-              : isFirstChunk
-                ? "webgpu_compiling"
-                : "webgpu_inference",
-        } satisfies WorkerOutMessage);
-
-        postMsg({
-          type: "worker_log",
-          level: "info",
-          message: `Chunk ${i + 1}/${totalChunks}: Executing ${activeBackend.toUpperCase()} session.run()${isFirstChunk && activeBackend === "webgpu" ? " (compiling shaders in GPU driver)..." : activeBackend === "wasm" ? " (memory-safe SIMD)..." : "..."}`,
-        } satisfies WorkerOutMessage);
-
-        const inferStart = Date.now();
-        const outputFeeds = await session.run(feeds);
-        const inferElapsed = Date.now() - inferStart;
-
-        postMsg({
-          type: "worker_log",
-          level: "info",
-          message: `Chunk ${i + 1}/${totalChunks}: ${activeBackend.toUpperCase()} inference completed in ${inferElapsed}ms!`,
-        } satisfies WorkerOutMessage);
-
-        const outRealTensor =
-          outputFeeds["out_spec_real"] || outputFeeds[session.outputNames[0]];
-        const outImagTensor =
-          outputFeeds["out_spec_imag"] || outputFeeds[session.outputNames[1]];
-
-        const numStemsInOutput = outRealTensor.dims[1] || 6;
-        // .slice() ensures an owned copy in JS heap before disposing WebGPU tensor resources
-        const outReal = (outRealTensor.data as Float32Array).slice();
-        const outImag = (outImagTensor.data as Float32Array).slice();
-
-        realTensor.dispose();
-        imagTensor.dispose();
-        outRealTensor.dispose();
-        outImagTensor.dispose();
-
-        postMsg({
-          type: "chunk_start",
-          chunkIndex: i,
-          totalChunks,
-          stage: "istft",
-        } satisfies WorkerOutMessage);
-
-        const istftStart = Date.now();
-        chunkStems = computeBatchISTFT(
-          outReal,
-          outImag,
-          chunkSamples,
-          undefined,
-          undefined,
-          undefined,
-          numStemsInOutput
-        );
-
-        postMsg({
-          type: "worker_log",
-          level: "info",
-          message: `Chunk ${i + 1}/${totalChunks}: iSTFT completed in ${Date.now() - istftStart}ms`,
-        } satisfies WorkerOutMessage);
       } else {
         // Mock / simulation mode: deterministic DSP filter separation
         await new Promise((resolve) => setTimeout(resolve, 5));

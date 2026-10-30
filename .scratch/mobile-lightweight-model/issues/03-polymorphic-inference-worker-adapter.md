@@ -4,9 +4,9 @@
 
 **Blocked by:** 01: Centralized Model Registry & Unified Model Identity, 02: MDX-Net 4-Stem ONNX Model Asset & Provisioning Script
 
-**Status:** ready-for-agent
+**Status:** complete
 
-- [ ] The inference worker initializes sessions dynamically using the model URL and cache partition designated by the active model profile.
-- [ ] A polymorphic tensor adapter prepares input buffers matching the model architecture (spectrogram inputs for BS-RoFormer, magnitude/waveform inputs for MDX-Net).
-- [ ] Sequential chunk inference processes the Source Mix and outputs the canonical four discrete Stems (`vocals`, `drums`, `bass`, `other`) without audio dropouts or phase misalignments.
-- [ ] Unit and worker tests verify that switching between model profiles successfully executes chunked separation and emits the four expected stems.
+- [x] The inference worker initializes sessions dynamically using the model URL and cache partition designated by the active model profile.
+- [x] A polymorphic tensor adapter prepares input buffers matching the model architecture (spectrogram inputs for BS-RoFormer, magnitude/waveform inputs for MDX-Net).
+- [x] Sequential chunk inference processes the Source Mix and outputs the canonical four discrete Stems (`vocals`, `drums`, `bass`, `other`) without audio dropouts or phase misalignments.
+- [x] Unit and worker tests verify that switching between model profiles successfully executes chunked separation and emits the four expected stems.
