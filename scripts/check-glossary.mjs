@@ -23,13 +23,13 @@ const IGNORED_FILES = [
 // Patterns forbidden outside of modelConfig.ts
 const MODEL_CONFIG_RESTRICTED_PATTERNS = [
   {
-    pattern: /demuxify-(roformer|htdemucs|mdxnet)-cache/g,
+    pattern: /demuxify-(roformer|htdemucs|openunmix|mdxnet)-cache/g,
     reason:
       "ADR 0005 rule: Cache partition keys must only be defined in src/lib/modelConfig.ts. Use resolveModelProfile() or ModelProfile.cacheName.",
   },
   {
     pattern:
-      /(bs_roformer_4stem_webgpu|htdemucs_4stem_mobile|mdx_net_4stem_mobile)\.onnx/g,
+      /(bs_roformer_4stem_webgpu|htdemucs_4stem_mobile|open_unmix_4stem_mobile|mdx_net_4stem_mobile)\.onnx/g,
     reason:
       "ADR 0005 rule: Model asset filenames must only be defined in src/lib/modelConfig.ts. Use resolveModelProfile() or ModelProfile.modelUrl.",
   },

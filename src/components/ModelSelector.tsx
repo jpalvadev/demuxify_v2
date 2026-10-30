@@ -1,11 +1,18 @@
 import React from "react";
-import { Sparkles, Zap, Smartphone, Check, ShieldCheck } from "lucide-react";
+import {
+  Sparkles,
+  Zap,
+  Gauge,
+  Smartphone,
+  Check,
+  ShieldCheck,
+  AlertTriangle,
+} from "lucide-react";
 import {
   ModelId,
   ModelProfile,
   MODEL_PROFILES,
   BS_ROFORMER_PROFILE,
-  HT_DEMUCS_PROFILE,
   listModelProfiles,
 } from "../lib/modelConfig";
 
@@ -25,44 +32,8 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
   const activeProfile: ModelProfile =
     MODEL_PROFILES[selectedModelId] || BS_ROFORMER_PROFILE;
 
-  // On mobile devices, lock to MDX-Net 4-Stem with protective advisory
-  if (isMobile) {
-    return (
-      <div
-        role="region"
-        aria-label="Active Model Profile Advisory"
-        className="rounded-2xl border border-primary/20 bg-primary/5 p-4 shadow-xs"
-      >
-        <div className="flex items-start gap-3">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-            <Smartphone className="h-5 w-5" />
-          </div>
-          <div className="flex-1 space-y-1">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold uppercase tracking-wider text-primary">
-                Mobile-Optimized Model Active
-              </span>
-              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
-                <ShieldCheck className="h-3 w-3" />
-                Memory Protected
-              </span>
-            </div>
-            <h4 className="text-sm font-semibold text-foreground">
-              {HT_DEMUCS_PROFILE.name} (~{HT_DEMUCS_PROFILE.estimatedSizeMb} MB)
-            </h4>
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              Demuxify Web automatically selects this lightweight profile to
-              preserve memory and prevent browser crashes on smartphones and
-              tablets while extracting all 4 discrete Stems.
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // On desktop browsers, render interactive Model Selector control
   const profiles = listModelProfiles();
+  const isStudioSelected = activeProfile.id === "bs-roformer-4stem";
 
   return (
     <div
@@ -81,14 +52,70 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
         </div>
       </div>
 
+      {/* Mobile Device Protection Advisory Banner */}
+      {isMobile && !isStudioSelected && (
+        <div
+          role="region"
+          aria-label="Active Model Profile Advisory"
+          className="rounded-xl border border-primary/20 bg-primary/5 p-3"
+        >
+          <div className="flex items-start gap-2.5">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <Smartphone className="h-4 w-4" />
+            </div>
+            <div className="flex-1 space-y-0.5">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold uppercase tracking-wider text-primary">
+                  Mobile-Optimized Model Active
+                </span>
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
+                  <ShieldCheck className="h-3 w-3" />
+                  Memory Protected
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Demuxify Web automatically selects this lightweight profile to
+                preserve memory and prevent browser crashes on smartphones and
+                tablets while extracting all 4 discrete Stems.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mobile Warning if Studio is selected */}
+      {isMobile && isStudioSelected && (
+        <div
+          role="alert"
+          className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-800 dark:text-amber-200 flex items-start gap-2.5"
+        >
+          <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
+          <div className="space-y-0.5">
+            <div className="font-semibold">
+              Studio Profile on Mobile Warning
+            </div>
+            <p className="text-[11px] leading-relaxed">
+              Studio mode requires ~1.5 GB memory and dedicated WebGPU. It may
+              crash or run very slowly on smartphones. Ultra Fast or Balanced is
+              recommended for mobile devices.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Interactive 3-Model Selector Grid */}
       <div
         role="radiogroup"
         aria-label="Model Profile selection"
-        className="grid grid-cols-1 sm:grid-cols-2 gap-3"
+        className="grid grid-cols-1 sm:grid-cols-3 gap-3"
       >
         {profiles.map((profile) => {
           const isSelected = selectedModelId === profile.id;
-          const Icon = profile.deviceCategory === "desktop" ? Sparkles : Zap;
+          const isFast =
+            profile.id === "open-unmix-4stem" || profile.id === "umx-4stem";
+          const isBalanced =
+            profile.id === "htdemucs-4stem" || profile.id === "mdx-net-4stem";
+          const Icon = isFast ? Zap : isBalanced ? Gauge : Sparkles;
 
           return (
             <button

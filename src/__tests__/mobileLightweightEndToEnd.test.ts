@@ -327,4 +327,96 @@ describe("Mobile Lightweight Model End-to-End Integration", () => {
       expect(bass[0][100]).not.toEqual(other[0][100]);
     }
   });
+
+  it("processes audio through Open-Unmix ultra fast STFT magnitude pipeline with all 4 stems", async () => {
+    const postedMessages: WorkerOutMessage[] = [];
+    const postMsg = (m: WorkerOutMessage) => {
+      postedMessages.push(m);
+    };
+
+    const chunkSamples = 44100;
+    const UMX_N_FFT = 4096;
+    const UMX_HOP_LENGTH = 1024;
+    const F = Math.floor(UMX_N_FFT / 2) + 1; // 2049
+    const T = Math.floor(chunkSamples / UMX_HOP_LENGTH) + 1; // 44
+    const totalBins = 2 * F * T;
+
+    const fakeUmxSession: any = {
+      inputNames: ["magnitude"],
+      outputNames: [
+        "vocals_magnitude",
+        "drums_magnitude",
+        "bass_magnitude",
+        "other_magnitude",
+      ],
+      run: vi.fn(async (feeds: Record<string, any>) => {
+        expect(feeds.magnitude).toBeDefined();
+        return {
+          vocals_magnitude: {
+            data: new Float32Array(totalBins).fill(0.4),
+            dims: [1, 2, F, T],
+            dispose: vi.fn(),
+          },
+          drums_magnitude: {
+            data: new Float32Array(totalBins).fill(0.3),
+            dims: [1, 2, F, T],
+            dispose: vi.fn(),
+          },
+          bass_magnitude: {
+            data: new Float32Array(totalBins).fill(0.2),
+            dims: [1, 2, F, T],
+            dispose: vi.fn(),
+          },
+          other_magnitude: {
+            data: new Float32Array(totalBins).fill(0.1),
+            dims: [1, 2, F, T],
+            dispose: vi.fn(),
+          },
+        };
+      }),
+    };
+
+    const ort = await import("onnxruntime-web");
+    vi.spyOn(ort.InferenceSession, "create").mockResolvedValueOnce(
+      fakeUmxSession
+    );
+    vi.spyOn(modelCache, "getModelWeights").mockResolvedValueOnce(
+      new ArrayBuffer(1024)
+    );
+
+    await handleWorkerMessage(
+      {
+        type: "init",
+        modelProfileId: "open-unmix-4stem",
+        modelUrl: "/models/open_unmix_4stem_mobile.onnx",
+        useMock: false,
+      },
+      postMsg
+    );
+
+    const audio = [
+      new Float32Array(chunkSamples).fill(0.2),
+      new Float32Array(chunkSamples).fill(0.2),
+    ];
+
+    await handleWorkerMessage(
+      {
+        type: "start",
+        audio,
+        sampleRate: 44100,
+        options: { chunkSamples, overlapSamples: 4410 },
+      },
+      postMsg
+    );
+
+    const complete = postedMessages.find((m) => m.type === "complete");
+    expect(complete).toBeDefined();
+    if (complete && complete.type === "complete") {
+      const { vocals, drums, bass, other } = complete.stems;
+      expect(vocals[0].length).toBe(chunkSamples);
+      expect(drums[0].length).toBe(chunkSamples);
+      expect(bass[0].length).toBe(chunkSamples);
+      expect(other[0].length).toBe(chunkSamples);
+    }
+  });
 });

@@ -23,11 +23,11 @@ describe("Model Registry & Configuration", () => {
     expect(profile.memoryRequirementDescription).toContain("MB");
   });
 
-  it("provides comprehensive profile configuration for Fast/Mobile (HT-Demucs) model", () => {
-    const profile = getModelProfile(DEFAULT_MOBILE_MODEL_ID);
+  it("provides comprehensive profile configuration for Balanced (HT-Demucs) model", () => {
+    const profile = getModelProfile("htdemucs-4stem");
     expect(profile.id).toBe("htdemucs-4stem");
     expect(profile.name).toBe("HT-Demucs 4-Stem");
-    expect(profile.shortName).toBe("Fast");
+    expect(profile.shortName).toBe("Balanced");
     expect(profile.deviceCategory).toBe("mobile");
     expect(profile.modelUrl).toContain("htdemucs_4stem_mobile.onnx");
     expect(profile.cacheName).toBe("demuxify-htdemucs-cache-v1");
@@ -37,17 +37,37 @@ describe("Model Registry & Configuration", () => {
     expect(profile.memoryRequirementDescription).toContain("MB");
   });
 
-  it("lists all available model profiles", () => {
+  it("provides comprehensive profile configuration for Ultra Fast (Open-Unmix) model", () => {
+    const profile = getModelProfile(DEFAULT_MOBILE_MODEL_ID);
+    expect(profile.id).toBe("open-unmix-4stem");
+    expect(profile.name).toBe("Open-Unmix 4-Stem");
+    expect(profile.shortName).toBe("Ultra Fast");
+    expect(profile.deviceCategory).toBe("mobile");
+    expect(profile.modelUrl).toContain("open_unmix_4stem_mobile.onnx");
+    expect(profile.cacheName).toBe("demuxify-openunmix-cache-v1");
+    expect(profile.estimatedSizeMb).toBeLessThan(50);
+    expect(profile.explanation).toBeDefined();
+    expect(profile.explanation.length).toBeGreaterThan(10);
+    expect(profile.memoryRequirementDescription).toContain("MB");
+  });
+
+  it("lists all 3 registered model profiles", () => {
     const profiles = listModelProfiles();
-    expect(profiles.length).toBeGreaterThanOrEqual(2);
+    expect(profiles.length).toBe(3);
     const ids = profiles.map((p) => p.id);
     expect(ids).toContain("bs-roformer-4stem");
     expect(ids).toContain("htdemucs-4stem");
+    expect(ids).toContain("open-unmix-4stem");
   });
 
   it("resolves legacy mdx-net-4stem requests to HT-Demucs", () => {
     const profile = getModelProfile("mdx-net-4stem");
     expect(profile.name).toBe("HT-Demucs 4-Stem");
+  });
+
+  it("resolves umx-4stem requests to Open-Unmix", () => {
+    const profile = getModelProfile("umx-4stem");
+    expect(profile.name).toBe("Open-Unmix 4-Stem");
   });
 
   it("falls back to default desktop model when unknown identifier is requested", () => {
@@ -80,11 +100,11 @@ describe("Device Detection & Default Model Resolution", () => {
     expect(isMobileDevice(desktopChromeUA, 0)).toBe(false);
   });
 
-  it("resolves HT-Demucs 4-Stem as default profile on mobile devices", () => {
+  it("resolves Open-Unmix 4-Stem as default profile on mobile devices for ultra fast processing", () => {
     const mobileUA =
       "Mozilla/5.0 (iPhone; CPU iPhone OS 16_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.5 Mobile/15E148 Safari/604.1";
     const profile = getDefaultModelProfile(mobileUA, 5);
-    expect(profile.id).toBe("htdemucs-4stem");
+    expect(profile.id).toBe("open-unmix-4stem");
     expect(profile.deviceCategory).toBe("mobile");
   });
 

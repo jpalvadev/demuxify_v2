@@ -733,7 +733,7 @@ describe("App UI Shell", () => {
     ).toBeInTheDocument();
   });
 
-  it("allows desktop users to select Fast (HT-Demucs) model profile and initializes client with chosen profile", async () => {
+  it("allows desktop users to select Balanced (HT-Demucs) model profile and initializes client with chosen profile", async () => {
     const initSpy = vi
       .spyOn(InferenceClient.prototype, "init")
       .mockResolvedValue({ backend: "wasm" });
@@ -749,11 +749,13 @@ describe("App UI Shell", () => {
 
     render(<App />);
 
-    // Click Fast / HT-Demucs radio button
-    const fastOption = screen.getByRole("radio", { name: /fast/i });
-    fireEvent.click(fastOption);
+    // Click Balanced / HT-Demucs radio button
+    const balancedOption = screen.getByRole("radio", { name: /balanced/i });
+    fireEvent.click(balancedOption);
 
-    const file = new File(["audio"], "fast_test.mp3", { type: "audio/mp3" });
+    const file = new File(["audio"], "balanced_test.mp3", {
+      type: "audio/mp3",
+    });
     const fileInput = screen.getByLabelText(/select source mix file/i, {
       selector: "input",
     });
@@ -777,6 +779,55 @@ describe("App UI Shell", () => {
         expect.objectContaining({
           modelProfileId: "htdemucs-4stem",
           modelUrl: expect.stringContaining("htdemucs_4stem_mobile.onnx"),
+        })
+      );
+    });
+  });
+
+  it("allows desktop users to select Ultra Fast (Open-Unmix) model profile and initializes client with chosen profile", async () => {
+    const initSpy = vi
+      .spyOn(InferenceClient.prototype, "init")
+      .mockResolvedValue({ backend: "wasm" });
+    vi.spyOn(InferenceClient.prototype, "separate").mockResolvedValue({
+      stems: {
+        vocals: [new Float32Array(500), new Float32Array(500)],
+        drums: [new Float32Array(500), new Float32Array(500)],
+        bass: [new Float32Array(500), new Float32Array(500)],
+        other: [new Float32Array(500), new Float32Array(500)],
+      },
+      duration: 180,
+    });
+
+    render(<App />);
+
+    // Click Ultra Fast / Open-Unmix radio button
+    const ultraFastOption = screen.getByRole("radio", { name: /ultra fast/i });
+    fireEvent.click(ultraFastOption);
+
+    const file = new File(["audio"], "fast_test.mp3", { type: "audio/mp3" });
+    const fileInput = screen.getByLabelText(/select source mix file/i, {
+      selector: "input",
+    });
+    fireEvent.change(fileInput, { target: { files: [file] } });
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", {
+          name: /separate stems|start separation/i,
+        })
+      ).toBeInTheDocument();
+    });
+
+    const separateBtn = screen.getByRole("button", {
+      name: /separate stems|start separation/i,
+    });
+    fireEvent.click(separateBtn);
+
+    await waitFor(() => {
+      expect(initSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          modelProfileId: "open-unmix-4stem",
+          modelUrl: expect.stringContaining("open_unmix_4stem_mobile.onnx"),
         })
       );
     });

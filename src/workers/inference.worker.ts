@@ -247,12 +247,15 @@ async function handleStart(
         const inputNames = session.inputNames;
         const isSpecModel =
           inputNames.includes("spec_real") && inputNames.includes("spec_imag");
+        const isOpenUnmix =
+          inputNames.includes("magnitude") ||
+          activeProfile.architecture === "open-unmix";
 
         postMsg({
           type: "chunk_start",
           chunkIndex: i,
           totalChunks,
-          stage: isSpecModel ? "stft" : "waveform_prep",
+          stage: isSpecModel || isOpenUnmix ? "stft" : "waveform_prep",
         } satisfies WorkerOutMessage);
 
         if (isSpecModel) {
@@ -349,6 +352,136 @@ async function handleStart(
             type: "worker_log",
             level: "info",
             message: `Chunk ${i + 1}/${totalChunks}: iSTFT completed in ${Date.now() - istftStart}ms`,
+          } satisfies WorkerOutMessage);
+        } else if (isOpenUnmix) {
+          // Open-Unmix (UMX) STFT magnitude processor with ratio masking
+          postMsg({
+            type: "worker_log",
+            level: "info",
+            message: `Chunk ${i + 1}/${totalChunks}: Computing Open-Unmix STFT (4096/1024)...`,
+          } satisfies WorkerOutMessage);
+
+          const UMX_N_FFT = 4096;
+          const UMX_HOP_LENGTH = 1024;
+          const UMX_WIN_LENGTH = 4096;
+
+          const stftStart = Date.now();
+          const { real, imag, F, T } = computeStereoSTFT(
+            chunk.audio[0],
+            chunk.audio[1],
+            chunkSamples,
+            UMX_N_FFT,
+            UMX_HOP_LENGTH,
+            UMX_WIN_LENGTH
+          );
+
+          postMsg({
+            type: "worker_log",
+            level: "info",
+            message: `Chunk ${i + 1}/${totalChunks}: STFT done in ${Date.now() - stftStart}ms`,
+          } satisfies WorkerOutMessage);
+
+          const totalBins = 2 * F * T;
+          const mag = new Float32Array(totalBins);
+          for (let idx = 0; idx < totalBins; idx++) {
+            mag[idx] = Math.hypot(real[idx], imag[idx]);
+          }
+
+          const magTensor = new ort.Tensor("float32", mag, [1, 2, F, T]);
+          const inputName = session.inputNames[0] || "magnitude";
+          const feeds: Record<string, ort.Tensor> = {
+            [inputName]: magTensor,
+          };
+
+          const isFirstChunk = i === 0;
+          postMsg({
+            type: "chunk_start",
+            chunkIndex: i,
+            totalChunks,
+            stage:
+              activeBackend === "wasm"
+                ? "wasm_inference"
+                : isFirstChunk
+                  ? "webgpu_compiling"
+                  : "webgpu_inference",
+          } satisfies WorkerOutMessage);
+
+          const inferStart = Date.now();
+          const outputFeeds = await session.run(feeds);
+          const inferElapsed = Date.now() - inferStart;
+
+          postMsg({
+            type: "worker_log",
+            level: "info",
+            message: `Chunk ${i + 1}/${totalChunks}: Open-Unmix ${activeBackend.toUpperCase()} inference completed in ${inferElapsed}ms!`,
+          } satisfies WorkerOutMessage);
+
+          const vocalsTensor = outputFeeds["vocals_magnitude"];
+          const drumsTensor = outputFeeds["drums_magnitude"];
+          const bassTensor = outputFeeds["bass_magnitude"];
+          const otherTensor = outputFeeds["other_magnitude"];
+
+          const vocalsMag = vocalsTensor.data as Float32Array;
+          const drumsMag = drumsTensor.data as Float32Array;
+          const bassMag = bassTensor.data as Float32Array;
+          const otherMag = otherTensor.data as Float32Array;
+
+          // Prepare 4-stem complex STFT tensors: [drums=0, bass=1, other=2, vocals=3]
+          const sliceStride = F * T;
+          const outReal = new Float32Array(4 * 2 * sliceStride);
+          const outImag = new Float32Array(4 * 2 * sliceStride);
+          const stemData = [drumsMag, bassMag, otherMag, vocalsMag];
+
+          for (let c = 0; c < 2; c++) {
+            const cOff = c * sliceStride;
+            for (let k = 0; k < sliceStride; k++) {
+              const idx = cOff + k;
+              const d = stemData[0][idx];
+              const b = stemData[1][idx];
+              const o = stemData[2][idx];
+              const v = stemData[3][idx];
+              const sum = d + b + o + v + 1e-8;
+
+              const re = real[idx];
+              const im = imag[idx];
+
+              for (let s = 0; s < 4; s++) {
+                const ratio = stemData[s][idx] / sum;
+                const outIdx = s * 2 * sliceStride + cOff + k;
+                outReal[outIdx] = re * ratio;
+                outImag[outIdx] = im * ratio;
+              }
+            }
+          }
+
+          magTensor.dispose();
+          vocalsTensor.dispose();
+          drumsTensor.dispose();
+          bassTensor.dispose();
+          otherTensor.dispose();
+
+          postMsg({
+            type: "chunk_start",
+            chunkIndex: i,
+            totalChunks,
+            stage: "istft",
+          } satisfies WorkerOutMessage);
+
+          const istftStart = Date.now();
+          chunkStems = computeBatchISTFT(
+            outReal,
+            outImag,
+            chunkSamples,
+            UMX_N_FFT,
+            UMX_HOP_LENGTH,
+            UMX_WIN_LENGTH,
+            4
+          );
+
+          postMsg({
+            type: "worker_log",
+            level: "info",
+            message: `Chunk ${i + 1}/${totalChunks}: Open-Unmix iSTFT completed in ${Date.now() - istftStart}ms`,
           } satisfies WorkerOutMessage);
         } else {
           // Polymorphic tensor adapter for HT-Demucs (Direct Waveform Tensor input)
