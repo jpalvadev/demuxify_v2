@@ -40,6 +40,10 @@ _Avoid_: Project, document, workspace
 The package of separated Stems exported to the user's filesystem as individual files (WAV/MP3) or a compressed archive.
 _Avoid_: Download folder, zip file, audio package
 
+**Custom Mixdown**:
+A single exported audio file (WAV or MP3) containing a user-selected combination of Stems summed together with custom volume levels and anti-clipping protection (e.g., Karaoke, Instrumental, or Custom Backing Track).
+_Avoid_: Mixed track, merged audio, bounce, blended song, exported song
+
 **Master Waveform**:
 The full overview visual representation of the audio mix used for primary timeline navigation and scrubbing.
 _Avoid_: Timeline bar, progress bar, audio visualizer

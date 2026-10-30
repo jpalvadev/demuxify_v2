@@ -5,8 +5,8 @@ Implementation map for Demuxify Web.
 ## Notes
 
 - Frontier begins with Ticket 01 (Project skeleton, PWA, WebGPU detection).
-- Ticket graph: 01 -> 02 -> 03 -> 04 -> [05, 06, 07] -> [08, 09, 10] -> 11.
-- Active Frontier: Ticket 09 (Transport/WSOLA sync).
+- Ticket graph: 01 -> 02 -> 03 -> 04 -> [05, 06, 07] -> [08, 09, 10] -> 11 -> 12 -> 13 -> 14.
+- Active Frontier: Ticket 09 (Transport/WSOLA sync) and Ticket 12 (Custom Mixdown DSP).
 
 ## Decisions so far
 
