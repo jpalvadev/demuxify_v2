@@ -4,6 +4,11 @@ import {
   registerWsolaAudioWorklet,
   WSOLA_WORKLET_PROCESSOR_NAME,
 } from "./wsolaProcessor";
+import {
+  createMultiTrackStretchAdapter,
+  isSignalsmithStretchSupported,
+  MultiTrackStretchNode,
+} from "./signalsmithStretchAdapter";
 
 export interface StemMixerState {
   volume: number; // 0.0 to 1.0
@@ -16,6 +21,7 @@ export type StemMixerStates = Record<StemName, StemMixerState>;
 export interface TimeStretchState {
   tempo: number; // 0.5 to 2.0
   pitch: number; // -12 to 12 semitones
+  formantPreservation?: boolean;
 }
 
 export interface StemPlayerEngineOptions {
@@ -26,6 +32,8 @@ export interface StemPlayerEngineOptions {
   initialMasterVolume?: number;
   initialCurrentTime?: number;
   disableWorklet?: boolean;
+  formantPreservation?: boolean;
+  stretchAdapter?: MultiTrackStretchNode;
 }
 
 export type PositionListener = (timeSec: number) => void;
@@ -68,6 +76,8 @@ export class StemPlayerEngine {
 
   private tempo: number = 1.0;
   private pitch: number = 0; // semitones (-12 to +12)
+  private formantPreservation: boolean = true;
+  private stretchAdapter: MultiTrackStretchNode | null = null;
   private workletNode: AudioWorkletNode | null = null;
   private useWorklet: boolean = false;
   private workletInitPromise: Promise<void> | null = null;
@@ -151,12 +161,58 @@ export class StemPlayerEngine {
 
     this.duration = maxDuration;
     this.applyGainMatrix();
-    if (!options?.disableWorklet) {
+    this.formantPreservation = options?.formantPreservation ?? true;
+
+    if (options?.stretchAdapter) {
+      this.stretchAdapter = options.stretchAdapter;
+      this.useWorklet = !options.stretchAdapter.isFallback;
+    } else if (!options?.disableWorklet) {
       this.workletInitPromise = this.initAudioWorklet(sampleRate);
     }
   }
 
   private async initAudioWorklet(sampleRate: number): Promise<void> {
+    try {
+      if (isSignalsmithStretchSupported(this.audioContext)) {
+        const adapter = await createMultiTrackStretchAdapter({
+          audioContext: this.audioContext,
+          sampleRate,
+          initialTempo: this.tempo,
+          initialPitch: this.pitch,
+          formantPreservation: this.formantPreservation,
+        });
+
+        if (this.isDisposed) {
+          adapter.disconnect();
+          return;
+        }
+
+        if (!adapter.isFallback) {
+          await adapter.loadStems(this.stemBuffers);
+          for (const stem of STEM_NAMES) {
+            adapter.connectStem(stem, this.stemGainNodes[stem]);
+          }
+
+          this.stretchAdapter = adapter;
+          this.useWorklet = true;
+
+          if (this.playing) {
+            const curTime = this.getCurrentTime();
+            this.stopActiveSources();
+            this.stretchAdapter.seek(curTime);
+            this.stretchAdapter.start(this.audioContext.currentTime, curTime);
+            this.playStartContextTime = this.audioContext.currentTime;
+            this.currentOffset = curTime;
+          } else if (this.currentOffset > 0) {
+            this.stretchAdapter.seek(this.currentOffset);
+          }
+          return;
+        }
+      }
+    } catch {
+      // Signalsmith Stretch setup failed, proceed to WSOLA fallback
+    }
+
     try {
       const registered = await registerWsolaAudioWorklet(this.audioContext);
       if (!registered || this.isDisposed) return;
@@ -385,7 +441,17 @@ export class StemPlayerEngine {
 
     this.stopActiveSources();
 
-    if (this.useWorklet && this.workletNode) {
+    if (
+      this.useWorklet &&
+      this.stretchAdapter &&
+      !this.stretchAdapter.isFallback
+    ) {
+      this.stretchAdapter.seek(offset);
+      this.stretchAdapter.setTempo(this.tempo);
+      this.stretchAdapter.setPitch(this.pitch);
+      this.stretchAdapter.setFormantPreservation(this.formantPreservation);
+      this.stretchAdapter.start(startTime, offset);
+    } else if (this.useWorklet && this.workletNode) {
       this.workletNode.port.postMessage({ type: "seek", timeSec: offset });
       this.workletNode.port.postMessage({
         type: "setTempo",
@@ -410,7 +476,13 @@ export class StemPlayerEngine {
 
     this.currentOffset = this.getCurrentTime();
 
-    if (this.useWorklet && this.workletNode) {
+    if (
+      this.useWorklet &&
+      this.stretchAdapter &&
+      !this.stretchAdapter.isFallback
+    ) {
+      this.stretchAdapter.stop();
+    } else if (this.useWorklet && this.workletNode) {
       this.workletNode.port.postMessage({ type: "pause" });
     }
     this.stopActiveSources();
@@ -429,7 +501,16 @@ export class StemPlayerEngine {
     // Immediately stop any active buffer sources so audio never sticks to old positions
     this.stopActiveSources();
 
-    if (this.useWorklet && this.workletNode) {
+    if (
+      this.useWorklet &&
+      this.stretchAdapter &&
+      !this.stretchAdapter.isFallback
+    ) {
+      this.stretchAdapter.seek(clampedTime);
+      if (this.playing) {
+        this.stretchAdapter.start(startTime, clampedTime);
+      }
+    } else if (this.useWorklet && this.workletNode) {
       this.workletNode.port.postMessage({ type: "seek", timeSec: clampedTime });
       if (this.playing) {
         this.workletNode.port.postMessage({ type: "play" });
@@ -555,7 +636,7 @@ export class StemPlayerEngine {
       this.currentOffset = this.getCurrentTime();
       this.playStartContextTime = this.audioContext.currentTime;
       // In fallback mode only, update playbackRate on active buffer sources
-      if (!this.useWorklet || !this.workletNode) {
+      if (!this.useWorklet || (!this.workletNode && !this.stretchAdapter)) {
         for (const source of this.activeSources) {
           if (source.playbackRate) {
             source.playbackRate.setValueAtTime(
@@ -567,7 +648,13 @@ export class StemPlayerEngine {
       }
     }
     this.tempo = clamped;
-    if (this.useWorklet && this.workletNode) {
+    if (
+      this.useWorklet &&
+      this.stretchAdapter &&
+      !this.stretchAdapter.isFallback
+    ) {
+      this.stretchAdapter.setTempo(clamped);
+    } else if (this.useWorklet && this.workletNode) {
       this.workletNode.port.postMessage({ type: "setTempo", tempo: clamped });
     }
     this.notifyTimeStretch();
@@ -580,8 +667,30 @@ export class StemPlayerEngine {
   public setPitch(semitones: number): void {
     const clamped = Math.max(-12, Math.min(12, semitones));
     this.pitch = clamped;
-    if (this.useWorklet && this.workletNode) {
+    if (
+      this.useWorklet &&
+      this.stretchAdapter &&
+      !this.stretchAdapter.isFallback
+    ) {
+      this.stretchAdapter.setPitch(clamped);
+    } else if (this.useWorklet && this.workletNode) {
       this.workletNode.port.postMessage({ type: "setPitch", pitch: clamped });
+    }
+    this.notifyTimeStretch();
+  }
+
+  public isFormantPreservationEnabled(): boolean {
+    return this.formantPreservation;
+  }
+
+  public setFormantPreservation(enabled: boolean): void {
+    this.formantPreservation = enabled;
+    if (
+      this.useWorklet &&
+      this.stretchAdapter &&
+      !this.stretchAdapter.isFallback
+    ) {
+      this.stretchAdapter.setFormantPreservation(enabled);
     }
     this.notifyTimeStretch();
   }
@@ -589,13 +698,23 @@ export class StemPlayerEngine {
   public resetTimeStretch(): void {
     this.setTempo(1.0);
     this.setPitch(0);
-    if (this.useWorklet && this.workletNode) {
+    if (
+      this.useWorklet &&
+      this.stretchAdapter &&
+      !this.stretchAdapter.isFallback
+    ) {
+      this.stretchAdapter.setTempo(1.0);
+      this.stretchAdapter.setPitch(0);
+    } else if (this.useWorklet && this.workletNode) {
       this.workletNode.port.postMessage({ type: "resetTimeStretch" });
     }
   }
 
   public getTimeStretch(): TimeStretchState {
-    return { tempo: this.tempo, pitch: this.pitch };
+    return {
+      tempo: this.tempo,
+      pitch: this.pitch,
+    };
   }
 
   public subscribeTimeStretch(listener: TimeStretchListener): () => void {
@@ -614,7 +733,15 @@ export class StemPlayerEngine {
   }
 
   public isUsingWorklet(): boolean {
-    return this.useWorklet && this.workletNode !== null;
+    return (
+      this.useWorklet &&
+      (this.workletNode !== null ||
+        (this.stretchAdapter !== null && !this.stretchAdapter.isFallback))
+    );
+  }
+
+  public getStretchAdapter(): MultiTrackStretchNode | null {
+    return this.stretchAdapter;
   }
 
   public getActiveSources(): AudioBufferSourceNode[] {
@@ -639,6 +766,15 @@ export class StemPlayerEngine {
     this.positionListeners.clear();
     this.stateListeners.clear();
     this.timeStretchListeners.clear();
+
+    if (this.stretchAdapter) {
+      try {
+        this.stretchAdapter.disconnect();
+      } catch {
+        // Ignored
+      }
+      this.stretchAdapter = null;
+    }
 
     if (this.workletNode) {
       try {

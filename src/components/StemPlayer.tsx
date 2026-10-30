@@ -79,6 +79,7 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
   const [tempo, setTempo] = useState(1.0);
   const [pitch, setPitch] = useState(0);
+  const [formantPreservation, setFormantPreservation] = useState(true);
 
   // Initialize engine
   useEffect(() => {
@@ -100,6 +101,7 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
     }
     setTempo(engine.getTempo());
     setPitch(engine.getPitch());
+    setFormantPreservation(engine.isFormantPreservationEnabled());
 
     const unsubPos = engine.subscribePosition((time) => {
       setCurrentTime(time);
@@ -113,6 +115,9 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
     const unsubTimeStretch = engine.subscribeTimeStretch((ts) => {
       setTempo(ts.tempo);
       setPitch(ts.pitch);
+      if (ts.formantPreservation !== undefined) {
+        setFormantPreservation(ts.formantPreservation);
+      }
     });
 
     return () => {
@@ -268,6 +273,14 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
     setPitch((prev) => {
       const next = Math.max(-12, prev - 1);
       engineRef.current?.setPitch(next);
+      return next;
+    });
+  }, []);
+
+  const handleToggleFormant = useCallback(() => {
+    setFormantPreservation((prev) => {
+      const next = !prev;
+      engineRef.current?.setFormantPreservation(next);
       return next;
     });
   }, []);
@@ -572,6 +585,41 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
               <span>Octave Down (-12)</span>
               <span>Original (0)</span>
               <span>Octave Up (+12)</span>
+            </div>
+
+            {/* Vocal Formant Preservation Toggle */}
+            <div className="flex items-center justify-between pt-2 border-t border-border/40">
+              <div className="space-y-0.5">
+                <div className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                  <span>Vocal Formant Preservation</span>
+                  <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-primary/10 text-primary border border-primary/20">
+                    Vocals Stem
+                  </span>
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  Keeps natural vocal timbre across semitone changes
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-label="Vocal Formant Preservation"
+                aria-checked={formantPreservation}
+                onClick={handleToggleFormant}
+                className={cn(
+                  "relative inline-flex h-5 w-9 sm:h-6 sm:w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden",
+                  formantPreservation ? "bg-primary" : "bg-muted"
+                )}
+              >
+                <span
+                  className={cn(
+                    "pointer-events-none inline-block h-4 w-4 sm:h-5 sm:w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out",
+                    formantPreservation
+                      ? "translate-x-4 sm:translate-x-5"
+                      : "translate-x-0"
+                  )}
+                />
+              </button>
             </div>
           </div>
         </div>

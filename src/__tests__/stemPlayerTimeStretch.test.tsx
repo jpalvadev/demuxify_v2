@@ -260,4 +260,48 @@ describe("StemPlayer Time-Stretch & Pitch Controls", () => {
     expect(pitchSlider).toHaveValue("0");
     expect(resetBtn).toBeDisabled();
   });
+
+  it("renders Vocal Formant Preservation toggle switch enabled by default and responds to user toggle", () => {
+    render(
+      <StemPlayer
+        stems={dummyStems}
+        sampleRate={sampleRate}
+        audioContext={mockCtx}
+      />
+    );
+
+    const formantToggle = screen.getByRole("switch", {
+      name: /vocal formant preservation/i,
+    });
+    expect(formantToggle).toBeInTheDocument();
+    expect(formantToggle).toHaveAttribute("aria-checked", "true");
+
+    // Click to toggle off
+    fireEvent.click(formantToggle);
+    expect(formantToggle).toHaveAttribute("aria-checked", "false");
+
+    // Click to toggle back on
+    fireEvent.click(formantToggle);
+    expect(formantToggle).toHaveAttribute("aria-checked", "true");
+  });
+
+  it("anchors Master Waveform duration display to canonical duration during time-stretch playback", () => {
+    render(
+      <StemPlayer
+        stems={dummyStems}
+        sampleRate={sampleRate}
+        audioContext={mockCtx}
+      />
+    );
+
+    // Initial canonical duration (5s -> 00:05)
+    expect(screen.getByText("00:05")).toBeInTheDocument();
+
+    // Alter tempo to 2.00x
+    const tempoSlider = screen.getByRole("slider", { name: /playback tempo/i });
+    fireEvent.change(tempoSlider, { target: { value: "2.00" } });
+
+    // Duration display must remain anchored to 00:05 (never shortened to 00:02)
+    expect(screen.getByText("00:05")).toBeInTheDocument();
+  });
 });

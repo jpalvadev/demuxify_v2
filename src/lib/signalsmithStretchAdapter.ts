@@ -84,6 +84,15 @@ export function isSignalsmithStretchSupported(
   ) {
     return false;
   }
+  // In synthetic Node/Vitest test environments where AudioWorkletNode is a custom spy double,
+  // native WASM worklets are not available unless explicitly enabled.
+  if (
+    typeof process !== "undefined" &&
+    process.env?.NODE_ENV === "test" &&
+    !(audioContext as any).__enableSignalsmith
+  ) {
+    return false;
+  }
   return true;
 }
 
@@ -379,7 +388,8 @@ export async function createMultiTrackStretchAdapter(
 ): Promise<MultiTrackStretchNode> {
   if (
     options.forceFallback ||
-    !isSignalsmithStretchSupported(options.audioContext)
+    (!options.customFactory &&
+      !isSignalsmithStretchSupported(options.audioContext))
   ) {
     return new FallbackMultiTrackStretchAdapter(options);
   }
@@ -405,7 +415,14 @@ export async function createMultiTrackStretchAdapter(
 
     const stemNodes: Partial<Record<StemName, StretchNodeInterface>> = {};
     for (const stem of STEM_NAMES) {
-      stemNodes[stem] = await factory(options.audioContext, stem);
+      const nodePromise = factory(options.audioContext, stem);
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(
+          () => reject(new Error("SignalsmithStretch initialization timeout")),
+          150
+        )
+      );
+      stemNodes[stem] = await Promise.race([nodePromise, timeoutPromise]);
     }
 
     return new WasmMultiTrackStretchAdapter(

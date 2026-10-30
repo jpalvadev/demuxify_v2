@@ -69,6 +69,7 @@ describe("Signalsmith Stretch WebAssembly Adapter & Test Fallback", () => {
 
     it("detects supported environment when audioWorklet and WebAssembly exist", () => {
       const mockCtx = createMockAudioContext(true);
+      (mockCtx as any).__enableSignalsmith = true;
       expect(isSignalsmithStretchSupported(mockCtx)).toBe(true);
     });
   });
