@@ -4,9 +4,9 @@
 
 **Blocked by:** 03: Polymorphic Inference Worker & 4-Stem Processing Adapter, 04: Device-Aware User Advisory & Desktop Model Selector UI
 
-**Status:** ready-for-agent
+**Status:** complete
 
-- [ ] Session storage schema incorporates the active model identifier into persisted session metadata.
-- [ ] Stems produced via the lightweight mobile model synchronize with sub-millisecond phase accuracy in the multi-track Stem Player with pitch and tempo shifting.
-- [ ] Custom Mixdown generation and Export Bundle creation process lightweight model stems with anti-clipping protection identical to standard sessions.
-- [ ] End-to-end integration tests verify that low-memory simulation environments process an entire song through MDX-Net without out-of-memory errors or memory leaks.
+- [x] Session storage schema incorporates the active model identifier into persisted session metadata.
+- [x] Stems produced via the lightweight mobile model synchronize with sub-millisecond phase accuracy in the multi-track Stem Player with pitch and tempo shifting.
+- [x] Custom Mixdown generation and Export Bundle creation process lightweight model stems with anti-clipping protection identical to standard sessions.
+- [x] End-to-end integration tests verify that low-memory simulation environments process an entire song through MDX-Net without out-of-memory errors or memory leaks.

@@ -282,6 +282,9 @@ export const App: React.FC = () => {
       setWaveformPeaks(peaks);
       setSeparatedStems(session.stems);
       setRestoredMixerState(session.mixer);
+      if (session.metadata.modelProfileId) {
+        setSelectedModelId(session.metadata.modelProfileId as ModelId);
+      }
       setCurrentTime(session.mixer.currentTime ?? 0);
       setSeparationPhase("completed");
       setDetectedSession(null);
@@ -416,6 +419,7 @@ export const App: React.FC = () => {
           duration: decodedSourceMix.metadata.duration,
           sampleRate: decodedSourceMix.metadata.sampleRate,
           size: decodedSourceMix.metadata.fileSize,
+          modelProfileId: selectedModelId,
         },
         sourceMix: {
           channels: audio,
