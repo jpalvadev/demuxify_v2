@@ -1,20 +1,23 @@
-import React from 'react';
-import { Download, Cpu, AlertTriangle, XCircle, RefreshCw } from 'lucide-react';
-import { DownloadProgress } from '../lib/modelCache';
-import { ChunkProgress } from '../lib/inferenceClient';
+import React, { useState, useEffect } from "react";
+import {
+  Download,
+  Cpu,
+  AlertTriangle,
+  XCircle,
+  RefreshCw,
+  Loader2,
+} from "lucide-react";
+import { DownloadProgress } from "../lib/modelCache";
+import { ChunkProgress, ChunkStartEvent } from "../lib/inferenceClient";
 
 export type SeparationPhase =
-  | 'idle'
-  | 'downloading'
-  | 'separating'
-  | 'completed'
-  | 'cancelled'
-  | 'error';
+  "idle" | "downloading" | "separating" | "completed" | "cancelled" | "error";
 
 export interface SeparationProgressProps {
   phase: SeparationPhase;
   downloadProgress?: DownloadProgress | null;
   chunkProgress?: ChunkProgress | null;
+  chunkStart?: ChunkStartEvent | null;
   error?: string | null;
   onCancel: () => void;
   onRetry?: () => void;
@@ -29,24 +32,38 @@ function formatDuration(ms: number): string {
   const totalSeconds = Math.max(0, Math.floor(ms / 1000));
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
-  return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  return `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
 }
 
 export const SeparationProgress: React.FC<SeparationProgressProps> = ({
   phase,
   downloadProgress,
   chunkProgress,
+  chunkStart,
   error,
   onCancel,
   onRetry,
 }) => {
-  if (phase === 'idle' || phase === 'completed') {
+  const [activeSeconds, setActiveSeconds] = useState(0);
+
+  useEffect(() => {
+    if (phase !== "separating") {
+      setActiveSeconds(0);
+      return;
+    }
+    const timer = setInterval(() => {
+      setActiveSeconds((prev) => prev + 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [phase]);
+
+  if (phase === "idle" || phase === "completed") {
     return null;
   }
 
-  const isDownloading = phase === 'downloading';
-  const isSeparating = phase === 'separating';
-  const isError = phase === 'error';
+  const isDownloading = phase === "downloading";
+  const isSeparating = phase === "separating";
+  const isError = phase === "error";
 
   let percent = 0;
   if (isDownloading && downloadProgress) {
@@ -54,6 +71,18 @@ export const SeparationProgress: React.FC<SeparationProgressProps> = ({
   } else if (isSeparating && chunkProgress) {
     percent = Math.round(chunkProgress.progress * 100);
   }
+
+  const currentChunkIndex = chunkProgress
+    ? chunkProgress.chunkIndex + 1
+    : chunkStart
+      ? chunkStart.chunkIndex + 1
+      : 1;
+
+  const totalChunksCount = chunkProgress
+    ? chunkProgress.totalChunks
+    : chunkStart
+      ? chunkStart.totalChunks
+      : null;
 
   return (
     <div
@@ -71,29 +100,48 @@ export const SeparationProgress: React.FC<SeparationProgressProps> = ({
           </div>
 
           <div>
-            <h3 className="text-base font-semibold text-foreground">
-              {isDownloading && 'Downloading Model Weights'}
+            <h3 className="text-base font-semibold text-foreground flex items-center gap-2">
+              {isDownloading && "Downloading Model Weights"}
               {isSeparating &&
-                chunkProgress &&
-                `Separating Chunk ${chunkProgress.chunkIndex + 1} of ${chunkProgress.totalChunks}`}
-              {isSeparating && !chunkProgress && 'Initializing Neural Network Inference...'}
-              {isError && 'Separation Error'}
+                totalChunksCount &&
+                `Separating Chunk ${currentChunkIndex} of ${totalChunksCount}`}
+              {isSeparating &&
+                !totalChunksCount &&
+                "Initializing Neural Network Inference..."}
+              {isError && "Separation Error"}
+              {isSeparating && (
+                <span className="inline-flex items-center gap-1 rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-mono text-primary font-normal">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  {activeSeconds}s
+                </span>
+              )}
             </h3>
 
             <p className="text-xs text-muted-foreground mt-0.5">
               {isDownloading && downloadProgress && (
                 <>
-                  Persisting HTDemucs v4 model into Model Cache (
-                  {formatBytes(downloadProgress.loadedBytes)} / {formatBytes(downloadProgress.totalBytes)})
+                  Persisting BS-RoFormer 4-stem model into Model Cache (
+                  {formatBytes(downloadProgress.loadedBytes)} /{" "}
+                  {formatBytes(downloadProgress.totalBytes)})
                 </>
               )}
-              {isDownloading && !downloadProgress && 'Connecting to Model Cache repository...'}
+              {isDownloading &&
+                !downloadProgress &&
+                "Connecting to Model Cache repository..."}
               {isSeparating &&
                 chunkProgress &&
                 `Elapsed: ${formatDuration(chunkProgress.elapsedMs)} • ETA: ${formatDuration(
                   chunkProgress.etaMs
                 )}`}
-              {isSeparating && !chunkProgress && 'Processing sequential Chunk Segments via WebGPU...'}
+              {isSeparating &&
+                !chunkProgress &&
+                (chunkStart?.stage === "webgpu_compiling"
+                  ? "Compiling WebGPU shaders & executing inference... (first chunk takes longer)"
+                  : chunkStart?.stage === "stft"
+                    ? "Computing STFT frequency spectrogram..."
+                    : chunkStart?.stage === "istft"
+                      ? "Reconstructing audio stems via iSTFT..."
+                      : "Processing sequential Chunk Segments via WebGPU...")}
               {isError && error}
             </p>
           </div>
@@ -151,8 +199,8 @@ export const SeparationProgress: React.FC<SeparationProgressProps> = ({
           <div className="flex justify-between text-[11px] text-muted-foreground">
             <span>
               {isDownloading
-                ? 'Model Cache initialization'
-                : 'Neural network chunk processing & overlap-add blending'}
+                ? "Model Cache initialization"
+                : "Neural network chunk processing & overlap-add blending"}
             </span>
             <span>{percent}%</span>
           </div>

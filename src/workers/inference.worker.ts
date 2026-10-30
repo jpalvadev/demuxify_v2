@@ -35,6 +35,18 @@ export type WorkerOutMessage =
   | ({ type: "download_progress" } & DownloadProgress)
   | { type: "init_complete"; backend: "webgpu" | "wasm" | "mock" }
   | {
+      type: "chunk_start";
+      chunkIndex: number;
+      totalChunks: number;
+      stage: string;
+    }
+  | {
+      type: "worker_log";
+      level: "info" | "warn" | "error";
+      message: string;
+      data?: unknown;
+    }
+  | {
       type: "chunk_progress";
       chunkIndex: number;
       totalChunks: number;
@@ -147,7 +159,15 @@ async function handleStart(
       }
 
       const chunk = chunks[i];
+      const chunkStart = Date.now();
       let chunkStems: Record<StemName, Float32Array[]>;
+
+      postMsg({
+        type: "chunk_start",
+        chunkIndex: i,
+        totalChunks,
+        stage: "stft",
+      } satisfies WorkerOutMessage);
 
       if (session && !isMockSession) {
         const chunkSamples = chunk.audio[0].length;
@@ -156,12 +176,24 @@ async function handleStart(
           inputNames.includes("spec_real") && inputNames.includes("spec_imag");
 
         if (isSpecModel) {
-          // BS-RoFormer architecture (browser WebGPU-optimized STFT/iSTFT pipeline)
+          postMsg({
+            type: "worker_log",
+            level: "info",
+            message: `Chunk ${i + 1}/${totalChunks}: Computing STFT...`,
+          } satisfies WorkerOutMessage);
+
+          const stftStart = Date.now();
           const { real, imag, F, T } = computeStereoSTFT(
             chunk.audio[0],
             chunk.audio[1],
             chunkSamples
           );
+
+          postMsg({
+            type: "worker_log",
+            level: "info",
+            message: `Chunk ${i + 1}/${totalChunks}: STFT done in ${Date.now() - stftStart}ms`,
+          } satisfies WorkerOutMessage);
 
           const realTensor = new ort.Tensor("float32", real, [1, 2, F, T]);
           const imagTensor = new ort.Tensor("float32", imag, [1, 2, F, T]);
@@ -171,7 +203,30 @@ async function handleStart(
             spec_imag: imagTensor,
           };
 
+          const isFirstChunk = i === 0;
+          postMsg({
+            type: "chunk_start",
+            chunkIndex: i,
+            totalChunks,
+            stage: isFirstChunk ? "webgpu_compiling" : "webgpu_inference",
+          } satisfies WorkerOutMessage);
+
+          postMsg({
+            type: "worker_log",
+            level: "info",
+            message: `Chunk ${i + 1}/${totalChunks}: Executing WebGPU session.run()${isFirstChunk ? " (compiling shaders in GPU driver)..." : "..."}`,
+          } satisfies WorkerOutMessage);
+
+          const gpuStart = Date.now();
           const outputFeeds = await session.run(feeds);
+          const gpuElapsed = Date.now() - gpuStart;
+
+          postMsg({
+            type: "worker_log",
+            level: "info",
+            message: `Chunk ${i + 1}/${totalChunks}: WebGPU inference completed in ${gpuElapsed}ms!`,
+          } satisfies WorkerOutMessage);
+
           const outRealTensor =
             outputFeeds["out_spec_real"] || outputFeeds[session.outputNames[0]];
           const outImagTensor =
@@ -187,6 +242,14 @@ async function handleStart(
           outRealTensor.dispose();
           outImagTensor.dispose();
 
+          postMsg({
+            type: "chunk_start",
+            chunkIndex: i,
+            totalChunks,
+            stage: "istft",
+          } satisfies WorkerOutMessage);
+
+          const istftStart = Date.now();
           chunkStems = computeBatchISTFT(
             outReal,
             outImag,
@@ -196,6 +259,12 @@ async function handleStart(
             undefined,
             numStemsInOutput
           );
+
+          postMsg({
+            type: "worker_log",
+            level: "info",
+            message: `Chunk ${i + 1}/${totalChunks}: iSTFT completed in ${Date.now() - istftStart}ms`,
+          } satisfies WorkerOutMessage);
         } else {
           // Standard time-domain waveform model fallback
           let sum = 0;
@@ -292,6 +361,12 @@ async function handleStart(
       const msPerChunk = elapsedMs / chunksCompleted;
       const remainingChunks = totalChunks - chunksCompleted;
       const etaMs = Math.round(msPerChunk * remainingChunks);
+
+      postMsg({
+        type: "worker_log",
+        level: "info",
+        message: `Chunk ${chunksCompleted}/${totalChunks} finished in ${Date.now() - chunkStart}ms (Overall: ${(elapsedMs / 1000).toFixed(1)}s elapsed, ${(etaMs / 1000).toFixed(1)}s ETA)`,
+      } satisfies WorkerOutMessage);
 
       postMsg({
         type: "chunk_progress",

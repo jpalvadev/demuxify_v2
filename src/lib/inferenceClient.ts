@@ -14,6 +14,12 @@ export interface ChunkProgress {
   etaMs: number;
 }
 
+export interface ChunkStartEvent {
+  chunkIndex: number;
+  totalChunks: number;
+  stage: string;
+}
+
 export type InferenceProgressEvent =
   | ({ stage: "download" } & DownloadProgress)
   | ({ stage: "inference" } & ChunkProgress);
@@ -31,6 +37,7 @@ export interface InitOptions {
 
 export interface SeparateOptions {
   chunkOptions?: ChunkOptions;
+  onChunkStart?: (event: ChunkStartEvent) => void;
   onChunkProgress?: (progress: ChunkProgress) => void;
 }
 
@@ -44,6 +51,7 @@ export class InferenceClient {
     null;
   private currentSeparationReject: ((err: Error) => void) | null = null;
   private onDownloadProgressCb?: (progress: DownloadProgress) => void;
+  private onChunkStartCb?: (event: ChunkStartEvent) => void;
   private onChunkProgressCb?: (progress: ChunkProgress) => void;
 
   constructor(worker?: Worker) {
@@ -83,6 +91,24 @@ export class InferenceClient {
             this.currentInitResolve = null;
             this.currentInitReject = null;
             this.onDownloadProgressCb = undefined;
+          }
+          break;
+
+        case "chunk_start":
+          this.onChunkStartCb?.({
+            chunkIndex: data.chunkIndex,
+            totalChunks: data.totalChunks,
+            stage: data.stage,
+          });
+          break;
+
+        case "worker_log":
+          if (data.level === "error") {
+            diagnostics.error("inference", data.message, data.data);
+          } else if (data.level === "warn") {
+            diagnostics.warn("inference", data.message, data.data);
+          } else {
+            diagnostics.info("inference", data.message, data.data);
           }
           break;
 
@@ -158,6 +184,7 @@ export class InferenceClient {
   private cleanupSeparation() {
     this.currentSeparationResolve = null;
     this.currentSeparationReject = null;
+    this.onChunkStartCb = undefined;
     this.onChunkProgressCb = undefined;
   }
 
@@ -202,6 +229,7 @@ export class InferenceClient {
     );
 
     this.isProcessing = true;
+    this.onChunkStartCb = options.onChunkStart;
     this.onChunkProgressCb = options.onChunkProgress;
 
     return new Promise((resolve, reject) => {

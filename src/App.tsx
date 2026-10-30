@@ -17,7 +17,11 @@ import { diagnostics } from "./lib/diagnostics";
 import { detectWebGPUCapability, WebGPUCapability } from "./lib/webgpu";
 import { decodeAudio, DecodedSourceMix } from "./lib/audioDecoder";
 import { computeWaveformPeaks, WaveformPeaks } from "./lib/waveformPeaks";
-import { InferenceClient, ChunkProgress } from "./lib/inferenceClient";
+import {
+  InferenceClient,
+  ChunkProgress,
+  ChunkStartEvent,
+} from "./lib/inferenceClient";
 import { DownloadProgress } from "./lib/modelCache";
 import { StemName, STEM_NAMES } from "./lib/chunkOverlapAdd";
 import {
@@ -66,6 +70,7 @@ export const App: React.FC = () => {
   const [chunkProgress, setChunkProgress] = useState<ChunkProgress | null>(
     null
   );
+  const [chunkStart, setChunkStart] = useState<ChunkStartEvent | null>(null);
   const [separationError, setSeparationError] = useState<string | null>(null);
   const [separatedStems, setSeparatedStems] = useState<Record<
     StemName,
@@ -211,6 +216,7 @@ export const App: React.FC = () => {
     setSeparatedStems(null);
     setDownloadProgress(null);
     setChunkProgress(null);
+    setChunkStart(null);
     setSeparationError(null);
     setRestoredMixerState(null);
     if (fileInputRef.current) {
@@ -357,6 +363,9 @@ export const App: React.FC = () => {
         audio,
         decodedSourceMix.buffer.sampleRate,
         {
+          onChunkStart: (start) => {
+            setChunkStart(start);
+          },
           onChunkProgress: (p) => {
             setChunkProgress(p);
           },
@@ -417,6 +426,7 @@ export const App: React.FC = () => {
     }
     setSeparationPhase("idle");
     setChunkProgress(null);
+    setChunkStart(null);
     setDownloadProgress(null);
   };
 
@@ -530,6 +540,7 @@ export const App: React.FC = () => {
                 phase={separationPhase}
                 downloadProgress={downloadProgress}
                 chunkProgress={chunkProgress}
+                chunkStart={chunkStart}
                 error={separationError}
                 onCancel={handleCancelSeparation}
                 onRetry={handleStartSeparation}
