@@ -25,6 +25,7 @@ export interface StemPlayerEngineOptions {
   initialMixerStates?: StemMixerStates;
   initialMasterVolume?: number;
   initialCurrentTime?: number;
+  disableWorklet?: boolean;
 }
 
 export type PositionListener = (timeSec: number) => void;
@@ -69,6 +70,8 @@ export class StemPlayerEngine {
   private pitch: number = 0; // semitones (-12 to +12)
   private workletNode: AudioWorkletNode | null = null;
   private useWorklet: boolean = false;
+  private workletInitPromise: Promise<void> | null = null;
+  private isDisposed: boolean = false;
 
   constructor(
     stems: Record<StemName, Float32Array[] | AudioBuffer>,
@@ -148,13 +151,15 @@ export class StemPlayerEngine {
 
     this.duration = maxDuration;
     this.applyGainMatrix();
-    this.initAudioWorklet(sampleRate);
+    if (!options?.disableWorklet) {
+      this.workletInitPromise = this.initAudioWorklet(sampleRate);
+    }
   }
 
   private async initAudioWorklet(sampleRate: number): Promise<void> {
     try {
       const registered = await registerWsolaAudioWorklet(this.audioContext);
-      if (!registered) return;
+      if (!registered || this.isDisposed) return;
 
       const AudioWorkletNodeClass =
         (window as unknown as { AudioWorkletNode?: typeof AudioWorkletNode })
@@ -165,7 +170,7 @@ export class StemPlayerEngine {
           }
         ).AudioWorkletNode;
 
-      if (!AudioWorkletNodeClass) return;
+      if (!AudioWorkletNodeClass || this.isDisposed) return;
 
       const workletNode = new AudioWorkletNodeClass(
         this.audioContext,
@@ -175,6 +180,13 @@ export class StemPlayerEngine {
           outputChannelCount: [2, 2, 2, 2],
         }
       );
+
+      if (this.isDisposed) {
+        try {
+          workletNode.disconnect();
+        } catch {}
+        return;
+      }
 
       // Collect 8 channels across the 4 stems
       const stems8: Float32Array[] = [];
@@ -190,6 +202,16 @@ export class StemPlayerEngine {
         type: "loadStems",
         stems: stems8,
         sampleRate,
+      });
+
+      workletNode.port.postMessage({
+        type: "setTempo",
+        tempo: this.tempo,
+      });
+
+      workletNode.port.postMessage({
+        type: "setPitch",
+        pitch: this.pitch,
       });
 
       // Connect 4 stereo outputs to stemGainNodes
@@ -210,6 +232,22 @@ export class StemPlayerEngine {
 
       this.workletNode = workletNode;
       this.useWorklet = true;
+
+      // If active playback was started via fallback sources while worklet was loading,
+      // seamlessly migrate active playback into the worklet without ghost sources!
+      if (this.playing) {
+        const curTime = this.getCurrentTime();
+        this.stopActiveSources();
+        this.workletNode.port.postMessage({ type: "seek", timeSec: curTime });
+        this.workletNode.port.postMessage({ type: "play" });
+        this.playStartContextTime = this.audioContext.currentTime;
+        this.currentOffset = curTime;
+      } else if (this.currentOffset > 0) {
+        this.workletNode.port.postMessage({
+          type: "seek",
+          timeSec: this.currentOffset,
+        });
+      }
     } catch {
       // AudioWorklet initialization failed, fallback remains active
       this.useWorklet = false;
@@ -345,11 +383,9 @@ export class StemPlayerEngine {
     this.playStartContextTime = startTime;
     const offset = this.currentOffset;
 
-    const isNormalSpeedAndPitch =
-      Math.abs(this.tempo - 1.0) < 1e-4 && Math.abs(this.pitch) < 1e-4;
+    this.stopActiveSources();
 
-    if (this.useWorklet && this.workletNode && !isNormalSpeedAndPitch) {
-      this.stopActiveSources();
+    if (this.useWorklet && this.workletNode) {
       this.workletNode.port.postMessage({ type: "seek", timeSec: offset });
       this.workletNode.port.postMessage({
         type: "setTempo",
@@ -361,11 +397,6 @@ export class StemPlayerEngine {
       });
       this.workletNode.port.postMessage({ type: "play" });
     } else {
-      if (this.useWorklet && this.workletNode) {
-        this.workletNode.port.postMessage({ type: "pause" });
-      }
-      this.stopActiveSources();
-
       const sources: AudioBufferSourceNode[] = [];
       for (const stem of STEM_NAMES) {
         const source = this.audioContext.createBufferSource();
@@ -381,17 +412,7 @@ export class StemPlayerEngine {
       }
 
       this.activeSources = sources;
-
-      // Listen on the first source ended event to handle auto-pause on completion
-      if (sources[0]) {
-        sources[0].onended = () => {
-          if (this.playing && this.getCurrentTime() >= this.duration - 0.05) {
-            this.pause();
-            this.currentOffset = 0;
-            this.notifyPosition();
-          }
-        };
-      }
+      this.setupSourcesEndedListener(sources);
     }
 
     this.playing = true;
@@ -406,9 +427,8 @@ export class StemPlayerEngine {
 
     if (this.useWorklet && this.workletNode) {
       this.workletNode.port.postMessage({ type: "pause" });
-    } else {
-      this.stopActiveSources();
     }
+    this.stopActiveSources();
 
     this.playing = false;
     this.stopPositionLoop();
@@ -421,11 +441,15 @@ export class StemPlayerEngine {
     const startTime = this.audioContext.currentTime;
     this.playStartContextTime = startTime;
 
+    // Immediately stop any active buffer sources so audio never sticks to old positions
+    this.stopActiveSources();
+
     if (this.useWorklet && this.workletNode) {
       this.workletNode.port.postMessage({ type: "seek", timeSec: clampedTime });
+      if (this.playing) {
+        this.workletNode.port.postMessage({ type: "play" });
+      }
     } else if (this.playing) {
-      this.stopActiveSources();
-
       const sources: AudioBufferSourceNode[] = [];
       for (const stem of STEM_NAMES) {
         const source = this.audioContext.createBufferSource();
@@ -438,19 +462,22 @@ export class StemPlayerEngine {
         sources.push(source);
       }
       this.activeSources = sources;
-
-      if (sources[0]) {
-        sources[0].onended = () => {
-          if (this.playing && this.getCurrentTime() >= this.duration - 0.05) {
-            this.pause();
-            this.currentOffset = 0;
-            this.notifyPosition();
-          }
-        };
-      }
+      this.setupSourcesEndedListener(sources);
     }
 
     this.notifyPosition();
+  }
+
+  private setupSourcesEndedListener(sources: AudioBufferSourceNode[]): void {
+    if (sources[0]) {
+      sources[0].onended = () => {
+        if (this.playing && this.getCurrentTime() >= this.duration - 0.05) {
+          this.pause();
+          this.currentOffset = 0;
+          this.notifyPosition();
+        }
+      };
+    }
   }
 
   private stopActiveSources(): void {
@@ -537,12 +564,15 @@ export class StemPlayerEngine {
     if (this.playing) {
       this.currentOffset = this.getCurrentTime();
       this.playStartContextTime = this.audioContext.currentTime;
-      for (const source of this.activeSources) {
-        if (source.playbackRate) {
-          source.playbackRate.setValueAtTime(
-            clamped,
-            this.audioContext.currentTime
-          );
+      // In fallback mode only, update playbackRate on active buffer sources
+      if (!this.useWorklet || !this.workletNode) {
+        for (const source of this.activeSources) {
+          if (source.playbackRate) {
+            source.playbackRate.setValueAtTime(
+              clamped,
+              this.audioContext.currentTime
+            );
+          }
         }
       }
     }
@@ -593,7 +623,31 @@ export class StemPlayerEngine {
     }
   }
 
+  public isUsingWorklet(): boolean {
+    return this.useWorklet && this.workletNode !== null;
+  }
+
+  public getWorkletNode(): AudioWorkletNode | null {
+    return this.workletNode;
+  }
+
+  public getActiveSources(): AudioBufferSourceNode[] {
+    return [...this.activeSources];
+  }
+
+  public async waitForWorkletReady(): Promise<boolean> {
+    if (this.workletInitPromise) {
+      try {
+        await this.workletInitPromise;
+      } catch {
+        // Ignored
+      }
+    }
+    return this.isUsingWorklet();
+  }
+
   public dispose(): void {
+    this.isDisposed = true;
     this.pause();
     this.stopPositionLoop();
     this.positionListeners.clear();
