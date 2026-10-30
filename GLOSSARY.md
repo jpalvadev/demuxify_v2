@@ -36,6 +36,14 @@ _Avoid_: Window, block, packet
 Altering audio playback speed without altering the musical pitch, or shifting pitch without altering tempo.
 _Avoid_: Resample, fast forward, pitch bend
 
+**Pitch-Shift**:
+Altering the musical pitch (key) of stems or mixes in discrete semitone steps without altering playback speed.
+_Avoid_: Pitch bend, detune, transpose slider, key change hack
+
+**Formant Preservation**:
+Maintaining vocal tract resonance characteristics during pitch shifting to prevent unnatural vocal timbre distortions ("chipmunk" or cavernous effects).
+_Avoid_: Formant filter, vocal enhancer, autotune
+
 **Session**:
 The active working state containing the Source Mix, separated Stems, playback position, and mixer settings persisted in local storage.
 _Avoid_: Project, document, workspace
