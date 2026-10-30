@@ -29,6 +29,7 @@ import {
   sanitizeSourceMixTitle,
 } from "../lib/bundleZip";
 import { mixAudioStems, formatMixdownFileName } from "../lib/customMixdown";
+import { renderOfflineStems } from "../lib/signalsmithStretchAdapter";
 import { toast } from "../lib/toast";
 import { cn } from "../lib/utils";
 
@@ -41,6 +42,9 @@ export interface ExportDialogProps {
   initialMixerStates?: StemMixerStates;
   initialMasterVolume?: number;
   onExportComplete?: (fileName: string) => void;
+  activeTempo?: number;
+  activePitch?: number;
+  activeFormantPreservation?: boolean;
 }
 
 export type ExportMode = "single" | "bundle" | "mixdown";
@@ -140,12 +144,22 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
   initialMixerStates,
   initialMasterVolume,
   onExportComplete,
+  activeTempo,
+  activePitch,
+  activeFormantPreservation,
 }) => {
   const [mode, setMode] = useState<ExportMode>("single");
   const [selectedStem, setSelectedStem] = useState<StemName>("vocals");
   const [format, setFormat] = useState<ExportFormat>("wav");
   const [bitDepth, setBitDepth] = useState<16 | 24>(16);
   const [bitrate, setBitrate] = useState<Mp3Bitrate>(192);
+
+  const hasActiveAdjustments =
+    (activeTempo !== undefined && Math.abs(activeTempo - 1.0) >= 0.01) ||
+    (activePitch !== undefined && Math.abs(activePitch) >= 1);
+
+  const [applyAdjustments, setApplyAdjustments] =
+    useState<boolean>(hasActiveAdjustments);
 
   // Custom Mixdown state
   const [stemControls, setStemControls] = useState<
@@ -228,9 +242,10 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
       setStatusMessage("");
       setStemControls(computeInitialStemControls(initialMixerStates));
       setMasterGain(initialMasterVolume ?? 1.0);
+      setApplyAdjustments(hasActiveAdjustments);
     }
     prevOpenRef.current = isOpen;
-  }, [isOpen, initialMixerStates, initialMasterVolume]);
+  }, [isOpen, initialMixerStates, initialMasterVolume, hasActiveAdjustments]);
 
   const handleExport = useCallback(async () => {
     setIsExporting(true);
@@ -239,9 +254,20 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
     setSuccessNotification(null);
 
     try {
+      let exportStems = stems;
+      if (applyAdjustments && hasActiveAdjustments) {
+        setStatusMessage("Applying active pitch and tempo adjustments...");
+        exportStems = await renderOfflineStems(stems, {
+          sampleRate,
+          tempo: activeTempo ?? 1.0,
+          pitch: activePitch ?? 0,
+          formantPreservation: activeFormantPreservation ?? true,
+        });
+      }
+
       if (mode === "single") {
         setStatusMessage(`Encoding ${selectedStem}...`);
-        const stemData = stems[selectedStem];
+        const stemData = exportStems[selectedStem];
         if (!stemData) {
           throw new Error(`Stem "${selectedStem}" is not available.`);
         }
@@ -278,7 +304,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
         const stemCount = STEM_NAMES.length;
         for (let i = 0; i < stemCount; i++) {
           const stemName = STEM_NAMES[i];
-          const stemData = stems[stemName];
+          const stemData = exportStems[stemName];
           if (!stemData) {
             throw new Error(`Stem "${stemName}" is missing from stems set.`);
           }
@@ -329,7 +355,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
           stemGains[name] = ctrl.enabled ? ctrl.volume : 0;
         }
 
-        const mixResult = mixAudioStems(stems, {
+        const mixResult = mixAudioStems(exportStems, {
           stemGains,
           masterGain,
           antiClipping,
@@ -382,6 +408,11 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
     masterGain,
     antiClipping,
     onExportComplete,
+    applyAdjustments,
+    hasActiveAdjustments,
+    activeTempo,
+    activePitch,
+    activeFormantPreservation,
   ]);
 
   if (!isOpen) return null;
@@ -513,6 +544,39 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
               </label>
             </div>
           </div>
+
+          {/* Active Pitch & Tempo Adjustments Checkbox */}
+          {hasActiveAdjustments && (
+            <div className="flex items-center justify-between p-3 rounded-xl border border-border/80 bg-secondary/40">
+              <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={applyAdjustments}
+                  onChange={(e) => setApplyAdjustments(e.target.checked)}
+                  disabled={isExporting}
+                  className="rounded border-border text-primary focus:ring-primary h-4 w-4"
+                  aria-label="Apply active Pitch & Tempo adjustments"
+                />
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold text-foreground">
+                    Apply active Pitch & Tempo adjustments
+                  </span>
+                  <span className="font-mono text-[11px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-md border border-primary/20">
+                    {[
+                      activePitch !== undefined && activePitch !== 0
+                        ? `${activePitch > 0 ? "+" : ""}${activePitch} st`
+                        : null,
+                      activeTempo !== undefined && activeTempo !== 1.0
+                        ? `${activeTempo.toFixed(2)}x`
+                        : null,
+                    ]
+                      .filter(Boolean)
+                      .join(", ")}
+                  </span>
+                </div>
+              </label>
+            </div>
+          )}
 
           {/* Stem Selector (Visible only in Single Stem mode) */}
           {mode === "single" && (

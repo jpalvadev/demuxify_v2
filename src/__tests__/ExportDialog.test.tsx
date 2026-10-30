@@ -710,4 +710,123 @@ describe("ExportDialog", () => {
       ).toHaveValue("0.75");
     });
   });
+
+  describe("Active Pitch & Tempo Adjustments Export", () => {
+    it("displays 'Apply active Pitch & Tempo adjustments' checkbox with informative label when session values are non-neutral", () => {
+      render(
+        <ExportDialog
+          isOpen={true}
+          onClose={vi.fn()}
+          stems={mockStems}
+          sourceMixTitle="audioslave_stone.mp3"
+          activeTempo={1.25}
+          activePitch={2}
+        />
+      );
+
+      const checkbox = screen.getByRole("checkbox", {
+        name: /apply active pitch & tempo adjustments/i,
+      });
+      expect(checkbox).toBeInTheDocument();
+      expect(checkbox).toBeChecked();
+      expect(screen.getByText(/\+2 st, 1\.25x/i)).toBeInTheDocument();
+    });
+
+    it("does not display adjustments checkbox when session values are at neutral default (1.00x, 0 st)", () => {
+      render(
+        <ExportDialog
+          isOpen={true}
+          onClose={vi.fn()}
+          stems={mockStems}
+          sourceMixTitle="audioslave_stone.mp3"
+          activeTempo={1.0}
+          activePitch={0}
+        />
+      );
+
+      expect(
+        screen.queryByRole("checkbox", {
+          name: /apply active pitch & tempo adjustments/i,
+        })
+      ).not.toBeInTheDocument();
+    });
+
+    it("applies pitch and tempo adjustments to exported custom mixdown when checked", async () => {
+      const user = userEvent.setup();
+      const mixAudioSpy = vi.spyOn(customMixdown, "mixAudioStems");
+
+      render(
+        <ExportDialog
+          isOpen={true}
+          onClose={vi.fn()}
+          stems={mockStems}
+          sourceMixTitle="audioslave_stone.mp3"
+          activeTempo={1.5}
+          activePitch={-2}
+        />
+      );
+
+      // Select Custom Mixdown mode
+      await user.click(screen.getByRole("radio", { name: /custom mixdown/i }));
+
+      const checkbox = screen.getByRole("checkbox", {
+        name: /apply active pitch & tempo adjustments/i,
+      });
+      expect(checkbox).toBeChecked();
+
+      // Trigger export
+      await user.click(
+        screen.getByRole("button", { name: /export & download/i })
+      );
+
+      await waitFor(() => {
+        expect(mixAudioSpy).toHaveBeenCalled();
+      });
+
+      // Transformed stems should have scaled sample length (1152*2 / 1.5 = 1536)
+      const passedStems = mixAudioSpy.mock.calls[0][0];
+      const vocalsLength = (passedStems.vocals as Float32Array[])[0].length;
+      expect(vocalsLength).toBe(Math.round((1152 * 2) / 1.5));
+    });
+
+    it("exports unmodified audio when adjustments checkbox is unchecked by user", async () => {
+      const user = userEvent.setup();
+      const mixAudioSpy = vi.spyOn(customMixdown, "mixAudioStems");
+
+      render(
+        <ExportDialog
+          isOpen={true}
+          onClose={vi.fn()}
+          stems={mockStems}
+          sourceMixTitle="audioslave_stone.mp3"
+          activeTempo={1.5}
+          activePitch={-2}
+        />
+      );
+
+      // Select Custom Mixdown mode
+      await user.click(screen.getByRole("radio", { name: /custom mixdown/i }));
+
+      const checkbox = screen.getByRole("checkbox", {
+        name: /apply active pitch & tempo adjustments/i,
+      });
+      // Uncheck adjustments
+      await user.click(checkbox);
+      expect(checkbox).not.toBeChecked();
+
+      // Trigger export
+      await user.click(
+        screen.getByRole("button", { name: /export & download/i })
+      );
+
+      await waitFor(() => {
+        expect(mixAudioSpy).toHaveBeenCalled();
+      });
+
+      // Passed stems should maintain original sample length (1152 * 2 = 2304)
+      const passedStems = mixAudioSpy.mock.calls[0][0];
+      const vocalsLength = (passedStems.vocals as Float32Array[])[0].length;
+      expect(vocalsLength).toBe(1152 * 2);
+    });
+  });
 });
