@@ -4,8 +4,8 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** complete
 
-- [ ] A verified 4-stem MDX-Net ONNX model asset (~45 MB) is placed in static assets storage under `public/models/mdx_net_4stem_mobile.onnx`.
-- [ ] A reproducible python script in `scripts/` verifies the model asset integrity, downloads or exports the model, and documents the upstream source repository and license.
-- [ ] Automated tests verify the model file exists, is non-empty, and possesses valid input/output tensor configurations matching the 4-stem separation contract.
+- [x] A verified 4-stem MDX-Net ONNX model asset (~45 MB) is placed in static assets storage under `public/models/mdx_net_4stem_mobile.onnx`.
+- [x] A reproducible python script in `scripts/` verifies the model asset integrity, downloads or exports the model, and documents the upstream source repository and license.
+- [x] Automated tests verify the model file exists, is non-empty, and possesses valid input/output tensor configurations matching the 4-stem separation contract.
