@@ -9,12 +9,8 @@ import {
 ort.env.wasm.wasmPaths =
   "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.31.1/dist/";
 
-// Multi-threaded WASM execution (capped at 4 threads to prevent heap fragmentation while leveraging multi-core CPUs)
-const hardwareThreads =
-  typeof navigator !== "undefined" && navigator.hardwareConcurrency
-    ? navigator.hardwareConcurrency
-    : 2;
-ort.env.wasm.numThreads = Math.min(4, Math.max(1, hardwareThreads));
+// Constrain WASM to 1 thread to prevent 32-bit heap fragmentation and multi-arena memory multiplication (std::bad_alloc)
+ort.env.wasm.numThreads = 1;
 
 import {
   createChunkSegments,
@@ -97,21 +93,24 @@ async function handleInit(
   }
 
   try {
-    const weightsBuffer = await getModelWeights(modelUrl, (progress) => {
-      postMsg({
-        type: "download_progress",
-        ...progress,
-      } satisfies WorkerOutMessage);
-    });
+    let weightsBuffer: ArrayBuffer | null = await getModelWeights(
+      modelUrl,
+      (progress) => {
+        postMsg({
+          type: "download_progress",
+          ...progress,
+        } satisfies WorkerOutMessage);
+      }
+    );
 
-    const weightsBytes = new Uint8Array(weightsBuffer);
+    let weightsBytes: Uint8Array | null = new Uint8Array(weightsBuffer);
+    weightsBuffer = null; // Release JS ArrayBuffer to free ~270 MB before session creation
 
-    // Disable graph optimization and CPU memory arena to prevent duplicate buffer
-    // allocations and memory pool reservation that trigger std::bad_alloc in 32-bit WASM
+    // Memory pattern planning & arena pooling: pre-plan activation tensor allocation to eliminate heap fragmentation
     const baseSessionOptions: ort.InferenceSession.SessionOptions = {
       graphOptimizationLevel: "disabled",
-      enableCpuMemArena: false,
-      enableMemPattern: false,
+      enableCpuMemArena: true,
+      enableMemPattern: true,
       executionMode: "sequential",
     };
 
@@ -144,7 +143,7 @@ async function handleInit(
           type: "worker_log",
           level: "warn",
           message:
-            "Qualcomm Adreno GPU detected: automatically routing to CPU/WASM mode (multi-threaded SIMD) to bypass mobile driver lockups.",
+            "Qualcomm Adreno GPU detected: automatically routing to CPU/WASM mode (single-thread memory safe) to bypass mobile driver lockups.",
         } satisfies WorkerOutMessage);
       }
       session = await ort.InferenceSession.create(weightsBytes, {
@@ -172,6 +171,7 @@ async function handleInit(
       }
     }
 
+    weightsBytes = null; // Release typed array reference after session loads into WASM runtime
     isMockSession = false;
     activeBackend = backend;
     postMsg({ type: "init_complete", backend } satisfies WorkerOutMessage);
@@ -270,7 +270,7 @@ async function handleStart(
           postMsg({
             type: "worker_log",
             level: "info",
-            message: `Chunk ${i + 1}/${totalChunks}: Executing ${activeBackend.toUpperCase()} session.run()${isFirstChunk && activeBackend === "webgpu" ? " (compiling shaders in GPU driver)..." : activeBackend === "wasm" ? ` (multi-threaded SIMD, ${ort.env.wasm.numThreads} threads)...` : "..."}`,
+            message: `Chunk ${i + 1}/${totalChunks}: Executing ${activeBackend.toUpperCase()} session.run()${isFirstChunk && activeBackend === "webgpu" ? " (compiling shaders in GPU driver)..." : activeBackend === "wasm" ? " (memory-safe SIMD)..." : "..."}`,
           } satisfies WorkerOutMessage);
 
           const inferStart = Date.now();
