@@ -18,12 +18,13 @@ export interface WebGPUCapability {
  * Returns clear capability state and fallback reasons if unsupported.
  */
 export async function detectWebGPUCapability(): Promise<WebGPUCapability> {
-  const nav = typeof navigator !== 'undefined' ? (navigator as any) : undefined;
+  const nav = typeof navigator !== "undefined" ? (navigator as any) : undefined;
   if (!nav || !nav.gpu) {
     return {
       supported: false,
       isFallback: true,
-      errorReason: 'WebGPU is not supported in this browser. Running in CPU/WASM fallback mode.',
+      errorReason:
+        "WebGPU is not supported in this browser. Running in CPU/WASM fallback mode.",
     };
   }
 
@@ -43,7 +44,8 @@ export async function detectWebGPUCapability(): Promise<WebGPUCapability> {
     return {
       supported: false,
       isFallback: true,
-      errorReason: 'No compatible WebGPU adapter found on your hardware. Running in CPU/WASM fallback mode.',
+      errorReason:
+        "No compatible WebGPU adapter found on your hardware. Running in CPU/WASM fallback mode.",
     };
   }
 
@@ -68,7 +70,7 @@ export async function detectWebGPUCapability(): Promise<WebGPUCapability> {
       device: adapter.info.device,
       description: adapter.info.description,
     };
-  } else if (typeof adapter.requestAdapterInfo === 'function') {
+  } else if (typeof adapter.requestAdapterInfo === "function") {
     try {
       const info = await adapter.requestAdapterInfo();
       adapterInfo = {
@@ -83,12 +85,28 @@ export async function detectWebGPUCapability(): Promise<WebGPUCapability> {
   }
 
   // Release the probe device so we don't hold resources
-  if (device && typeof device.destroy === 'function') {
+  if (device && typeof device.destroy === "function") {
     try {
       device.destroy();
     } catch {
       // Ignore cleanup error
     }
+  }
+
+  // Qualcomm Adreno mobile GPUs have known driver compiler deadlocks with RoFormer WGSL shaders.
+  // Fall back cleanly to CPU/WASM to prevent hanging the browser.
+  const isAdreno = /qualcomm|adreno/i.test(
+    `${adapterInfo?.vendor || ""} ${adapterInfo?.description || ""} ${adapterInfo?.architecture || ""}`
+  );
+
+  if (isAdreno) {
+    return {
+      supported: false,
+      isFallback: true,
+      adapterInfo,
+      errorReason:
+        "Qualcomm Adreno GPU detected. Automatically switched to CPU/WASM mode to bypass mobile GPU driver lockups.",
+    };
   }
 
   return {

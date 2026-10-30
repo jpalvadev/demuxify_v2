@@ -135,13 +135,15 @@ export const SeparationProgress: React.FC<SeparationProgressProps> = ({
                 )}`}
               {isSeparating &&
                 !chunkProgress &&
-                (chunkStart?.stage === "webgpu_compiling"
-                  ? "Compiling WebGPU shaders & executing inference... (first chunk takes longer)"
-                  : chunkStart?.stage === "stft"
-                    ? "Computing STFT frequency spectrogram..."
-                    : chunkStart?.stage === "istft"
-                      ? "Reconstructing audio stems via iSTFT..."
-                      : "Processing sequential Chunk Segments via WebGPU...")}
+                (chunkStart?.stage === "wasm_inference"
+                  ? "Executing multi-threaded CPU/WASM inference..."
+                  : chunkStart?.stage === "webgpu_compiling"
+                    ? "Compiling WebGPU shaders & executing inference... (first chunk takes longer)"
+                    : chunkStart?.stage === "stft"
+                      ? "Computing STFT frequency spectrogram..."
+                      : chunkStart?.stage === "istft"
+                        ? "Reconstructing audio stems via iSTFT..."
+                        : "Processing sequential Chunk Segments...")}
               {isError && error}
             </p>
           </div>

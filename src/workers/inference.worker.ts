@@ -9,9 +9,13 @@ import {
 ort.env.wasm.wasmPaths =
   "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.31.1/dist/";
 
-// Memory & thread safety: constrain to 1 thread to prevent 32-bit WASM heap fragmentation
-// when allocating large models (>300 MB).
-ort.env.wasm.numThreads = 1;
+// Multi-threaded WASM execution (capped at 4 threads to prevent heap fragmentation while leveraging multi-core CPUs)
+const hardwareThreads =
+  typeof navigator !== "undefined" && navigator.hardwareConcurrency
+    ? navigator.hardwareConcurrency
+    : 2;
+ort.env.wasm.numThreads = Math.min(4, Math.max(1, hardwareThreads));
+
 import {
   createChunkSegments,
   reconstructStemsFromChunks,
@@ -22,7 +26,12 @@ import {
 import { computeStereoSTFT, computeBatchISTFT } from "../lib/stft";
 
 export type WorkerInMessage =
-  | { type: "init"; modelUrl?: string; useMock?: boolean }
+  | {
+      type: "init";
+      modelUrl?: string;
+      useMock?: boolean;
+      preferredBackend?: "webgpu" | "wasm";
+    }
   | {
       type: "start";
       audio: Float32Array[];
@@ -65,6 +74,7 @@ export type WorkerOutMessage =
 let session: ort.InferenceSession | null = null;
 let isMockSession = false;
 let isCancelled = false;
+let activeBackend: "webgpu" | "wasm" | "mock" = "webgpu";
 
 // HTDemucs stem order standard: [drums, bass, other, vocals]
 const DEMUCS_STEM_ORDER: StemName[] = ["drums", "bass", "other", "vocals"];
@@ -72,11 +82,13 @@ const DEMUCS_STEM_ORDER: StemName[] = ["drums", "bass", "other", "vocals"];
 async function handleInit(
   modelUrl: string = DEFAULT_MODEL_URL,
   useMock: boolean = false,
+  preferredBackend?: "webgpu" | "wasm",
   postMsg: (msg: WorkerOutMessage) => void = (m) => self.postMessage(m)
 ) {
   if (useMock) {
     isMockSession = true;
     session = null;
+    activeBackend = "mock";
     postMsg({
       type: "init_complete",
       backend: "mock",
@@ -103,26 +115,65 @@ async function handleInit(
       executionMode: "sequential",
     };
 
+    // Check if the GPU adapter is Qualcomm Adreno (which has driver compiler deadlocks with RoFormer WGSL shaders)
+    let isAdrenoGpu = false;
+    const nav =
+      typeof navigator !== "undefined" ? (navigator as any) : undefined;
+    if (nav?.gpu?.requestAdapter) {
+      try {
+        const probeAdapter = await nav.gpu.requestAdapter();
+        const info =
+          probeAdapter?.info ||
+          (await probeAdapter?.requestAdapterInfo?.()) ||
+          {};
+        const combined =
+          `${info.vendor || ""} ${info.description || ""} ${info.architecture || ""}`.toLowerCase();
+        if (combined.includes("qualcomm") || combined.includes("adreno")) {
+          isAdrenoGpu = true;
+        }
+      } catch {
+        // Non-fatal probe
+      }
+    }
+
     let backend: "webgpu" | "wasm" = "webgpu";
-    try {
-      session = await ort.InferenceSession.create(weightsBytes, {
-        ...baseSessionOptions,
-        executionProviders: ["webgpu"],
-      });
-      backend = "webgpu";
-    } catch (gpuErr) {
-      console.warn(
-        "WebGPU EP initialization failed in Worker, falling back to WASM:",
-        gpuErr
-      );
+
+    if (preferredBackend === "wasm" || isAdrenoGpu) {
+      if (isAdrenoGpu) {
+        postMsg({
+          type: "worker_log",
+          level: "warn",
+          message:
+            "Qualcomm Adreno GPU detected: automatically routing to CPU/WASM mode (multi-threaded SIMD) to bypass mobile driver lockups.",
+        } satisfies WorkerOutMessage);
+      }
       session = await ort.InferenceSession.create(weightsBytes, {
         ...baseSessionOptions,
         executionProviders: ["wasm"],
       });
       backend = "wasm";
+    } else {
+      try {
+        session = await ort.InferenceSession.create(weightsBytes, {
+          ...baseSessionOptions,
+          executionProviders: ["webgpu"],
+        });
+        backend = "webgpu";
+      } catch (gpuErr) {
+        console.warn(
+          "WebGPU EP initialization failed in Worker, falling back to WASM:",
+          gpuErr
+        );
+        session = await ort.InferenceSession.create(weightsBytes, {
+          ...baseSessionOptions,
+          executionProviders: ["wasm"],
+        });
+        backend = "wasm";
+      }
     }
 
     isMockSession = false;
+    activeBackend = backend;
     postMsg({ type: "init_complete", backend } satisfies WorkerOutMessage);
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : String(err);
@@ -208,23 +259,28 @@ async function handleStart(
             type: "chunk_start",
             chunkIndex: i,
             totalChunks,
-            stage: isFirstChunk ? "webgpu_compiling" : "webgpu_inference",
+            stage:
+              activeBackend === "wasm"
+                ? "wasm_inference"
+                : isFirstChunk
+                  ? "webgpu_compiling"
+                  : "webgpu_inference",
           } satisfies WorkerOutMessage);
 
           postMsg({
             type: "worker_log",
             level: "info",
-            message: `Chunk ${i + 1}/${totalChunks}: Executing WebGPU session.run()${isFirstChunk ? " (compiling shaders in GPU driver)..." : "..."}`,
+            message: `Chunk ${i + 1}/${totalChunks}: Executing ${activeBackend.toUpperCase()} session.run()${isFirstChunk && activeBackend === "webgpu" ? " (compiling shaders in GPU driver)..." : activeBackend === "wasm" ? ` (multi-threaded SIMD, ${ort.env.wasm.numThreads} threads)...` : "..."}`,
           } satisfies WorkerOutMessage);
 
-          const gpuStart = Date.now();
+          const inferStart = Date.now();
           const outputFeeds = await session.run(feeds);
-          const gpuElapsed = Date.now() - gpuStart;
+          const inferElapsed = Date.now() - inferStart;
 
           postMsg({
             type: "worker_log",
             level: "info",
-            message: `Chunk ${i + 1}/${totalChunks}: WebGPU inference completed in ${gpuElapsed}ms!`,
+            message: `Chunk ${i + 1}/${totalChunks}: ${activeBackend.toUpperCase()} inference completed in ${inferElapsed}ms!`,
           } satisfies WorkerOutMessage);
 
           const outRealTensor =
@@ -407,7 +463,12 @@ export async function handleWorkerMessage(
 ): Promise<void> {
   switch (msg.type) {
     case "init":
-      await handleInit(msg.modelUrl, msg.useMock, postMsg);
+      await handleInit(
+        msg.modelUrl,
+        msg.useMock,
+        msg.preferredBackend,
+        postMsg
+      );
       break;
     case "start":
       await handleStart(msg.audio, msg.sampleRate, msg.options, postMsg);

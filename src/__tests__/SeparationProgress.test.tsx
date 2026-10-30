@@ -90,4 +90,21 @@ describe("SeparationProgress Component", () => {
     expect(screen.getByText(/separating chunk 1 of 42/i)).toBeInTheDocument();
     expect(screen.getByText(/compiling webgpu shaders/i)).toBeInTheDocument();
   });
+
+  it("renders early chunk_start state while chunk 1 is compiling shaders", () => {
+    render(
+      <SeparationProgress
+        phase="separating"
+        chunkStart={{
+          chunkIndex: 0,
+          totalChunks: 42,
+          stage: "webgpu_compiling",
+        }}
+        onCancel={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText(/separating chunk 1 of 42/i)).toBeInTheDocument();
+    expect(screen.getByText(/compiling webgpu shaders/i)).toBeInTheDocument();
+  });
 });

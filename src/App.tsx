@@ -345,6 +345,7 @@ export const App: React.FC = () => {
 
       await client.init({
         useMock: isTestEnv,
+        preferredBackend: capability?.isFallback ? "wasm" : undefined,
         onDownloadProgress: (p) => {
           setDownloadProgress(p);
           setSeparationPhase("downloading");
