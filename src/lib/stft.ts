@@ -13,12 +13,12 @@
 import { fftRadix2InPlace } from "./fftRadix2";
 import { StemName } from "./chunkOverlapAdd";
 
-export const BS_ROFORMER_CHUNK_SAMPLES = 176400; // 4.0s @ 44.1kHz
+export const BS_ROFORMER_CHUNK_SAMPLES = 352800; // 8.0s @ 44.1kHz (T=801 frames for 4-stem BS-RoFormer)
 export const BS_ROFORMER_N_FFT = 2048;
-export const BS_ROFORMER_HOP_LENGTH = 512;
+export const BS_ROFORMER_HOP_LENGTH = 441;
 export const BS_ROFORMER_WIN_LENGTH = 2048;
 export const BS_ROFORMER_F = 1025; // n_fft / 2 + 1
-export const BS_ROFORMER_T = 345; // Math.floor(176400 / 512) + 1
+export const BS_ROFORMER_T = 801; // Math.floor(352800 / 441) + 1
 
 function makeHannWindow(n: number): Float32Array {
   const w = new Float32Array(n);

@@ -5,3 +5,5 @@ dist/
 .env
 .env.local
 .cache/
+*.onnx
+public/models/

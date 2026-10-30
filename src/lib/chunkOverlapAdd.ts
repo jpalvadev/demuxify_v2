@@ -31,8 +31,8 @@ export interface ChunkInferenceResult {
   stems: Record<StemName, Float32Array[]>;
 }
 
-export const DEFAULT_CHUNK_SAMPLES = 176400; // 4.0s @ 44.1kHz (T=345 frames for BS-RoFormer-SW)
-export const DEFAULT_OVERLAP_SAMPLES = 44100; // 1.0s @ 44.1kHz (25% overlap)
+export const DEFAULT_CHUNK_SAMPLES = 352800; // 8.0s @ 44.1kHz (T=801 frames for BS-RoFormer)
+export const DEFAULT_OVERLAP_SAMPLES = 88200; // 2.0s @ 44.1kHz (25% overlap)
 
 /**
  * Slices multi-channel audio into sequential Chunk Segments with overlap.

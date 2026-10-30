@@ -5,9 +5,8 @@
  * across browser sessions, supporting stream progress reporting.
  */
 
-export const MODEL_CACHE_NAME = "demuxify-model-cache-v2";
-export const DEFAULT_MODEL_URL =
-  "https://huggingface.co/elicwhite/bs-roformer-sw-6stem-onnx/resolve/main/bs_roformer_sw_6stem_fp16.onnx";
+export const MODEL_CACHE_NAME = "demuxify-model-cache-v4";
+export const DEFAULT_MODEL_URL = "/models/bs_roformer_4stem_webgpu.onnx";
 
 export interface DownloadProgress {
   loadedBytes: number;
@@ -75,8 +74,10 @@ export async function getModelWeights(
   // 1. Try to fetch from Cache Storage
   if (isCacheStorageAvailable()) {
     try {
-      // Purge obsolete v1 cache if found
+      // Purge obsolete caches if found
       globalThis.caches.delete("demuxify-model-cache-v1").catch(() => {});
+      globalThis.caches.delete("demuxify-model-cache-v2").catch(() => {});
+      globalThis.caches.delete("demuxify-model-cache-v3").catch(() => {});
 
       const cache = await globalThis.caches.open(MODEL_CACHE_NAME);
       const cachedResponse = await cache.match(url);

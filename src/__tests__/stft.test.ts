@@ -9,7 +9,7 @@ import {
 } from "../lib/stft";
 
 describe("BS-RoFormer STFT & iSTFT Engine", () => {
-  it("computes forward STFT with exact expected shape [2, 1025, 345]", () => {
+  it("computes forward STFT with exact expected shape [2, 1025, 801]", () => {
     const length = BS_ROFORMER_CHUNK_SAMPLES;
     const left = new Float32Array(length);
     const right = new Float32Array(length);
