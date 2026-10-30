@@ -12,6 +12,8 @@ import {
   SeparationPhase,
 } from "./components/SeparationProgress";
 import { ToastContainer } from "./components/Toast";
+import { DiagnosticsOverlay } from "./components/DiagnosticsOverlay";
+import { diagnostics } from "./lib/diagnostics";
 import { detectWebGPUCapability, WebGPUCapability } from "./lib/webgpu";
 import { decodeAudio, DecodedSourceMix } from "./lib/audioDecoder";
 import { computeWaveformPeaks, WaveformPeaks } from "./lib/waveformPeaks";
@@ -85,6 +87,8 @@ export const App: React.FC = () => {
   const autoSaverRef = useRef(createSessionAutoSaver(600));
 
   useEffect(() => {
+    const uninstallInterceptors = diagnostics.installGlobalInterceptors();
+    diagnostics.info("system", "Demuxify application initialized");
     let isMounted = true;
 
     async function probeCapability() {
@@ -92,13 +96,20 @@ export const App: React.FC = () => {
         const result = await detectWebGPUCapability();
         if (isMounted) {
           setCapability(result);
+          diagnostics.info(
+            "system",
+            `WebGPU capability probed: supported=${result.supported}, isFallback=${result.isFallback}`,
+            result.adapterInfo
+          );
         }
       } catch (err) {
         if (isMounted) {
+          const msg = `WebGPU detection failed: ${err instanceof Error ? err.message : String(err)}`;
+          diagnostics.error("system", msg, err);
           setCapability({
             supported: false,
             isFallback: true,
-            errorReason: `WebGPU detection failed: ${err instanceof Error ? err.message : String(err)}`,
+            errorReason: msg,
           });
         }
       } finally {
@@ -132,6 +143,7 @@ export const App: React.FC = () => {
 
     return () => {
       isMounted = false;
+      uninstallInterceptors();
       inferenceClientRef.current?.terminate();
       autoSaverRef.current.cancel();
     };
@@ -588,6 +600,7 @@ export const App: React.FC = () => {
       </main>
 
       <ToastContainer />
+      <DiagnosticsOverlay />
 
       <footer className="border-t border-border/60 py-6 text-center text-xs text-muted-foreground">
         <p>

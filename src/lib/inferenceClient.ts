@@ -1,6 +1,10 @@
-import { StemName, ChunkOptions } from './chunkOverlapAdd';
-import { DownloadProgress, DEFAULT_MODEL_URL } from './modelCache';
-import type { WorkerInMessage, WorkerOutMessage } from '../workers/inference.worker';
+import { StemName, ChunkOptions } from "./chunkOverlapAdd";
+import { DownloadProgress, DEFAULT_MODEL_URL } from "./modelCache";
+import { diagnostics } from "./diagnostics";
+import type {
+  WorkerInMessage,
+  WorkerOutMessage,
+} from "../workers/inference.worker";
 
 export interface ChunkProgress {
   chunkIndex: number;
@@ -11,8 +15,8 @@ export interface ChunkProgress {
 }
 
 export type InferenceProgressEvent =
-  | ({ stage: 'download' } & DownloadProgress)
-  | ({ stage: 'inference' } & ChunkProgress);
+  | ({ stage: "download" } & DownloadProgress)
+  | ({ stage: "inference" } & ChunkProgress);
 
 export interface SeparationResult {
   stems: Record<StemName, Float32Array[]>;
@@ -33,9 +37,11 @@ export interface SeparateOptions {
 export class InferenceClient {
   private worker: Worker;
   private isProcessing = false;
-  private currentInitResolve: ((val: { backend: string }) => void) | null = null;
+  private currentInitResolve: ((val: { backend: string }) => void) | null =
+    null;
   private currentInitReject: ((err: Error) => void) | null = null;
-  private currentSeparationResolve: ((val: SeparationResult) => void) | null = null;
+  private currentSeparationResolve: ((val: SeparationResult) => void) | null =
+    null;
   private currentSeparationReject: ((err: Error) => void) | null = null;
   private onDownloadProgressCb?: (progress: DownloadProgress) => void;
   private onChunkProgressCb?: (progress: ChunkProgress) => void;
@@ -45,8 +51,8 @@ export class InferenceClient {
       this.worker = worker;
     } else {
       this.worker = new Worker(
-        new URL('../workers/inference.worker.ts', import.meta.url),
-        { type: 'module' }
+        new URL("../workers/inference.worker.ts", import.meta.url),
+        { type: "module" }
       );
     }
 
@@ -59,7 +65,7 @@ export class InferenceClient {
       if (!data) return;
 
       switch (data.type) {
-        case 'download_progress':
+        case "download_progress":
           this.onDownloadProgressCb?.({
             loadedBytes: data.loadedBytes,
             totalBytes: data.totalBytes,
@@ -67,7 +73,11 @@ export class InferenceClient {
           });
           break;
 
-        case 'init_complete':
+        case "init_complete":
+          diagnostics.info(
+            "inference",
+            `Inference engine ready on backend: ${data.backend}`
+          );
           if (this.currentInitResolve) {
             this.currentInitResolve({ backend: data.backend });
             this.currentInitResolve = null;
@@ -76,7 +86,7 @@ export class InferenceClient {
           }
           break;
 
-        case 'chunk_progress':
+        case "chunk_progress":
           this.onChunkProgressCb?.({
             chunkIndex: data.chunkIndex,
             totalChunks: data.totalChunks,
@@ -86,8 +96,12 @@ export class InferenceClient {
           });
           break;
 
-        case 'complete':
+        case "complete":
           this.isProcessing = false;
+          diagnostics.info(
+            "inference",
+            `Separation completed successfully (${data.duration.toFixed(2)}s)`
+          );
           if (this.currentSeparationResolve) {
             this.currentSeparationResolve({
               stems: data.stems,
@@ -97,16 +111,20 @@ export class InferenceClient {
           }
           break;
 
-        case 'cancelled':
+        case "cancelled":
           this.isProcessing = false;
+          diagnostics.warn("inference", "Separation cancelled by user");
           if (this.currentSeparationReject) {
-            this.currentSeparationReject(new Error('Separation was cancelled by user'));
+            this.currentSeparationReject(
+              new Error("Separation was cancelled by user")
+            );
             this.cleanupSeparation();
           }
           break;
 
-        case 'error':
+        case "error":
           this.isProcessing = false;
+          diagnostics.error("inference", `Inference error: ${data.error}`);
           const error = new Error(data.error);
           if (this.currentSeparationReject) {
             this.currentSeparationReject(error);
@@ -122,7 +140,10 @@ export class InferenceClient {
 
     this.worker.onerror = (err) => {
       this.isProcessing = false;
-      const error = new Error(err.message || 'Worker runtime error');
+      const msg =
+        err.message || "Worker runtime error (uncaught exception or OOM crash)";
+      diagnostics.error("inference", `Web Worker failed: ${msg}`, err);
+      const error = new Error(msg);
       if (this.currentSeparationReject) {
         this.currentSeparationReject(error);
         this.cleanupSeparation();
@@ -146,12 +167,16 @@ export class InferenceClient {
 
   public init(options: InitOptions = {}): Promise<{ backend: string }> {
     return new Promise((resolve, reject) => {
+      diagnostics.info(
+        "inference",
+        `Initializing inference client (modelUrl: ${options.modelUrl ?? DEFAULT_MODEL_URL}, mock: ${options.useMock ?? false})`
+      );
       this.currentInitResolve = resolve;
       this.currentInitReject = reject;
       this.onDownloadProgressCb = options.onDownloadProgress;
 
       const message: WorkerInMessage = {
-        type: 'init',
+        type: "init",
         modelUrl: options.modelUrl ?? DEFAULT_MODEL_URL,
         useMock: options.useMock ?? false,
       };
@@ -165,8 +190,16 @@ export class InferenceClient {
     options: SeparateOptions = {}
   ): Promise<SeparationResult> {
     if (this.isProcessing) {
-      return Promise.reject(new Error('Inference engine is already processing a task'));
+      return Promise.reject(
+        new Error("Inference engine is already processing a task")
+      );
     }
+
+    const durationSec = (audio[0]?.length ?? 0) / (sampleRate || 44100);
+    diagnostics.info(
+      "inference",
+      `Starting separation: ${audio.length} channels, ${audio[0]?.length ?? 0} samples (${durationSec.toFixed(1)}s at ${sampleRate}Hz)`
+    );
 
     this.isProcessing = true;
     this.onChunkProgressCb = options.onChunkProgress;
@@ -176,7 +209,7 @@ export class InferenceClient {
       this.currentSeparationReject = reject;
 
       const message: WorkerInMessage = {
-        type: 'start',
+        type: "start",
         audio,
         sampleRate,
         options: options.chunkOptions,
@@ -187,7 +220,7 @@ export class InferenceClient {
 
   public cancel(): void {
     if (this.isProcessing) {
-      const message: WorkerInMessage = { type: 'cancel' };
+      const message: WorkerInMessage = { type: "cancel" };
       this.worker.postMessage(message);
     }
   }

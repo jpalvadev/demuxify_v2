@@ -1,3 +1,5 @@
+import { diagnostics } from "./diagnostics";
+
 /**
  * Model Cache module for persistent storage of ONNX model weights.
  *
@@ -83,6 +85,10 @@ export async function getModelWeights(
       const cachedResponse = await cache.match(url);
       if (cachedResponse) {
         const buffer = await cachedResponse.arrayBuffer();
+        diagnostics.info(
+          "network",
+          `Model Cache hit for ${url} (${(buffer.byteLength / 1048576).toFixed(1)} MB)`
+        );
         onProgress?.({
           loadedBytes: buffer.byteLength,
           totalBytes: buffer.byteLength,
@@ -96,17 +102,23 @@ export async function getModelWeights(
   }
 
   // 2. Fetch from network with stream progress reporting
+  diagnostics.info("network", `Fetching model weights from ${url}...`);
   const response = await fetch(url);
   if (!response.ok) {
-    throw new Error(
-      `Failed to download model weights from ${url}: ${response.status} ${response.statusText}`
-    );
+    const err = `Failed to download model weights from ${url}: ${response.status} ${response.statusText}`;
+    diagnostics.error("network", err);
+    throw new Error(err);
   }
 
   const contentLengthHeader = response.headers.get("Content-Length");
   const totalBytes = contentLengthHeader
     ? parseInt(contentLengthHeader, 10)
     : 0;
+
+  diagnostics.info(
+    "network",
+    `Started downloading model weights (Size: ${(totalBytes / 1048576).toFixed(1)} MB)`
+  );
 
   let buffer: ArrayBuffer;
 
