@@ -30,6 +30,20 @@ const IGNORED_FILES = [
   "StemTrack.tsx", // Backwards compatibility alias re-export file
 ];
 
+// Patterns forbidden outside of modelConfig.ts
+const MODEL_CONFIG_RESTRICTED_PATTERNS = [
+  {
+    pattern: /demuxify-(roformer|mdxnet)-cache/g,
+    reason:
+      "ADR 0005 rule: Cache partition keys must only be defined in src/lib/modelConfig.ts. Use resolveModelProfile() or ModelProfile.cacheName.",
+  },
+  {
+    pattern: /(bs_roformer_4stem_webgpu|mdx_net_4stem_mobile)\.onnx/g,
+    reason:
+      "ADR 0005 rule: Model asset filenames must only be defined in src/lib/modelConfig.ts. Use resolveModelProfile() or ModelProfile.modelUrl.",
+  },
+];
+
 let hasErrors = false;
 
 function scanDir(dir) {
@@ -69,6 +83,19 @@ function scanDir(dir) {
             console.error(`   "${line.trim()}"`);
             console.error(`   👉 ${reason}\n`);
             hasErrors = true;
+          }
+        }
+
+        if (entry.name !== "modelConfig.ts") {
+          for (const { pattern, reason } of MODEL_CONFIG_RESTRICTED_PATTERNS) {
+            if (pattern.test(line)) {
+              console.error(
+                `❌ Centralized Model Identity violation in ${path.relative(process.cwd(), fullPath)}:${lineIdx + 1}`
+              );
+              console.error(`   "${line.trim()}"`);
+              console.error(`   👉 ${reason}\n`);
+              hasErrors = true;
+            }
           }
         }
       });

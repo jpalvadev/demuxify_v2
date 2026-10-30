@@ -22,8 +22,18 @@ Always use canonical domain terms defined in `GLOSSARY.md`.
 
 - Avoid data clumps of loosely traveling mixer properties (`volume`, `muted`, `solo`).
 - Bundle track settings into `StemMixerSettings` (defined in `sessionStore.ts` / `stemPlayerEngine.ts`).
+- Avoid Primitive Obsession for domain identifiers:
+  - Use `ModelId` (`'bs-roformer' | 'mdx-net-4stem'`) instead of raw `string` across worker messages, client APIs, and session metadata.
+  - Use `StemName` (`'vocals' | 'drums' | 'bass' | 'other'`) for stem identifiers.
 
 ## 4. Test Isolation & Mock Separation
 
 - Production web workers (e.g. `src/workers/inference.worker.ts`, `src/workers/mp3Encoder.worker.ts`) must contain real processing code only.
 - Test doubles, synthetic DSP generators, and offline mocks belong exclusively in `src/__tests__/` or `src/test/`.
+
+## 5. Centralized Model Profiles & Identity (ADR 0005)
+
+- All model profiles, asset URLs (`.onnx`), cache partition keys (`demuxify-*-cache`), execution backends, and UI presentation labels must reside solely in `src/lib/modelConfig.ts`.
+- Never hardcode cache names, model asset filenames, or profile tags across consumer components, client classes, or workers.
+- Consumers should always query `resolveModelProfile(id)`, `MODEL_PROFILES`, or `DEFAULT_MODEL_PROFILE`.
+- Verified by `npm run check:glossary` static analysis.

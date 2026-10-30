@@ -17,3 +17,11 @@ Single-context layout (`GLOSSARY.md` and `docs/adr/`). See `docs/agents/domain.m
 ### Coding standards
 
 Enforced conventions and architectural guardrails. See `CODING_STANDARDS.md`.
+
+### Model provisioning
+
+ONNX models and lightweight weights can be downloaded or provisioned using `scripts/provision_mdx_net.py`. See `public/models/`.
+
+### Windows environment & worktrees
+
+When working on Windows, avoid cross-drive NTFS junctions to `node_modules` because native packages (such as Tailwind/PostCSS resolution like `@alloc/quick-lru`) can fail to resolve symlinks across boundaries. Prefer standard branch checkouts in the main repo or independent `npm install` runs.
