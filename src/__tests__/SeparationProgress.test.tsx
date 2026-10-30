@@ -100,40 +100,40 @@ describe("SeparationProgress Component", () => {
 
   it("renders dynamic model identity when a mobile or fast profile is provided", () => {
     const handleCancel = vi.fn();
-    const mdxProfile = {
-      id: "mdx-net-4stem" as const,
-      name: "MDX-Net 4-Stem",
+    const htdemucsProfile = {
+      id: "htdemucs-4stem" as const,
+      name: "HT-Demucs 4-Stem",
       shortName: "Fast",
       tagline: "Rapid 4-stem separation with minimal memory footprint",
       deviceCategory: "mobile" as const,
       explanation: "Optimized for mobile devices",
-      modelUrl: "/models/mdx_net_4stem_mobile.onnx",
-      cacheName: "demuxify-mdxnet-cache-v1",
-      estimatedSizeMb: 45,
-      chunkDurationSec: 8.0,
+      modelUrl: "/models/htdemucs_4stem_mobile.onnx",
+      cacheName: "demuxify-htdemucs-cache-v1",
+      estimatedSizeMb: 54,
+      chunkDurationSec: 6.0,
       chunkOverlapSec: 1.0,
-      architecture: "mdx-net" as const,
-      memoryRequirementDescription: "~45 MB model",
+      architecture: "htdemucs" as const,
+      memoryRequirementDescription: "~54 MB model",
     };
 
     render(
       <SeparationProgress
         phase="downloading"
-        modelProfile={mdxProfile}
+        modelProfile={htdemucsProfile}
         downloadProgress={{
           loadedBytes: 20 * 1024 * 1024,
-          totalBytes: 45 * 1024 * 1024,
-          progress: 0.44,
+          totalBytes: 54 * 1024 * 1024,
+          progress: 0.37,
         }}
         onCancel={handleCancel}
       />
     );
 
     expect(
-      screen.getByText(/downloading mdx-net 4-stem weights/i)
+      screen.getByText(/downloading ht-demucs 4-stem weights/i)
     ).toBeInTheDocument();
     expect(
-      screen.getByText(/persisting mdx-net 4-stem into model cache/i)
+      screen.getByText(/persisting ht-demucs 4-stem into model cache/i)
     ).toBeInTheDocument();
     expect(screen.queryByText(/bs-roformer/i)).not.toBeInTheDocument();
   });

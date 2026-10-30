@@ -23,7 +23,7 @@ Always use canonical domain terms defined in `GLOSSARY.md`.
 - Avoid data clumps of loosely traveling mixer properties (`volume`, `muted`, `solo`).
 - Bundle track settings into `StemMixerSettings` (defined in `sessionStore.ts` / `stemPlayerEngine.ts`).
 - Avoid Primitive Obsession for domain identifiers:
-  - Use `ModelId` (`'bs-roformer' | 'mdx-net-4stem'`) instead of raw `string` across worker messages, client APIs, and session metadata.
+  - Use `ModelId` (`'bs-roformer-4stem' | 'htdemucs-4stem'`) instead of raw `string` across worker messages, client APIs, and session metadata.
   - Use `StemName` (`'vocals' | 'drums' | 'bass' | 'other'`) for stem identifiers.
 
 ## 4. Test Isolation & Mock Separation

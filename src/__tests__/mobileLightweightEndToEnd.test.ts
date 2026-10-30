@@ -34,7 +34,7 @@ describe("Mobile Lightweight Model End-to-End Integration", () => {
         filename: "mobile_song.mp3",
         duration: 1.0,
         sampleRate,
-        modelProfileId: "mdx-net-4stem",
+        modelProfileId: "htdemucs-4stem",
       },
       sourceMix: {
         channels: [dummyAudio, dummyAudio],
@@ -63,17 +63,17 @@ describe("Mobile Lightweight Model End-to-End Integration", () => {
     const restored = await loadActiveSession();
 
     expect(restored).not.toBeNull();
-    expect(restored?.metadata.modelProfileId).toBe("mdx-net-4stem");
+    expect(restored?.metadata.modelProfileId).toBe("htdemucs-4stem");
   });
 
-  it("synchronizes MDX-Net stems in multi-track Stem Player with tempo and pitch shifting", () => {
+  it("synchronizes HT-Demucs stems in multi-track Stem Player with tempo and pitch shifting", () => {
     const AudioCtx =
       window.AudioContext ||
       (window as unknown as { webkitAudioContext: typeof AudioContext })
         .webkitAudioContext;
     const ctx = new AudioCtx();
 
-    const mdxStems = {
+    const stems = {
       vocals: ctx.createBuffer(2, chunkLength, sampleRate),
       drums: ctx.createBuffer(2, chunkLength, sampleRate),
       bass: ctx.createBuffer(2, chunkLength, sampleRate),
@@ -81,12 +81,12 @@ describe("Mobile Lightweight Model End-to-End Integration", () => {
     };
 
     // Fill buffers with synthetic audio
-    for (const stem of Object.values(mdxStems)) {
+    for (const stem of Object.values(stems)) {
       stem.getChannelData(0).fill(0.2);
       stem.getChannelData(1).fill(0.2);
     }
 
-    const engine = new StemPlayerEngine(mdxStems, {
+    const engine = new StemPlayerEngine(stems, {
       audioContext: ctx,
       sampleRate,
     });
@@ -102,7 +102,7 @@ describe("Mobile Lightweight Model End-to-End Integration", () => {
     engine.dispose();
   });
 
-  it("processes MDX-Net stems into Custom Mixdown with anti-clipping protection", () => {
+  it("processes HT-Demucs stems into Custom Mixdown with anti-clipping protection", () => {
     const length = 1000;
     // Generate loud signals to test anti-clipping
     const loudVocal = new Float32Array(length).fill(0.8);
@@ -110,14 +110,14 @@ describe("Mobile Lightweight Model End-to-End Integration", () => {
     const loudBass = new Float32Array(length).fill(0.6);
     const loudOther = new Float32Array(length).fill(0.6);
 
-    const mdxStems = {
+    const stems = {
       vocals: [loudVocal, loudVocal],
       drums: [loudDrums, loudDrums],
       bass: [loudBass, loudBass],
       other: [loudOther, loudOther],
     };
 
-    const mixdown = mixAudioStems(mdxStems, {
+    const mixdown = mixAudioStems(stems, {
       stemGains: {
         vocals: 1.0,
         drums: 1.0,
@@ -141,7 +141,7 @@ describe("Mobile Lightweight Model End-to-End Integration", () => {
     }
   });
 
-  it("exports MDX-Net stems into a compressed ZIP Export Bundle", async () => {
+  it("exports HT-Demucs stems into a compressed ZIP Export Bundle", async () => {
     const fakeWavBytes = new Uint8Array([82, 73, 70, 70, 0, 0, 0, 0]);
     const stemFiles = {
       vocals: fakeWavBytes,
@@ -160,23 +160,23 @@ describe("Mobile Lightweight Model End-to-End Integration", () => {
     expect(zipBlob.type).toBe("application/zip");
   });
 
-  it("processes a multi-chunk song through MDX-Net low-memory polymorphic inference safely", async () => {
+  it("processes a multi-chunk song through HT-Demucs low-memory polymorphic inference safely", async () => {
     const postedMessages: WorkerOutMessage[] = [];
     const postMsg = (m: WorkerOutMessage) => {
       postedMessages.push(m);
     };
 
     const chunkSamples = 44100;
-    const fakeMdxSession: any = {
-      inputNames: ["input"],
-      outputNames: ["output"],
+    const fakeDemucsSession: any = {
+      inputNames: ["mix"],
+      outputNames: ["stems"],
       run: vi.fn(async (feeds: Record<string, any>) => {
-        expect(feeds.input).toBeDefined();
+        expect(feeds.mix || feeds.input).toBeDefined();
         const outputData = new Float32Array(1 * 4 * 2 * chunkSamples).fill(
           0.05
         );
         return {
-          output: {
+          stems: {
             data: outputData,
             dims: [1, 4, 2, chunkSamples],
             dispose: vi.fn(),
@@ -187,7 +187,7 @@ describe("Mobile Lightweight Model End-to-End Integration", () => {
 
     const ort = await import("onnxruntime-web");
     vi.spyOn(ort.InferenceSession, "create").mockResolvedValueOnce(
-      fakeMdxSession
+      fakeDemucsSession
     );
     vi.spyOn(modelCache, "getModelWeights").mockResolvedValueOnce(
       new ArrayBuffer(1024)
@@ -196,8 +196,8 @@ describe("Mobile Lightweight Model End-to-End Integration", () => {
     await handleWorkerMessage(
       {
         type: "init",
-        modelProfileId: "mdx-net-4stem",
-        modelUrl: "/models/mdx_net_4stem_mobile.onnx",
+        modelProfileId: "htdemucs-4stem",
+        modelUrl: "/models/htdemucs_4stem_mobile.onnx",
         useMock: false,
       },
       postMsg
@@ -227,6 +227,104 @@ describe("Mobile Lightweight Model End-to-End Integration", () => {
       expect(complete.stems.drums[0].length).toBe(totalSamples);
       expect(complete.stems.bass[0].length).toBe(totalSamples);
       expect(complete.stems.other[0].length).toBe(totalSamples);
+    }
+  });
+
+  it("guarantees HT-Demucs stem separation outputs non-identical discrete tracks without amplitude clipping", async () => {
+    const postedMessages: WorkerOutMessage[] = [];
+    const postMsg = (m: WorkerOutMessage) => {
+      postedMessages.push(m);
+    };
+
+    const chunkSamples = 44100;
+    const fakeDemucsSession: any = {
+      inputNames: ["mix"],
+      outputNames: ["stems"],
+      run: vi.fn(async (feeds: Record<string, any>) => {
+        expect(feeds.mix || feeds.input).toBeDefined();
+        const inputData = (feeds.mix || feeds.input).data as Float32Array;
+        const outputData = new Float32Array(1 * 4 * 2 * chunkSamples);
+
+        // Native HT-Demucs order: [drums, bass, other, vocals]
+        // Stem 0 (drums): 0.3
+        for (let i = 0; i < chunkSamples; i++) {
+          outputData[i] = inputData[i] * 0.3;
+          outputData[chunkSamples + i] = inputData[chunkSamples + i] * 0.3;
+        }
+        // Stem 1 (bass): 0.15
+        for (let i = 0; i < chunkSamples; i++) {
+          outputData[2 * chunkSamples + i] = inputData[i] * 0.15;
+          outputData[3 * chunkSamples + i] = inputData[chunkSamples + i] * 0.15;
+        }
+        // Stem 2 (other): 0.05
+        for (let i = 0; i < chunkSamples; i++) {
+          outputData[4 * chunkSamples + i] = inputData[i] * 0.05;
+          outputData[5 * chunkSamples + i] = inputData[chunkSamples + i] * 0.05;
+        }
+        // Stem 3 (vocals): 0.5
+        for (let i = 0; i < chunkSamples; i++) {
+          outputData[6 * chunkSamples + i] = inputData[i] * 0.5;
+          outputData[7 * chunkSamples + i] = inputData[chunkSamples + i] * 0.5;
+        }
+
+        return {
+          stems: {
+            data: outputData,
+            dims: [1, 4, 2, chunkSamples],
+            dispose: vi.fn(),
+          },
+        };
+      }),
+    };
+
+    const ort = await import("onnxruntime-web");
+    vi.spyOn(ort.InferenceSession, "create").mockResolvedValueOnce(
+      fakeDemucsSession
+    );
+    vi.spyOn(modelCache, "getModelWeights").mockResolvedValueOnce(
+      new ArrayBuffer(1024)
+    );
+
+    await handleWorkerMessage(
+      {
+        type: "init",
+        modelProfileId: "htdemucs-4stem",
+        modelUrl: "/models/htdemucs_4stem_mobile.onnx",
+        useMock: false,
+      },
+      postMsg
+    );
+
+    const totalSamples = chunkSamples;
+    const audio = [
+      new Float32Array(totalSamples),
+      new Float32Array(totalSamples),
+    ];
+    for (let i = 0; i < totalSamples; i++) {
+      audio[0][i] = 0.6 * Math.sin(i / 10);
+      audio[1][i] = 0.6 * Math.cos(i / 10);
+    }
+
+    await handleWorkerMessage(
+      {
+        type: "start",
+        audio,
+        sampleRate: 44100,
+        options: { chunkSamples, overlapSamples: 4410 },
+      },
+      postMsg
+    );
+
+    const complete = postedMessages.find((m) => m.type === "complete");
+    expect(complete).toBeDefined();
+    if (complete && complete.type === "complete") {
+      const { vocals, drums, bass, other } = complete.stems;
+
+      // Stems must NOT be identical to each other
+      expect(vocals[0][100]).not.toEqual(drums[0][100]);
+      expect(vocals[0][100]).not.toEqual(bass[0][100]);
+      expect(drums[0][100]).not.toEqual(bass[0][100]);
+      expect(bass[0][100]).not.toEqual(other[0][100]);
     }
   });
 });

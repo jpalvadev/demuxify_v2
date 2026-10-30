@@ -14,16 +14,6 @@ const FORBIDDEN_PATTERNS = [
     pattern: /\bsongTitle\b/g,
     reason: "GLOSSARY.md rule: Avoid 'song'. Use 'sourceMixTitle'.",
   },
-  {
-    pattern: /\bHTDemucs\b/gi,
-    reason:
-      "GLOSSARY.md rule: Avoid legacy 'HTDemucs'. Demuxify Web uses BS-RoFormer.",
-  },
-  {
-    pattern: /\bDemucs\b/g,
-    reason:
-      "GLOSSARY.md rule: Avoid legacy 'Demucs'. Demuxify Web uses BS-RoFormer.",
-  },
 ];
 
 const IGNORED_FILES = [
@@ -33,12 +23,13 @@ const IGNORED_FILES = [
 // Patterns forbidden outside of modelConfig.ts
 const MODEL_CONFIG_RESTRICTED_PATTERNS = [
   {
-    pattern: /demuxify-(roformer|mdxnet)-cache/g,
+    pattern: /demuxify-(roformer|htdemucs|mdxnet)-cache/g,
     reason:
       "ADR 0005 rule: Cache partition keys must only be defined in src/lib/modelConfig.ts. Use resolveModelProfile() or ModelProfile.cacheName.",
   },
   {
-    pattern: /(bs_roformer_4stem_webgpu|mdx_net_4stem_mobile)\.onnx/g,
+    pattern:
+      /(bs_roformer_4stem_webgpu|htdemucs_4stem_mobile|mdx_net_4stem_mobile)\.onnx/g,
     reason:
       "ADR 0005 rule: Model asset filenames must only be defined in src/lib/modelConfig.ts. Use resolveModelProfile() or ModelProfile.modelUrl.",
   },

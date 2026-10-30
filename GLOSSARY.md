@@ -17,8 +17,8 @@ The multi-track playback interface that synchronizes all stems and provides real
 _Avoid_: Mixer, audio controls, music player
 
 **Inference Engine**:
-The client-side execution runtime running the ONNX neural network model (Studio / BS-RoFormer on desktop, Mobile / MDX-Net on mobile devices) via WebGPU or WebAssembly.
-_Avoid_: Demucs runner, RoFormer runner, Demucs, backend, separator
+The client-side execution runtime running the ONNX neural network model (Studio / BS-RoFormer on desktop, Mobile / HT-Demucs on mobile devices) via WebGPU or WebAssembly.
+_Avoid_: RoFormer runner, backend, separator
 
 **Model Profile**:
 The hardware-adapted neural network specification (Studio Profile for desktop environments with dedicated GPU, Mobile Profile for memory-constrained smartphones and tablets) defining model weights, chunk size, and memory constraints.

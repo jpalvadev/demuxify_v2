@@ -283,7 +283,7 @@ export const App: React.FC = () => {
       setSeparatedStems(session.stems);
       setRestoredMixerState(session.mixer);
       if (isMobile) {
-        setSelectedModelId("mdx-net-4stem");
+        setSelectedModelId("htdemucs-4stem");
       } else if (session.metadata.modelProfileId) {
         setSelectedModelId(session.metadata.modelProfileId);
       }

@@ -116,16 +116,16 @@ describe("bundleZip", () => {
       const zipBlob = await createStemBundleZip(mockStems, {
         sourceMixTitle: "RockTrack",
         format: "wav",
-        modelProfileId: "mdx-net-4stem",
-        modelProfileName: "MDX-Net 4-Stem",
+        modelProfileId: "htdemucs-4stem",
+        modelProfileName: "HT-Demucs 4-Stem",
       });
 
       const zip = await JSZip.loadAsync(zipBlob);
       const manifestFile = zip.file("bundle_manifest.json");
       expect(manifestFile).not.toBeNull();
       const content = JSON.parse(await manifestFile!.async("text"));
-      expect(content.modelProfileId).toBe("mdx-net-4stem");
-      expect(content.modelProfileName).toBe("MDX-Net 4-Stem");
+      expect(content.modelProfileId).toBe("htdemucs-4stem");
+      expect(content.modelProfileName).toBe("HT-Demucs 4-Stem");
       expect(content.stems).toEqual(["vocals", "drums", "bass", "other"]);
     });
 

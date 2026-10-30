@@ -217,7 +217,18 @@ async function handleStart(
   const startTime = Date.now();
 
   try {
-    const chunks = createChunkSegments(audio, options);
+    const effectiveChunkSamples =
+      options?.chunkSamples ??
+      Math.round(activeProfile.chunkDurationSec * sampleRate);
+    const effectiveOverlapSamples =
+      options?.overlapSamples ??
+      Math.round(activeProfile.chunkOverlapSec * sampleRate);
+
+    const chunks = createChunkSegments(audio, {
+      chunkSamples: effectiveChunkSamples,
+      overlapSamples: effectiveOverlapSamples,
+      ...options,
+    });
     const totalChunks = chunks.length;
     const results: ChunkInferenceResult[] = [];
 
@@ -340,18 +351,33 @@ async function handleStart(
             message: `Chunk ${i + 1}/${totalChunks}: iSTFT completed in ${Date.now() - istftStart}ms`,
           } satisfies WorkerOutMessage);
         } else {
-          // Polymorphic tensor adapter for MDX-Net (Direct Waveform / Magnitude Tensor input)
+          // Polymorphic tensor adapter for HT-Demucs (Direct Waveform Tensor input)
           postMsg({
             type: "worker_log",
             level: "info",
-            message: `Chunk ${i + 1}/${totalChunks}: Preparing MDX-Net waveform tensor...`,
+            message: `Chunk ${i + 1}/${totalChunks}: Preparing HT-Demucs waveform tensor...`,
           } satisfies WorkerOutMessage);
 
-          const inputBuffer = new Float32Array(2 * chunkSamples);
-          inputBuffer.set(chunk.audio[0], 0);
-          inputBuffer.set(chunk.audio[1], chunkSamples);
+          // Standard Demucs audio normalization: (mix - mean) / std
+          let sum = 0;
+          let sqSum = 0;
+          for (let sIdx = 0; sIdx < chunkSamples; sIdx++) {
+            const monoVal = 0.5 * (chunk.audio[0][sIdx] + chunk.audio[1][sIdx]);
+            sum += monoVal;
+            sqSum += monoVal * monoVal;
+          }
+          const mean = sum / chunkSamples;
+          const variance = Math.max(0, sqSum / chunkSamples - mean * mean);
+          const std = Math.max(Math.sqrt(variance), 1e-4);
 
-          const inputTensorName = session.inputNames[0] || "input";
+          const inputBuffer = new Float32Array(2 * chunkSamples);
+          for (let sIdx = 0; sIdx < chunkSamples; sIdx++) {
+            inputBuffer[sIdx] = (chunk.audio[0][sIdx] - mean) / std;
+            inputBuffer[chunkSamples + sIdx] =
+              (chunk.audio[1][sIdx] - mean) / std;
+          }
+
+          const inputTensorName = session.inputNames[0] || "mix";
           const inputTensor = new ort.Tensor("float32", inputBuffer, [
             1,
             2,
@@ -382,31 +408,36 @@ async function handleStart(
           postMsg({
             type: "worker_log",
             level: "info",
-            message: `Chunk ${i + 1}/${totalChunks}: MDX-Net ${activeBackend.toUpperCase()} inference completed in ${inferElapsed}ms!`,
+            message: `Chunk ${i + 1}/${totalChunks}: HT-Demucs ${activeBackend.toUpperCase()} inference completed in ${inferElapsed}ms!`,
           } satisfies WorkerOutMessage);
 
-          const outputTensorName = session.outputNames[0] || "output";
+          const outputTensorName = session.outputNames[0] || "stems";
           const outputTensor = outputFeeds[outputTensorName];
           const outData = (outputTensor.data as Float32Array).slice();
 
           inputTensor.dispose();
           outputTensor.dispose();
 
-          // Canonical 4-Stem layout: [batch=1, stems=4, channels=2, samples=chunkSamples]
-          const MDX_NET_STEM_ORDER: StemName[] = [
-            "vocals",
+          // Canonical HT-Demucs 4-Stem layout: [batch=1, stems=4, channels=2, samples=chunkSamples]
+          // Native source order: [drums, bass, other, vocals]
+          const DEMUCS_STEM_ORDER: StemName[] = [
             "drums",
             "bass",
             "other",
+            "vocals",
           ];
           chunkStems = {} as Record<StemName, Float32Array[]>;
 
           for (let s = 0; s < 4; s++) {
-            const stemName = MDX_NET_STEM_ORDER[s];
+            const stemName = DEMUCS_STEM_ORDER[s];
             const leftStart = s * 2 * chunkSamples;
             const rightStart = (s * 2 + 1) * chunkSamples;
-            const left = outData.slice(leftStart, leftStart + chunkSamples);
-            const right = outData.slice(rightStart, rightStart + chunkSamples);
+            const left = new Float32Array(chunkSamples);
+            const right = new Float32Array(chunkSamples);
+            for (let sIdx = 0; sIdx < chunkSamples; sIdx++) {
+              left[sIdx] = outData[leftStart + sIdx] * std + mean;
+              right[sIdx] = outData[rightStart + sIdx] * std + mean;
+            }
             chunkStems[stemName] = [left, right];
           }
         }

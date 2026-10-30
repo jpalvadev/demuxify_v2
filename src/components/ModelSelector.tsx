@@ -5,7 +5,7 @@ import {
   ModelProfile,
   MODEL_PROFILES,
   BS_ROFORMER_PROFILE,
-  MDX_NET_PROFILE,
+  HT_DEMUCS_PROFILE,
 } from "../lib/modelConfig";
 
 export interface ModelSelectorProps {
@@ -47,7 +47,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
               </span>
             </div>
             <h4 className="text-sm font-semibold text-foreground">
-              {MDX_NET_PROFILE.name} (~{MDX_NET_PROFILE.estimatedSizeMb} MB)
+              {HT_DEMUCS_PROFILE.name} (~{HT_DEMUCS_PROFILE.estimatedSizeMb} MB)
             </h4>
             <p className="text-xs text-muted-foreground leading-relaxed">
               Demuxify Web automatically selects this lightweight profile to
@@ -61,7 +61,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
   }
 
   // On desktop browsers, render interactive Model Selector control
-  const profiles = [BS_ROFORMER_PROFILE, MDX_NET_PROFILE];
+  const profiles = [BS_ROFORMER_PROFILE, HT_DEMUCS_PROFILE];
 
   return (
     <div

@@ -733,7 +733,7 @@ describe("App UI Shell", () => {
     ).toBeInTheDocument();
   });
 
-  it("allows desktop users to select Fast (MDX-Net) model profile and initializes client with chosen profile", async () => {
+  it("allows desktop users to select Fast (HT-Demucs) model profile and initializes client with chosen profile", async () => {
     const initSpy = vi
       .spyOn(InferenceClient.prototype, "init")
       .mockResolvedValue({ backend: "wasm" });
@@ -749,7 +749,7 @@ describe("App UI Shell", () => {
 
     render(<App />);
 
-    // Click Fast / MDX-Net radio button
+    // Click Fast / HT-Demucs radio button
     const fastOption = screen.getByRole("radio", { name: /fast/i });
     fireEvent.click(fastOption);
 
@@ -775,8 +775,8 @@ describe("App UI Shell", () => {
     await waitFor(() => {
       expect(initSpy).toHaveBeenCalledWith(
         expect.objectContaining({
-          modelProfileId: "mdx-net-4stem",
-          modelUrl: expect.stringContaining("mdx_net_4stem_mobile.onnx"),
+          modelProfileId: "htdemucs-4stem",
+          modelUrl: expect.stringContaining("htdemucs_4stem_mobile.onnx"),
         })
       );
     });

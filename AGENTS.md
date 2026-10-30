@@ -20,7 +20,7 @@ Enforced conventions and architectural guardrails. See `CODING_STANDARDS.md`.
 
 ### Model provisioning
 
-ONNX models and lightweight weights can be downloaded or provisioned using `scripts/provision_mdx_net.py`. See `public/models/`.
+ONNX models and lightweight weights can be downloaded or provisioned using `scripts/provision_htdemucs.py`. See `public/models/`.
 
 ### Windows environment & worktrees
 

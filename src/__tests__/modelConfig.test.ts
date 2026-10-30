@@ -23,14 +23,14 @@ describe("Model Registry & Configuration", () => {
     expect(profile.memoryRequirementDescription).toContain("MB");
   });
 
-  it("provides comprehensive profile configuration for Fast/Mobile (MDX-Net) model", () => {
+  it("provides comprehensive profile configuration for Fast/Mobile (HT-Demucs) model", () => {
     const profile = getModelProfile(DEFAULT_MOBILE_MODEL_ID);
-    expect(profile.id).toBe("mdx-net-4stem");
-    expect(profile.name).toBe("MDX-Net 4-Stem");
+    expect(profile.id).toBe("htdemucs-4stem");
+    expect(profile.name).toBe("HT-Demucs 4-Stem");
     expect(profile.shortName).toBe("Fast");
     expect(profile.deviceCategory).toBe("mobile");
-    expect(profile.modelUrl).toContain("mdx_net_4stem_mobile.onnx");
-    expect(profile.cacheName).toBe("demuxify-mdxnet-cache-v1");
+    expect(profile.modelUrl).toContain("htdemucs_4stem_mobile.onnx");
+    expect(profile.cacheName).toBe("demuxify-htdemucs-cache-v1");
     expect(profile.estimatedSizeMb).toBeLessThan(100);
     expect(profile.explanation).toBeDefined();
     expect(profile.explanation.length).toBeGreaterThan(10);
@@ -42,7 +42,12 @@ describe("Model Registry & Configuration", () => {
     expect(profiles.length).toBeGreaterThanOrEqual(2);
     const ids = profiles.map((p) => p.id);
     expect(ids).toContain("bs-roformer-4stem");
-    expect(ids).toContain("mdx-net-4stem");
+    expect(ids).toContain("htdemucs-4stem");
+  });
+
+  it("resolves legacy mdx-net-4stem requests to HT-Demucs", () => {
+    const profile = getModelProfile("mdx-net-4stem");
+    expect(profile.name).toBe("HT-Demucs 4-Stem");
   });
 
   it("falls back to default desktop model when unknown identifier is requested", () => {
@@ -75,11 +80,11 @@ describe("Device Detection & Default Model Resolution", () => {
     expect(isMobileDevice(desktopChromeUA, 0)).toBe(false);
   });
 
-  it("resolves MDX-Net 4-Stem as default profile on mobile devices", () => {
+  it("resolves HT-Demucs 4-Stem as default profile on mobile devices", () => {
     const mobileUA =
       "Mozilla/5.0 (iPhone; CPU iPhone OS 16_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.5 Mobile/15E148 Safari/604.1";
     const profile = getDefaultModelProfile(mobileUA, 5);
-    expect(profile.id).toBe("mdx-net-4stem");
+    expect(profile.id).toBe("htdemucs-4stem");
     expect(profile.deviceCategory).toBe("mobile");
   });
 

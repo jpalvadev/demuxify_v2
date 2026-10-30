@@ -1,15 +1,15 @@
 /**
  * Centralized Model Registry and Device Profile Configuration
  *
- * Defines canonical Model Profiles (BS-RoFormer for Desktop, MDX-Net for Mobile/Fast),
+ * Defines canonical Model Profiles (BS-RoFormer for Desktop, HT-Demucs for Mobile/Fast),
  * device detection logic, and single-source-of-truth metadata.
  */
 
-export type ModelId = "bs-roformer-4stem" | "mdx-net-4stem";
+export type ModelId = "bs-roformer-4stem" | "htdemucs-4stem" | "mdx-net-4stem";
 
 export type DeviceCategory = "desktop" | "mobile";
 
-export type ModelArchitecture = "bs-roformer" | "mdx-net";
+export type ModelArchitecture = "bs-roformer" | "htdemucs" | "mdx-net";
 
 export interface ModelProfile {
   id: ModelId;
@@ -45,36 +45,44 @@ export const BS_ROFORMER_PROFILE: ModelProfile = {
     "~270 MB model download; requires ~1.5 GB memory",
 };
 
-export const MDX_NET_PROFILE: ModelProfile = {
-  id: "mdx-net-4stem",
-  name: "MDX-Net 4-Stem",
+export const HT_DEMUCS_PROFILE: ModelProfile = {
+  id: "htdemucs-4stem",
+  name: "HT-Demucs 4-Stem",
   shortName: "Fast",
   tagline: "Rapid 4-stem separation with minimal memory footprint",
   deviceCategory: "mobile",
   explanation:
     "Lightweight, fast 4-stem separation model tailored for mobile devices and laptops. Prevents memory exhaustion and crashes on smartphones and tablets.",
-  modelUrl: "/models/mdx_net_4stem_mobile.onnx",
-  cacheName: "demuxify-mdxnet-cache-v1",
-  estimatedSizeMb: 45,
-  chunkDurationSec: 8.0,
+  modelUrl: "/models/htdemucs_4stem_mobile.onnx",
+  cacheName: "demuxify-htdemucs-cache-v1",
+  estimatedSizeMb: 54,
+  chunkDurationSec: 6.0,
   chunkOverlapSec: 1.0,
-  architecture: "mdx-net",
+  architecture: "htdemucs",
   memoryRequirementDescription:
-    "~45 MB model download; requires ~300 MB memory",
+    "~54 MB model download; requires ~300 MB memory",
+};
+
+// Backwards-compatible alias for legacy MDX-Net references
+export const MDX_NET_PROFILE: ModelProfile = {
+  ...HT_DEMUCS_PROFILE,
+  id: "mdx-net-4stem",
 };
 
 export const MODEL_PROFILES: Record<ModelId, ModelProfile> = {
   "bs-roformer-4stem": BS_ROFORMER_PROFILE,
+  "htdemucs-4stem": HT_DEMUCS_PROFILE,
   "mdx-net-4stem": MDX_NET_PROFILE,
 };
 
 export const ALL_MODEL_CACHE_NAMES = [
   BS_ROFORMER_PROFILE.cacheName,
-  MDX_NET_PROFILE.cacheName,
+  HT_DEMUCS_PROFILE.cacheName,
+  "demuxify-mdxnet-cache-v1",
 ] as const;
 
 export const DEFAULT_DESKTOP_MODEL_ID: ModelId = "bs-roformer-4stem";
-export const DEFAULT_MOBILE_MODEL_ID: ModelId = "mdx-net-4stem";
+export const DEFAULT_MOBILE_MODEL_ID: ModelId = "htdemucs-4stem";
 
 /**
  * Resolves a Model Profile by identifier or model URL without magic strings.
@@ -86,13 +94,19 @@ export function resolveModelProfile(idOrUrl?: string): ModelProfile {
   if (idOrUrl in MODEL_PROFILES) {
     return MODEL_PROFILES[idOrUrl as ModelId];
   }
-  for (const profile of Object.values(MODEL_PROFILES)) {
+  if (idOrUrl.toLowerCase().includes("mdx")) {
+    return HT_DEMUCS_PROFILE;
+  }
+  for (const profile of [BS_ROFORMER_PROFILE, HT_DEMUCS_PROFILE]) {
     if (profile.modelUrl === idOrUrl || profile.cacheName === idOrUrl) {
       return profile;
     }
   }
-  if (idOrUrl.toLowerCase().includes("mdx")) {
-    return MODEL_PROFILES[DEFAULT_MOBILE_MODEL_ID];
+  if (
+    idOrUrl.toLowerCase().includes("demucs") ||
+    idOrUrl.toLowerCase().includes("htdemucs")
+  ) {
+    return HT_DEMUCS_PROFILE;
   }
   return MODEL_PROFILES[DEFAULT_DESKTOP_MODEL_ID];
 }
@@ -105,10 +119,10 @@ export function getModelProfile(id: ModelId | string): ModelProfile {
 }
 
 /**
- * Lists all registered Model Profiles.
+ * Lists all registered Model Profiles for presentation.
  */
 export function listModelProfiles(): ModelProfile[] {
-  return Object.values(MODEL_PROFILES);
+  return [BS_ROFORMER_PROFILE, HT_DEMUCS_PROFILE];
 }
 
 /**
@@ -148,7 +162,7 @@ export function isMobileDevice(
 
 /**
  * Determines the default Model Profile for the active environment.
- * Mobile devices lock to MDX-Net to eliminate OOM crashes; desktop defaults to BS-RoFormer.
+ * Mobile devices lock to HT-Demucs to eliminate OOM crashes; desktop defaults to BS-RoFormer.
  */
 export function getDefaultModelProfile(
   userAgent?: string,

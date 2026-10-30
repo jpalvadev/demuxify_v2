@@ -114,35 +114,35 @@ describe("Inference Engine Worker (Direct Handler Execution)", () => {
     );
 
     await handleWorkerMessage(
-      { type: "init", modelProfileId: "mdx-net-4stem", useMock: false },
+      { type: "init", modelProfileId: "htdemucs-4stem", useMock: false },
       postMsg
     );
 
     const errorEvent = postedMessages.find((m) => m.type === "error");
     expect(errorEvent).toBeDefined();
     if (errorEvent && errorEvent.type === "error") {
-      expect(errorEvent.error).toContain("MDX-Net 4-Stem");
+      expect(errorEvent.error).toContain("HT-Demucs 4-Stem");
       expect(errorEvent.error).toContain("300 MB");
       expect(errorEvent.error).not.toContain("BS-RoFormer");
     }
   });
 
-  it("polymorphic adapter processes MDX-Net 4-Stem waveform sessions emitting canonical 4 stems", async () => {
+  it("polymorphic adapter processes HT-Demucs 4-Stem waveform sessions emitting canonical 4 stems", async () => {
     const postedMessages: WorkerOutMessage[] = [];
     const postMsg = (m: WorkerOutMessage) => {
       postedMessages.push(m);
     };
 
     const chunkSamples = 88200;
-    const fakeMdxSession: any = {
-      inputNames: ["input"],
-      outputNames: ["output"],
+    const fakeDemucsSession: any = {
+      inputNames: ["mix"],
+      outputNames: ["stems"],
       run: vi.fn(async (feeds: Record<string, any>) => {
-        expect(feeds.input).toBeDefined();
+        expect(feeds.mix || feeds.input).toBeDefined();
         // Return 4 stems stereo: [1, 4, 2, chunkSamples]
         const outputData = new Float32Array(1 * 4 * 2 * chunkSamples).fill(0.1);
         return {
-          output: {
+          stems: {
             data: outputData,
             dims: [1, 4, 2, chunkSamples],
             dispose: vi.fn(),
@@ -151,10 +151,9 @@ describe("Inference Engine Worker (Direct Handler Execution)", () => {
       }),
     };
 
-    // Inject fake MDX-Net session
     const ort = await import("onnxruntime-web");
     vi.spyOn(ort.InferenceSession, "create").mockResolvedValueOnce(
-      fakeMdxSession
+      fakeDemucsSession
     );
     vi.spyOn(modelCache, "getModelWeights").mockResolvedValueOnce(
       new ArrayBuffer(1024)
@@ -163,8 +162,8 @@ describe("Inference Engine Worker (Direct Handler Execution)", () => {
     await handleWorkerMessage(
       {
         type: "init",
-        modelProfileId: "mdx-net-4stem",
-        modelUrl: "/models/mdx_net_4stem_mobile.onnx",
+        modelProfileId: "htdemucs-4stem",
+        modelUrl: "/models/htdemucs_4stem_mobile.onnx",
         useMock: false,
       },
       postMsg
@@ -196,6 +195,89 @@ describe("Inference Engine Worker (Direct Handler Execution)", () => {
       expect(complete.stems.bass).toBeDefined();
       expect(complete.stems.other).toBeDefined();
       expect(complete.stems.vocals[0].length).toBe(chunkSamples);
+    }
+  });
+
+  it("verifies HT-Demucs polymorphic adapter correctly isolates non-identical stem tracks", async () => {
+    const postedMessages: WorkerOutMessage[] = [];
+    const postMsg = (m: WorkerOutMessage) => {
+      postedMessages.push(m);
+    };
+
+    const chunkSamples = 44100;
+    const fakeDemucsSession: any = {
+      inputNames: ["mix"],
+      outputNames: ["stems"],
+      run: vi.fn(async (feeds: Record<string, any>) => {
+        expect(feeds.mix || feeds.input).toBeDefined();
+        const outputData = new Float32Array(1 * 4 * 2 * chunkSamples);
+
+        // Native HT-Demucs order: [drums, bass, other, vocals]
+        // Drums (index 0): 0.25
+        outputData.fill(0.25, 0, 2 * chunkSamples);
+        // Bass (index 1): 0.15
+        outputData.fill(0.15, 2 * chunkSamples, 4 * chunkSamples);
+        // Other (index 2): 0.1
+        outputData.fill(0.1, 4 * chunkSamples, 6 * chunkSamples);
+        // Vocals (index 3): 0.4
+        outputData.fill(0.4, 6 * chunkSamples, 8 * chunkSamples);
+
+        return {
+          stems: {
+            data: outputData,
+            dims: [1, 4, 2, chunkSamples],
+            dispose: vi.fn(),
+          },
+        };
+      }),
+    };
+
+    const ort = await import("onnxruntime-web");
+    vi.spyOn(ort.InferenceSession, "create").mockResolvedValueOnce(
+      fakeDemucsSession
+    );
+    vi.spyOn(modelCache, "getModelWeights").mockResolvedValueOnce(
+      new ArrayBuffer(1024)
+    );
+
+    await handleWorkerMessage(
+      {
+        type: "init",
+        modelProfileId: "htdemucs-4stem",
+        modelUrl: "/models/htdemucs_4stem_mobile.onnx",
+        useMock: false,
+      },
+      postMsg
+    );
+
+    const audio = [
+      new Float32Array(chunkSamples),
+      new Float32Array(chunkSamples),
+    ];
+    for (let i = 0; i < chunkSamples; i++) {
+      audio[0][i] = Math.sin(i / 100);
+      audio[1][i] = Math.cos(i / 100);
+    }
+
+    await handleWorkerMessage(
+      {
+        type: "start",
+        audio,
+        sampleRate: 44100,
+        options: { chunkSamples, overlapSamples: 4410 },
+      },
+      postMsg
+    );
+
+    const complete = postedMessages.find((m) => m.type === "complete");
+    expect(complete).toBeDefined();
+    if (complete && complete.type === "complete") {
+      const { vocals, drums, bass, other } = complete.stems;
+      // Stems must not be identical
+      expect(vocals[0][50]).not.toEqual(drums[0][50]);
+      expect(vocals[0][50]).not.toEqual(bass[0][50]);
+      expect(drums[0][50]).not.toEqual(bass[0][50]);
+      expect(bass[0][50]).not.toEqual(other[0][50]);
     }
   });
 });

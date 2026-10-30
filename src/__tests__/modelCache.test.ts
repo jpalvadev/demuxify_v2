@@ -178,30 +178,32 @@ describe("Model Cache", () => {
 
   it("supports isolated cache partitions for different model profiles", async () => {
     const roformerUrl = "/models/bs_roformer_4stem_webgpu.onnx";
-    const mdxnetUrl = "/models/mdx_net_4stem_mobile.onnx";
-    const mdxCacheName = "demuxify-mdxnet-cache-v1";
+    const htdemucsUrl = "/models/htdemucs_4stem_mobile.onnx";
+    const htdemucsCacheName = "demuxify-htdemucs-cache-v1";
     const roformerCacheName = "demuxify-roformer-cache-v1";
 
-    const mdxStore = new Map<string, Response>();
-    const mdxMockCache = {
-      match: vi.fn(async (req: string) => mdxStore.get(req)?.clone()),
+    const htdemucsStore = new Map<string, Response>();
+    const htdemucsMockCache = {
+      match: vi.fn(async (req: string) => htdemucsStore.get(req)?.clone()),
       put: vi.fn(async (req: string, res: Response) => {
-        mdxStore.set(req, res.clone());
+        htdemucsStore.set(req, res.clone());
       }),
-      delete: vi.fn(async (req: string) => mdxStore.delete(req)),
+      delete: vi.fn(async (req: string) => htdemucsStore.delete(req)),
     };
 
     (globalThis as any).caches.open = vi.fn(async (name: string) => {
-      if (name === mdxCacheName) return mdxMockCache;
+      if (name === htdemucsCacheName) return htdemucsMockCache;
       return mockCache;
     });
 
-    // Check caching MDX-Net into isolated partition
-    expect(await isModelCached(mdxnetUrl, mdxCacheName)).toBe(false);
-    expect((globalThis as any).caches.open).toHaveBeenCalledWith(mdxCacheName);
+    // Check caching HT-Demucs into isolated partition
+    expect(await isModelCached(htdemucsUrl, htdemucsCacheName)).toBe(false);
+    expect((globalThis as any).caches.open).toHaveBeenCalledWith(
+      htdemucsCacheName
+    );
 
-    mdxStore.set(mdxnetUrl, new Response(dummyData.buffer));
-    expect(await isModelCached(mdxnetUrl, mdxCacheName)).toBe(true);
+    htdemucsStore.set(htdemucsUrl, new Response(dummyData.buffer));
+    expect(await isModelCached(htdemucsUrl, htdemucsCacheName)).toBe(true);
 
     // Roformer partition remains unaffected
     expect(await isModelCached(roformerUrl, roformerCacheName)).toBe(false);
