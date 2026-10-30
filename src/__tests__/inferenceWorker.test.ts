@@ -102,4 +102,28 @@ describe("Inference Engine Worker (Direct Handler Execution)", () => {
       expect(errorEvent.error).not.toContain("Demucs");
     }
   });
+
+  it("reports dynamic active model profile name and requirements in memory error messages", async () => {
+    const postedMessages: WorkerOutMessage[] = [];
+    const postMsg = (m: WorkerOutMessage) => {
+      postedMessages.push(m);
+    };
+
+    vi.spyOn(modelCache, "getModelWeights").mockRejectedValueOnce(
+      new Error("RuntimeError: abort(std::bad_alloc)")
+    );
+
+    await handleWorkerMessage(
+      { type: "init", modelProfileId: "mdx-net-4stem", useMock: false },
+      postMsg
+    );
+
+    const errorEvent = postedMessages.find((m) => m.type === "error");
+    expect(errorEvent).toBeDefined();
+    if (errorEvent && errorEvent.type === "error") {
+      expect(errorEvent.error).toContain("MDX-Net 4-Stem");
+      expect(errorEvent.error).toContain("300 MB");
+      expect(errorEvent.error).not.toContain("BS-RoFormer");
+    }
+  });
 });

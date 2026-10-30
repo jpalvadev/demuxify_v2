@@ -18,10 +18,10 @@ describe("SeparationProgress Component", () => {
     );
 
     expect(
-      screen.getByText(/downloading bs-roformer model weights/i)
+      screen.getByText(/downloading bs-roformer.*weights/i)
     ).toBeInTheDocument();
     expect(
-      screen.getByText(/persisting bs-roformer 4-stem model into model cache/i)
+      screen.getByText(/persisting bs-roformer 4-stem into model cache/i)
     ).toBeInTheDocument();
     expect(screen.queryByText(/htdemucs/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/demucs/i)).not.toBeInTheDocument();
@@ -98,20 +98,42 @@ describe("SeparationProgress Component", () => {
     expect(screen.getByText(/compiling webgpu shaders/i)).toBeInTheDocument();
   });
 
-  it("renders early chunk_start state while chunk 1 is compiling shaders", () => {
+  it("renders dynamic model identity when a mobile or fast profile is provided", () => {
+    const handleCancel = vi.fn();
+    const mdxProfile = {
+      id: "mdx-net-4stem" as const,
+      name: "MDX-Net 4-Stem",
+      shortName: "Fast",
+      deviceCategory: "mobile" as const,
+      explanation: "Optimized for mobile devices",
+      modelUrl: "/models/mdx_net_4stem_mobile.onnx",
+      cacheName: "demuxify-mdxnet-cache-v1",
+      estimatedSizeMb: 45,
+      chunkDurationSec: 8.0,
+      chunkOverlapSec: 1.0,
+      architecture: "mdx-net" as const,
+      memoryRequirementDescription: "~45 MB model",
+    };
+
     render(
       <SeparationProgress
-        phase="separating"
-        chunkStart={{
-          chunkIndex: 0,
-          totalChunks: 42,
-          stage: "webgpu_compiling",
+        phase="downloading"
+        modelProfile={mdxProfile}
+        downloadProgress={{
+          loadedBytes: 20 * 1024 * 1024,
+          totalBytes: 45 * 1024 * 1024,
+          progress: 0.44,
         }}
-        onCancel={vi.fn()}
+        onCancel={handleCancel}
       />
     );
 
-    expect(screen.getByText(/separating chunk 1 of 42/i)).toBeInTheDocument();
-    expect(screen.getByText(/compiling webgpu shaders/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/downloading mdx-net 4-stem weights/i)
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/persisting mdx-net 4-stem into model cache/i)
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/bs-roformer/i)).not.toBeInTheDocument();
   });
 });

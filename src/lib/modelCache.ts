@@ -17,6 +17,22 @@ export const OBSOLETE_CACHE_NAMES = [
 export const MODEL_CACHE_NAME = "demuxify-roformer-cache-v1";
 export const DEFAULT_MODEL_URL = "/models/bs_roformer_4stem_webgpu.onnx";
 
+/**
+ * Resolves the cache partition name for a given model URL or explicitly provided cache partition.
+ */
+export function resolveModelCacheName(
+  url: string = DEFAULT_MODEL_URL,
+  explicitCacheName?: string
+): string {
+  if (explicitCacheName) {
+    return explicitCacheName;
+  }
+  if (url.includes("mdx")) {
+    return "demuxify-mdxnet-cache-v1";
+  }
+  return MODEL_CACHE_NAME;
+}
+
 export interface DownloadProgress {
   loadedBytes: number;
   totalBytes: number;
@@ -38,13 +54,15 @@ function isCacheStorageAvailable(): boolean {
  * Checks if model weights are already stored in Model Cache.
  */
 export async function isModelCached(
-  url: string = DEFAULT_MODEL_URL
+  url: string = DEFAULT_MODEL_URL,
+  cacheName?: string
 ): Promise<boolean> {
   if (!isCacheStorageAvailable()) {
     return false;
   }
   try {
-    const cache = await globalThis.caches.open(MODEL_CACHE_NAME);
+    const targetCache = resolveModelCacheName(url, cacheName);
+    const cache = await globalThis.caches.open(targetCache);
     const match = await cache.match(url);
     return Boolean(match);
   } catch {
@@ -55,16 +73,23 @@ export async function isModelCached(
 /**
  * Deletes model weights from Model Cache, or deletes entire cache if no url provided.
  */
-export async function clearModelCache(url?: string): Promise<boolean> {
+export async function clearModelCache(
+  url?: string,
+  cacheName?: string
+): Promise<boolean> {
   if (!isCacheStorageAvailable()) {
     return false;
   }
   try {
+    const targetCache = resolveModelCacheName(
+      url || DEFAULT_MODEL_URL,
+      cacheName
+    );
     if (url) {
-      const cache = await globalThis.caches.open(MODEL_CACHE_NAME);
+      const cache = await globalThis.caches.open(targetCache);
       return await cache.delete(url);
     } else {
-      return await globalThis.caches.delete(MODEL_CACHE_NAME);
+      return await globalThis.caches.delete(targetCache);
     }
   } catch {
     return false;
@@ -78,8 +103,11 @@ export async function clearModelCache(url?: string): Promise<boolean> {
  */
 export async function getModelWeights(
   url: string = DEFAULT_MODEL_URL,
-  onProgress?: (progress: DownloadProgress) => void
+  onProgress?: (progress: DownloadProgress) => void,
+  cacheName?: string
 ): Promise<ArrayBuffer> {
+  const targetCacheName = resolveModelCacheName(url, cacheName);
+
   // 1. Try to fetch from Cache Storage
   if (isCacheStorageAvailable()) {
     try {
@@ -88,13 +116,13 @@ export async function getModelWeights(
         globalThis.caches.delete(obsoleteCache).catch(() => {});
       }
 
-      const cache = await globalThis.caches.open(MODEL_CACHE_NAME);
+      const cache = await globalThis.caches.open(targetCacheName);
       const cachedResponse = await cache.match(url);
       if (cachedResponse) {
         const buffer = await cachedResponse.arrayBuffer();
         diagnostics.info(
           "network",
-          `Model Cache hit for ${url} (${(buffer.byteLength / 1048576).toFixed(1)} MB)`
+          `Model Cache hit for ${url} in ${targetCacheName} (${(buffer.byteLength / 1048576).toFixed(1)} MB)`
         );
         onProgress?.({
           loadedBytes: buffer.byteLength,
@@ -171,7 +199,7 @@ export async function getModelWeights(
   // 3. Persist to cache
   if (isCacheStorageAvailable()) {
     try {
-      const cache = await globalThis.caches.open(MODEL_CACHE_NAME);
+      const cache = await globalThis.caches.open(targetCacheName);
       // Response constructor accepts ArrayBuffer
       const responseToCache = new Response(buffer.slice(0), {
         headers: {

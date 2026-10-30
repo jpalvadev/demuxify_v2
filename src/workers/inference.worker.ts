@@ -4,6 +4,7 @@ import {
   DownloadProgress,
   DEFAULT_MODEL_URL,
 } from "../lib/modelCache";
+import { getModelProfile } from "../lib/modelConfig";
 
 // Configure ONNX Runtime WASM binary paths to matching version
 ort.env.wasm.wasmPaths =
@@ -31,6 +32,7 @@ export type WorkerInMessage =
   | {
       type: "init";
       modelUrl?: string;
+      modelProfileId?: string;
       useMock?: boolean;
       preferredBackend?: "webgpu" | "wasm";
     }
@@ -85,7 +87,8 @@ async function handleInit(
   modelUrl: string = DEFAULT_MODEL_URL,
   useMock: boolean = false,
   preferredBackend?: "webgpu" | "wasm",
-  postMsg: (msg: WorkerOutMessage) => void = (m) => self.postMessage(m)
+  postMsg: (msg: WorkerOutMessage) => void = (m) => self.postMessage(m),
+  modelProfileId?: string
 ) {
   if (useMock) {
     isMockSession = true;
@@ -183,10 +186,13 @@ async function handleInit(
     postMsg({ type: "init_complete", backend } satisfies WorkerOutMessage);
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : String(err);
+    const activeProfile = getModelProfile(
+      modelProfileId ||
+        (modelUrl.includes("mdx") ? "mdx-net-4stem" : "bs-roformer-4stem")
+    );
     let userFacingMessage = errorMessage;
     if (errorMessage.includes("std::bad_alloc")) {
-      userFacingMessage =
-        "Memory allocation failed (std::bad_alloc). The browser ran out of WASM heap space loading the BS-RoFormer model (~270 MB). Close background browser tabs or restart your browser to free memory.";
+      userFacingMessage = `Memory allocation failed (std::bad_alloc). The browser ran out of WASM heap space loading the ${activeProfile.name} (${activeProfile.memoryRequirementDescription}). Close background browser tabs or restart your browser to free memory.`;
     }
     postMsg({
       type: "error",
@@ -406,7 +412,8 @@ export async function handleWorkerMessage(
         msg.modelUrl,
         msg.useMock,
         msg.preferredBackend,
-        postMsg
+        postMsg,
+        msg.modelProfileId
       );
       break;
     case "start":

@@ -4,10 +4,10 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** complete
 
-- [ ] A centralized model configuration module defines the `ModelProfile` contract and exports configurations for both BS-RoFormer (Studio) and MDX-Net (Mobile/Fast).
-- [ ] Device detection logic evaluates mobile user agents and touch indicators to determine the default model profile for the active environment.
-- [ ] The model cache module adopts dynamic cache partition names per model profile rather than a single hardcoded cache key.
-- [ ] Hardcoded model name strings in UI components, progress indicators, and hardware memory error messages are replaced with dynamic properties of the active model profile.
-- [ ] Unit tests verify that device detection and model profile resolution return expected metadata for desktop and mobile environments without relying on hardcoded strings.
+- [x] A centralized model configuration module defines the `ModelProfile` contract and exports configurations for both BS-RoFormer (Studio) and MDX-Net (Mobile/Fast).
+- [x] Device detection logic evaluates mobile user agents and touch indicators to determine the default model profile for the active environment.
+- [x] The model cache module adopts dynamic cache partition names per model profile rather than a single hardcoded cache key.
+- [x] Hardcoded model name strings in UI components, progress indicators, and hardware memory error messages are replaced with dynamic properties of the active model profile.
+- [x] Unit tests verify that device detection and model profile resolution return expected metadata for desktop and mobile environments without relying on hardcoded strings.
