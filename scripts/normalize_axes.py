@@ -64,3 +64,4 @@ if __name__ == "__main__":
     p.add_argument("--out-path", required=True)
     args = p.parse_args()
     normalize(Path(args.in_path), Path(args.out_path))
+
