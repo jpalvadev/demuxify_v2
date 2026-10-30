@@ -4,11 +4,21 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Signalsmith Stretch library dependency is integrated into the web application build and audio pipeline.
-- [ ] Processing adapter exposes methods to initialize 4 stereo processing nodes for the 4 canonical Stems (Vocals, Drums, Bass, Other).
-- [ ] Adapter supports applying tempo ratios (`rate`) and pitch shifts in semitones (`semitones`), synchronizing sample processing across all active channels.
-- [ ] Selective vocal Formant Preservation (`formantCompensation: true`) is supported on the Vocals stem, with unpitched/direct processing on Drums, Bass, and Other.
-- [ ] Environment detection gracefully detects non-worklet or non-WASM execution environments (such as Vitest/JSDOM) and provides a mock/passthrough adapter to prevent test runner crashes.
-- [ ] Unit tests verify adapter lifecycle, parameter dispatching, and fallback detection.
+- [x] Signalsmith Stretch library dependency is integrated into the web application build and audio pipeline.
+- [x] Processing adapter exposes methods to initialize 4 stereo processing nodes for the 4 canonical Stems (Vocals, Drums, Bass, Other).
+- [x] Adapter supports applying tempo ratios (`rate`) and pitch shifts in semitones (`semitones`), synchronizing sample processing across all active channels.
+- [x] Selective vocal Formant Preservation (`formantCompensation: true`) is supported on the Vocals stem, with unpitched/direct processing on Drums, Bass, and Other.
+- [x] Environment detection gracefully detects non-worklet or non-WASM execution environments (such as Vitest/JSDOM) and provides a mock/passthrough adapter to prevent test runner crashes.
+- [x] Unit tests verify adapter lifecycle, parameter dispatching, and fallback detection.
+
+## Answer
+
+Implemented `src/lib/signalsmithStretchAdapter.ts` wrapping official `signalsmith-stretch` WebAssembly package with:
+
+1. `isSignalsmithStretchSupported(audioContext)` detecting WebAssembly and AudioWorklet capabilities.
+2. `createMultiTrackStretchAdapter` managing 4 synchronized stereo processing nodes (Vocals, Drums, Bass, Other).
+3. Selective Vocal Formant Preservation: formant compensation (`formantCompensation: true`) is applied exclusively to the Vocals stem while Drums, Bass, and Other run in direct transient-preserving mode.
+4. Robust `FallbackMultiTrackStretchAdapter` providing transparent test doubles and headless JSDOM/Vitest compatibility without native WASM worklet requirements.
+5. Unit test coverage in `src/__tests__/signalsmithStretchAdapter.test.ts`.
