@@ -37,3 +37,10 @@ Always use canonical domain terms defined in `GLOSSARY.md`.
 - Never hardcode cache names, model asset filenames, or profile tags across consumer components, client classes, or workers.
 - Consumers should always query `resolveModelProfile(id)`, `MODEL_PROFILES`, or `DEFAULT_MODEL_PROFILE`.
 - Verified by `npm run check:glossary` static analysis.
+
+## 6. UI View Design via OpenDesign MCP (ADR 0007)
+
+- MANDATORY: all views/looks are designed through the OpenDesign MCP (bundled design-system plugin catalog, no external MCPs). Never hand-design UI or layout in code.
+- Flow: OpenDesign run produces the artifact in its project → port into the existing React components; the token architecture (shadcn-style HSL CSS variables) and engine logic stay intact.
+- If a ticket's view is not covered by an existing OpenDesign artifact, run OpenDesign for that view first and record the run + preview URL on the ticket.
+- Tab Shell, Tab, and Transport vocabulary follows `GLOSSARY.md`; the shell decision is recorded in `docs/adr/0007-tab-shell-ui.md`.

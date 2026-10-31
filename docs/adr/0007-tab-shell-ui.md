@@ -1,0 +1,11 @@
+# Shell con Tabs: Supera la Flow Single-Column y Dialogs Modal
+
+Decidimos replace the single-column card flow and full-screen modals of the UI with a permanent **Tab Shell** with exactly five Tabs always present — **Separate**, **Listen**, **Mix**, **Export**, **System** — with a vertical left rail on desktop and a horizontal strip on mobile, rendering Listen/Mix/Export grayscaled with a reason line until Stems exist, and with the Master Waveform as a shared spine of the Shell (same playhead on Listen and Mix, hidden elsewhere). Visual identity is **Bold** (heavyweight typography, high-contrast, commanding layout) with a single acid-lime accent over a dark canvas near-black, dark mode only (the light/dark toggle and `.light` overrides are removed), a high-contrast quartet of hues re-tuned per Stem, and self-hosted woff2 fonts with subsets (PWA offline). Keep the shadcn HSL CSS-variable conventions and vendored components (token architecture unchanged, zero new installs); the design was generated in OpenDesign (plugin catalog, no external MCPs) and then ported to the existing React components.
+
+## Contexto y Alternativas
+
+The previous single-column flow (ADR-0003) buried the tools in an unbounded vertical scroll, and the export as a modal (ExportDialog) forced the user to hide the player to see the options; users found the tool placement unintuitive and the look too close to the generic shadcn default ("AI-made"). Real alternatives considered: a denser single-screen dashboard (rejected: unusable on mobile portrait and cramped touch targets), a menu tree inside a single Tab (rejected: hides tools behind navigation, more clicks), and installing external design MCPs from the web (rejected: memory constraints on the Windows environment and the ~140 bundled design-systems in the OpenDesign catalog were enough). Toasts become rail-bottom notices and the floating pill of Diagnostics and its full-screen modal die: Logs/Device inline in System.
+
+## Supersede
+
+Partially supersedes the UI decision in [ADR-0003](./0003-indexeddb-session-and-shadcn-ui.md): persistence on IndexedDB/OPFS, dual WAV/MP3 export, and the interactive Master Waveform remain; its ShadCN visual language and implicit single-column flow no longer apply.
