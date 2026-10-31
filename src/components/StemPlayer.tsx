@@ -247,12 +247,30 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
   );
 
   const handleTempoChange = useCallback((newTempo: number) => {
+    // 0.05x quantization so the slider, +/- buttons and presets all land on
+    // exact grid values (avoids 1.3500000000000001-style float drift).
     const quantized = Math.max(
       0.5,
-      Math.min(2.0, Math.round(newTempo * 4) / 4)
+      Math.min(2.0, Math.round(newTempo * 20) / 20)
     );
     engineRef.current?.setTempo(quantized);
     setTempo(quantized);
+  }, []);
+
+  const handleIncrementTempo = useCallback(() => {
+    setTempo((prev) => {
+      const next = Math.min(2.0, Math.round((prev + 0.05) * 20) / 20);
+      engineRef.current?.setTempo(next);
+      return next;
+    });
+  }, []);
+
+  const handleDecrementTempo = useCallback(() => {
+    setTempo((prev) => {
+      const next = Math.max(0.5, Math.round((prev - 0.05) * 20) / 20);
+      engineRef.current?.setTempo(next);
+      return next;
+    });
   }, []);
 
   const handlePitchChange = useCallback((newPitch: number) => {
@@ -471,23 +489,49 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
               </span>
             </div>
 
-            <div className="flex items-center gap-3">
-              <span className="text-[11px] font-mono text-muted-foreground">
-                0.50x
-              </span>
-              <input
-                type="range"
-                min="0.5"
-                max="2"
-                step="0.25"
-                value={tempo}
-                onChange={(e) => handleTempoChange(parseFloat(e.target.value))}
-                aria-label="Playback Tempo"
-                className="w-full accent-primary cursor-pointer h-1.5 bg-secondary rounded-lg appearance-none"
-              />
-              <span className="text-[11px] font-mono text-muted-foreground">
-                2.00x
-              </span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                aria-label="Decrement Tempo"
+                title="Slow down 0.05x"
+                onClick={handleDecrementTempo}
+                disabled={tempo <= 0.5}
+                className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+              >
+                <Minus className="h-3.5 w-3.5" />
+              </button>
+
+              <div className="flex-1 flex items-center gap-2">
+                <span className="text-[11px] font-mono text-muted-foreground">
+                  0.50x
+                </span>
+                <input
+                  type="range"
+                  min="0.5"
+                  max="2"
+                  step="0.05"
+                  value={tempo}
+                  onChange={(e) =>
+                    handleTempoChange(parseFloat(e.target.value))
+                  }
+                  aria-label="Playback Tempo"
+                  className="w-full accent-primary cursor-pointer h-1.5 bg-secondary rounded-lg appearance-none"
+                />
+                <span className="text-[11px] font-mono text-muted-foreground">
+                  2.00x
+                </span>
+              </div>
+
+              <button
+                type="button"
+                aria-label="Increment Tempo"
+                title="Speed up 0.05x"
+                onClick={handleIncrementTempo}
+                disabled={tempo >= 2.0}
+                className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+              >
+                <Plus className="h-3.5 w-3.5" />
+              </button>
             </div>
 
             <div className="flex items-center justify-between gap-1 sm:gap-1.5 pt-0.5">

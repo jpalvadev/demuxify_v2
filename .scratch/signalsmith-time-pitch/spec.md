@@ -8,12 +8,12 @@ Musicians, vocalists, and audio producers frequently need to shift playback temp
 
 ## Solution
 
-Integrate a state-of-the-art WebAssembly frequency-domain audio processing engine based on Signalsmith Stretch inside the browser audio pipeline. The engine processes all 4 Stems simultaneously with sample-accurate phase synchronization, enables Formant Preservation specifically on the Vocals stem to keep singing voices natural across pitch changes, and quantizes player controls to strict discrete musical steps: exact 1-semitone intervals for pitch transposition (-12 to +12 st) and 0.25x intervals for playback tempo (0.50x to 2.00x). In addition, the export workflow provides an explicit option to export individual stems or the Custom Mixdown with the active pitch and tempo modifications rendered offline at high speed.
+Integrate a state-of-the-art WebAssembly frequency-domain audio processing engine based on Signalsmith Stretch inside the browser audio pipeline. The engine processes all 4 Stems simultaneously with sample-accurate phase synchronization, enables Formant Preservation specifically on the Vocals stem to keep singing voices natural across pitch changes, and quantizes player controls to strict discrete musical steps: exact 1-semitone intervals for pitch transposition (-12 to +12 st) and 0.05x intervals for playback tempo (0.50x to 2.00x) with dedicated plus (`+`) and minus (`-`) stepper buttons flanking the tempo slider. In addition, the export workflow provides an explicit option to export individual stems or the Custom Mixdown with the active pitch and tempo modifications rendered offline at high speed.
 
 ## User Stories
 
 1. As a singer practicing a song, I want to shift the playback pitch in discrete steps of 1 semitone, so that I can match my comfortable vocal tessitura without accidental microtonal detuning.
-2. As an instrumentalist practicing a difficult musical passage, I want to adjust the playback speed in discrete steps of 0.25x (0.50x, 0.75x, 1.00x, 1.25x, 1.50x, 1.75x, 2.00x), so that I can systematically build up technical proficiency.
+2. As an instrumentalist practicing a difficult musical passage, I want to adjust the playback speed in fine discrete steps of 0.05x from 0.50x to 2.00x, so that I can ease into a passage with the smallest meaningful tempo changes.
 3. As a vocalist listening to transposed audio, I want the Vocals stem to have Formant Preservation enabled, so that vocal timbre remains natural and does not sound like a chipmunk when transposed upwards or cavernous when transposed downwards.
 4. As a drummer or percussionist, I want the Drums stem to bypass formant analysis, so that sharp transients, snare cracks, and kick attacks remain crisp without softening or phase smearing.
 5. As a bassist listening to transposed audio, I want the Bass stem to preserve its low-end clarity and tight attack without unnecessary spectral distortion.
@@ -28,6 +28,7 @@ Integrate a state-of-the-art WebAssembly frequency-domain audio processing engin
 14. As a user exporting unedited master stems, I want to uncheck the adjustments option in the Export Dialog to download the clean original stems at 1.00x and 0 st even when the live player is transposed.
 15. As a user whose browser restricts WebAssembly or modern worklets, I want the system to detect missing capabilities and provide a graceful fallback, so that playback remains functional without crashing.
 16. As a software developer running unit and regression tests, I want the test suite to execute rapidly and reliably in Vitest and JSDOM environments without requiring host-specific native binaries.
+17. As a Stem Player user, I want quick plus (`+`) and minus (`-`) buttons on either side of the tempo slider, so that I can nudge playback speed by exactly 0.05x per click without hunting for the slider thumb.
 
 ## Implementation Decisions
 
@@ -40,8 +41,9 @@ Integrate a state-of-the-art WebAssembly frequency-domain audio processing engin
 
 ### 2. Stepped UI and Quantized Interaction Architecture
 
-- Restrict playback tempo controls strictly to steps of `0.25x` within the range of `[0.50x, 2.00x]`.
-- Provide a preset button row displaying all seven discrete steps: `0.50x`, `0.75x`, `1.00x`, `1.25x`, `1.50x`, `1.75x`, and `2.00x`.
+- Restrict playback tempo controls strictly to steps of `0.05x` within the range of `[0.50x, 2.00x]`, quantized on the 0.05x grid (`Math.round(x * 20) / 20`) to avoid floating-point drift.
+- Flank the tempo slider with minus (`-`) and plus (`+`) stepper buttons that adjust the tempo by exactly `0.05x` per click and disable at the range boundaries, mirroring the pitch stepper layout.
+- Provide a preset button row displaying the seven coarse practice steps: `0.50x`, `0.75x`, `1.00x`, `1.25x`, `1.50x`, `1.75x`, and `2.00x` (all exact multiples of `0.05x`).
 - Restrict pitch controls strictly to integer semitone steps of `1 st` within the range of `[-12, +12]` semitones.
 - Add an accessible toggle control in the transposition section to allow the user to enable or disable vocal formant preservation on demand.
 - Ensure the Master Waveform time markers and duration displays represent canonical source duration, while the playhead speed scales dynamically with the active tempo multiplier.
@@ -56,6 +58,8 @@ Integrate a state-of-the-art WebAssembly frequency-domain audio processing engin
 
 - Implement an environment detection wrapper that verifies WebAssembly and AudioWorklet availability before instantiating the WASM processor.
 - Provide a test-safe adapter that emulates processing lifecycle methods when executing in headless test environments (such as Vitest and JSDOM), avoiding test failures in environments without native WASM AudioWorklet support.
+- Bound the Signalsmith Stretch worklet handshake with a hard initialization timeout: the library's factory promise only settles when the processor posts its `ready` message from inside the AudioWorklet, so a processor-side failure must degrade to the WSOLA chain in finite time and log a console warning (silent degradation is prohibited).
+- Exclude `signalsmith-stretch` from Vite dependency pre-bundling: the library serializes its own class source into a blob AudioWorklet module, and esbuild's class-field lowering emits the `__publicField` helper, which is undefined inside the worklet scope. The transformed source makes the processor constructor throw, the `ready` handshake never posts, and the factory promise hangs forever (this was the root cause of the tempo/pitch coupling regression).
 
 ## Testing Decisions
 
@@ -63,7 +67,7 @@ Integrate a state-of-the-art WebAssembly frequency-domain audio processing engin
 
 Tests must strictly verify observable external behavior and public contracts:
 
-- Verification that user interactions with the tempo slider or preset buttons update playback rate to exact multiples of 0.25x.
+- Verification that user interactions with the tempo slider, preset buttons, or `+`/`-` steppers update playback rate to exact multiples of 0.05x.
 - Verification that pitch adjustments increment/decrement exclusively in whole semitones without fractional floating-point noise.
 - Verification that the formant compensation toggle dispatches the appropriate state change to the audio engine.
 - Verification that the export dialog surfaces the adjustment option when values diverge from default, and routes export requests with the expected transform parameters.

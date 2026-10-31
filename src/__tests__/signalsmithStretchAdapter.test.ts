@@ -241,4 +241,51 @@ describe("Signalsmith Stretch WebAssembly Adapter & Test Fallback", () => {
       expect(updatedVocalsSchedule.formantCompensation).toBe(false);
     });
   });
+
+  describe("Init timeout guard (hung 'ready' handshake)", () => {
+    it("degrades to the fallback adapter when the factory promise never settles", async () => {
+      vi.useFakeTimers();
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      const adapterPromise = createMultiTrackStretchAdapter({
+        audioContext: createMockAudioContext(true),
+        sampleRate,
+        customFactory: () =>
+          new Promise(() => {
+            // Never resolves: models a processor-side failure where the
+            // worklet never posts its 'ready' handshake.
+          }),
+      });
+
+      await vi.advanceTimersByTimeAsync(9000);
+      const adapter = await adapterPromise;
+
+      expect(adapter.isFallback).toBe(true);
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Signalsmith Stretch unavailable"),
+        expect.anything()
+      );
+
+      vi.useRealTimers();
+    });
+
+    it("resolves a healthy factory before the timeout fires", async () => {
+      const mockCtx = createMockAudioContext(true);
+      const node = {
+        schedule: vi.fn(),
+        start: vi.fn(),
+        stop: vi.fn(),
+        addBuffers: vi.fn().mockResolvedValue(1.0),
+        dropBuffers: vi.fn().mockResolvedValue(undefined),
+        connect: vi.fn(),
+        disconnect: vi.fn(),
+      };
+      const adapter = await createMultiTrackStretchAdapter({
+        audioContext: mockCtx,
+        sampleRate,
+        customFactory: async () => node,
+      });
+      expect(adapter.isFallback).toBe(false);
+    });
+  });
 });

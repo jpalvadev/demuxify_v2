@@ -304,8 +304,12 @@ export class StemPlayerEngine {
           timeSec: this.currentOffset,
         });
       }
-    } catch {
-      // AudioWorklet initialization failed, fallback remains active
+    } catch (error) {
+      // AudioWorklet initialization failed, basic playbackRate fallback remains active
+      console.warn(
+        "[demuxify] WSOLA worklet unavailable; playback falls back to playbackRate (tempo changes will shift pitch, pitch control is inert).",
+        error
+      );
       this.useWorklet = false;
       this.workletNode = null;
     }
@@ -745,6 +749,25 @@ export class StemPlayerEngine {
       (this.workletNode !== null ||
         (this.stretchAdapter !== null && !this.stretchAdapter.isFallback))
     );
+  }
+
+  /**
+   * Active time-stretch pipeline: 'signalsmith' (WASM formant-aware),
+   * 'wsola' (in-process WSOLA worklet), or 'basic' (playbackRate last resort,
+   * where pitch control is inert).
+   */
+  public getStretchMode(): "signalsmith" | "wsola" | "basic" {
+    if (
+      this.useWorklet &&
+      this.stretchAdapter &&
+      !this.stretchAdapter.isFallback
+    ) {
+      return "signalsmith";
+    }
+    if (this.useWorklet && this.workletNode) {
+      return "wsola";
+    }
+    return "basic";
   }
 
   public getStretchAdapter(): MultiTrackStretchNode | null {

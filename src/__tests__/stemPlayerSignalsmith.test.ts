@@ -125,10 +125,13 @@ describe("Stem Player Multi-Track Signalsmith Stretch Integration", () => {
       stretchAdapter: mockAdapter,
     });
 
-    // Tempo stepping (0.25x)
+    // Tempo stepping (0.05x grid; engine accepts any clamped value)
     engine.setTempo(1.25);
     expect(mockAdapter.setTempo).toHaveBeenCalledWith(1.25);
     expect(engine.getTempo()).toBe(1.25);
+    engine.setTempo(1.35);
+    expect(mockAdapter.setTempo).toHaveBeenCalledWith(1.35);
+    expect(engine.getTempo()).toBe(1.35);
 
     // Pitch stepping (1 semitone)
     engine.setPitch(3);

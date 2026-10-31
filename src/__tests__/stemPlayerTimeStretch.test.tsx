@@ -82,7 +82,7 @@ describe("StemPlayer Time-Stretch & Pitch Controls", () => {
     mockCtx = createMockAudioContext();
   });
 
-  it("renders tempo slider with 0.25x steps, 7 discrete preset buttons, pitch slider with 1st step, stepper, and disabled reset button", () => {
+  it("renders tempo slider with 0.05x steps, 7 discrete preset buttons, pitch slider with 1st step, steppers, and disabled reset button", () => {
     render(
       <StemPlayer
         stems={dummyStems}
@@ -94,12 +94,18 @@ describe("StemPlayer Time-Stretch & Pitch Controls", () => {
     // Tempo Section
     const tempoSlider = screen.getByRole("slider", { name: /playback tempo/i });
     expect(tempoSlider).toBeInTheDocument();
-    expect(tempoSlider).toHaveAttribute("step", "0.25");
+    expect(tempoSlider).toHaveAttribute("step", "0.05");
     expect(tempoSlider).toHaveAttribute("min", "0.5");
     expect(tempoSlider).toHaveAttribute("max", "2");
     expect(screen.getByTestId("current-tempo-label")).toHaveTextContent(
       "1.00x"
     );
+    expect(
+      screen.getByRole("button", { name: /decrement tempo/i })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /increment tempo/i })
+    ).toBeInTheDocument();
 
     // All 7 discrete preset buttons exist
     EXPECTED_TEMPO_PRESETS.forEach((preset) => {
@@ -172,6 +178,69 @@ describe("StemPlayer Time-Stretch & Pitch Controls", () => {
     expect(tempoLabel).toHaveTextContent("2.00x");
     expect(tempoSlider).toHaveValue("2");
     expect(preset200).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("steps tempo in 0.05x increments via +/- buttons and clamps at [0.50, 2.00]", () => {
+    render(
+      <StemPlayer
+        stems={dummyStems}
+        sampleRate={sampleRate}
+        audioContext={mockCtx}
+      />
+    );
+
+    const tempoSlider = screen.getByRole("slider", { name: /playback tempo/i });
+    const tempoLabel = screen.getByTestId("current-tempo-label");
+    const incBtn = screen.getByRole("button", { name: /increment tempo/i });
+    const decBtn = screen.getByRole("button", { name: /decrement tempo/i });
+
+    // One step up: 1.00x -> 1.05x (exact, no float drift in the label)
+    fireEvent.click(incBtn);
+    expect(tempoLabel).toHaveTextContent("1.05x");
+    expect(tempoSlider).toHaveValue("1.05");
+
+    // Six steps up: 1.05x -> 1.35x (sums of 0.05 must stay on the grid)
+    for (let i = 0; i < 6; i++) fireEvent.click(incBtn);
+    expect(tempoLabel).toHaveTextContent("1.35x");
+
+    // Step back down to 1.30x
+    fireEvent.click(decBtn);
+    expect(tempoLabel).toHaveTextContent("1.30x");
+
+    // Clamp at the top: 26 increments land on 2.00x and disable the button
+    for (let i = 0; i < 26; i++) fireEvent.click(incBtn);
+    expect(tempoLabel).toHaveTextContent("2.00x");
+    expect(incBtn).toBeDisabled();
+
+    // Clamp at the bottom: 30 decrements land on 0.50x and disable the button
+    for (let i = 0; i < 30; i++) fireEvent.click(decBtn);
+    expect(tempoLabel).toHaveTextContent("0.50x");
+    expect(decBtn).toBeDisabled();
+  });
+
+  it("quantizes off-grid slider values down to the 0.05x grid", () => {
+    render(
+      <StemPlayer
+        stems={dummyStems}
+        sampleRate={sampleRate}
+        audioContext={mockCtx}
+      />
+    );
+
+    const tempoSlider = screen.getByRole("slider", { name: /playback tempo/i });
+    const tempoLabel = screen.getByTestId("current-tempo-label");
+
+    fireEvent.change(tempoSlider, { target: { value: "1.37" } });
+    expect(tempoLabel).toHaveTextContent("1.35x");
+
+    fireEvent.change(tempoSlider, { target: { value: "1.38" } });
+    expect(tempoLabel).toHaveTextContent("1.40x");
+
+    fireEvent.change(tempoSlider, { target: { value: "0.3" } });
+    expect(tempoLabel).toHaveTextContent("0.50x");
+
+    fireEvent.change(tempoSlider, { target: { value: "2.4" } });
+    expect(tempoLabel).toHaveTextContent("2.00x");
   });
 
   it("adjusts pitch exclusively in whole integer semitones and clamps at [-12, +12]", () => {

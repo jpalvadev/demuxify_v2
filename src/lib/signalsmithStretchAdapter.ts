@@ -387,6 +387,45 @@ class WasmMultiTrackStretchAdapter implements MultiTrackStretchNode {
 }
 
 /**
+ * Hard deadline for the Signalsmith Stretch worklet handshake. The library's
+ * factory resolves only when the processor posts ['ready'] from inside the
+ * AudioWorklet. A processor-side failure (e.g. a bundler transformation that
+ * breaks the self-serialized worklet source, as esbuild's `__publicField`
+ * lowering did in dev pre-bundling) rejects the processor's internal Module()
+ * promise without a handler, so the factory promise never settles. The timeout
+ * guarantees the engine always progresses to the WSOLA chain in finite time.
+ */
+export const STRETCH_INIT_TIMEOUT_MS = 8000;
+
+function withInitTimeout<T>(
+  promise: Promise<T>,
+  label: string,
+  ms = STRETCH_INIT_TIMEOUT_MS
+): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(
+      () =>
+        reject(
+          new Error(
+            `${label}: initialization timed out after ${ms}ms (AudioWorklet 'ready' handshake never completed)`
+          )
+        ),
+      ms
+    );
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timer);
+        reject(error);
+      }
+    );
+  });
+}
+
+/**
  * Factory function to instantiate a 4-stem multi-track Signalsmith Stretch processor.
  * Gracefully falls back to test double in unsupported or headless environments.
  */
@@ -422,7 +461,10 @@ export async function createMultiTrackStretchAdapter(
 
     const stemNodes: Partial<Record<StemName, StretchNodeInterface>> = {};
     for (const stem of STEM_NAMES) {
-      stemNodes[stem] = await factory(options.audioContext, stem);
+      stemNodes[stem] = await withInitTimeout(
+        factory(options.audioContext, stem),
+        `Signalsmith Stretch node (${stem})`
+      );
     }
 
     return new WasmMultiTrackStretchAdapter(
@@ -430,8 +472,14 @@ export async function createMultiTrackStretchAdapter(
       stemNodes as Record<StemName, StretchNodeInterface>,
       options
     );
-  } catch {
-    // If native WASM worklet initialization failed, return fallback adapter
+  } catch (error) {
+    // Native WASM worklet initialization failed, timed out, or hung; degrade
+    // to the engine's WSOLA chain. Loud on purpose: silent degradation made
+    // the pitch/tempo coupling invisible for too long.
+    console.warn(
+      "[demuxify] Signalsmith Stretch unavailable, using WSOLA/stretch fallback:",
+      error
+    );
     return new FallbackMultiTrackStretchAdapter(options);
   }
 }
@@ -496,11 +544,16 @@ export async function renderOfflineStems(
         );
         const module = await import("signalsmith-stretch");
         const SignalsmithStretch = (module.default || module) as any;
-        const stretchNode = await SignalsmithStretch(offlineCtx, {
-          numberOfInputs: 1,
-          numberOfOutputs: 1,
-          outputChannelCount: [channels.length],
-        });
+        const stretchNode = await withInitTimeout(
+          Promise.resolve(
+            SignalsmithStretch(offlineCtx, {
+              numberOfInputs: 1,
+              numberOfOutputs: 1,
+              outputChannelCount: [channels.length],
+            })
+          ),
+          `Signalsmith Stretch offline render (${stem})`
+        );
 
         await stretchNode.addBuffers(channels);
         const isVocals = stem === "vocals";

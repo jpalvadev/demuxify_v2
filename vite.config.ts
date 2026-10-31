@@ -57,6 +57,14 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  optimizeDeps: {
+    // signalsmith-stretch serializes its own class source (Function.prototype.toString)
+    // into a blob AudioWorklet module at runtime. If esbuild pre-bundles it, class fields
+    // are lowered to the `__publicField` helper, which does not exist inside the worklet
+    // scope: the processor constructor throws, the 'ready' handshake never posts, and
+    // the factory promise hangs forever (silent playbackRate fallback = pitch coupling).
+    exclude: ["signalsmith-stretch"],
+  },
   server: {
     host: true,
     headers: {

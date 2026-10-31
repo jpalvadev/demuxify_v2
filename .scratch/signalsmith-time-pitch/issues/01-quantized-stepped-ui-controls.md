@@ -15,3 +15,7 @@
 ## Answer
 
 Quantized the tempo slider strictly to 0.25x steps (`min="0.5" max="2" step="0.25"`), rendered the full 7-preset grid (`0.50x` to `2.00x` in 0.25x intervals) with `aria-pressed` highlighting, locked pitch slider and steppers to whole integer semitones in `[-12, +12]`, and ensured the reset button activates whenever values deviate from neutral (1.00x, 0 st) and disables when at neutral default. Comprehensive test coverage added in `src/__tests__/stemPlayerTimeStretch.test.tsx`.
+
+## Update (superseded by Ticket 05)
+
+Tempo quantization was retuned from 0.25x to **0.05x** steps (`step="0.05"`, quantized via `Math.round(x * 20) / 20`) and minus/plus stepper buttons now flank the tempo slider. The 7-preset grid is unchanged (all presets are exact multiples of 0.05x). See `issues/05-tempo-pitch-decoupling-fix-and-005-tempo-steps.md`.
