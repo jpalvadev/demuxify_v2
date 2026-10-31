@@ -54,6 +54,24 @@ const SUPPORTED_MIME_TYPES = [
   "audio/*",
 ];
 
+// Tab Shell registry (ADR-0007): one registry drives the desktop left rail,
+// the mobile top strip, and the five pinned Tab panels.
+interface TabEntry {
+  id: string;
+  title: string;
+  gatedUntilStems: boolean;
+}
+
+const TAB_REGISTRY: TabEntry[] = [
+  { id: "separate", title: "Separate", gatedUntilStems: false },
+  { id: "listen", title: "Listen", gatedUntilStems: true },
+  { id: "mix", title: "Mix", gatedUntilStems: true },
+  { id: "export", title: "Export", gatedUntilStems: true },
+  { id: "system", title: "System", gatedUntilStems: false },
+];
+
+const TAB_GATING_REASON = "no Stems yet";
+
 export const App: React.FC = () => {
   const [theme, setTheme] = useState<"dark" | "light">("dark");
   const [capability, setCapability] = useState<WebGPUCapability | null>(null);
@@ -454,6 +472,9 @@ export const App: React.FC = () => {
     setDownloadProgress(null);
   };
 
+  const stemsReady = separationPhase === "completed" && separatedStems !== null;
+  const activeTab = stemsReady ? "listen" : "separate";
+
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col font-sans transition-colors duration-200">
       <Header
@@ -463,185 +484,247 @@ export const App: React.FC = () => {
         onToggleTheme={handleToggleTheme}
       />
 
-      <main className="flex-1 mx-auto w-full max-w-4xl px-4 py-8 sm:px-6 sm:py-12 flex flex-col gap-8">
+      <main className="flex-1 mx-auto w-full max-w-4xl px-4 py-8 sm:px-6 sm:py-12 flex flex-col md:flex-row gap-6 md:gap-8">
         {capability?.isFallback && <FallbackAdvisory capability={capability} />}
 
-        <section className="space-y-4">
-          <div className="space-y-1">
-            <h2 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-              Separate Music Into Stems
-            </h2>
-            <p className="text-sm text-muted-foreground sm:text-base">
-              Extract Vocals, Drums, Bass, and Other instruments locally in your
-              browser using neural network models.
-            </p>
-          </div>
-
-          {/* Decoding Error Alert */}
-          {decodeError && (
-            <div
-              role="alert"
-              className="flex items-start gap-3 rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive"
-            >
-              <AlertCircle className="h-5 w-5 shrink-0 mt-0.5" />
-              <div className="flex-1">
-                <h4 className="font-semibold">Unable to Decode Audio</h4>
-                <p className="mt-0.5 text-xs text-destructive/90">
-                  {decodeError}
-                </p>
-              </div>
+        {/* Tab rail: horizontal top strip on mobile portrait, vertical left rail at md+ */}
+        <nav
+          aria-label="Tab rail"
+          className="flex items-center justify-center flex-wrap gap-2 w-full md:w-56 md:flex-col md:no-wrap md:justify-start md:items-stretch pb-3"
+        >
+          {TAB_REGISTRY.map((tab) => {
+            const gated = tab.gatedUntilStems && !stemsReady;
+            const active = activeTab === tab.id;
+            return (
               <button
+                key={tab.id}
                 type="button"
-                onClick={() => setDecodeError(null)}
-                className="rounded-lg border border-destructive/20 px-2 py-1 text-xs font-medium hover:bg-destructive/20 transition-colors"
+                aria-label={tab.title}
+                aria-current={active ? "true" : undefined}
+                className={`inline-flex flex-col items-center justify-center gap-1.5 rounded-lg px-4 py-3.5 min-h-[44px] min-w-[44px] md:w-full text-sm font-semibold tracking-wide text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${gated ? "opacity-50 text-muted-foreground" : ""} ${active ? "bg-primary/10 border-primary/60 shadow-sm" : ""}`.trim()}
               >
-                Dismiss
+                {tab.title}
+                {gated && (
+                  <span className="text-xs text-muted-foreground">
+                    {TAB_GATING_REASON}
+                  </span>
+                )}
               </button>
-            </div>
-          )}
+            );
+          })}
+        </nav>
 
-          {/* Hidden File Input for Replace / Change actions */}
-          <input
-            ref={fileInputRef}
-            type="file"
-            id="app-source-mix-input"
-            aria-label="Change Source Mix file"
-            accept={
-              SUPPORTED_EXTENSIONS.join(",") +
-              "," +
-              SUPPORTED_MIME_TYPES.join(",")
-            }
-            className="sr-only"
-            onChange={handleFileInputChange}
-          />
+        {/* Tab stage: five pinned Tab panels, always present in the DOM */}
+        <div className="flex-1 flex flex-col gap-4">
+          {TAB_REGISTRY.map((tab) => {
+            const gated = tab.gatedUntilStems && !stemsReady;
+            const active = activeTab === tab.id;
+            return (
+              <section
+                key={tab.id}
+                role="region"
+                aria-label={`${tab.title} Tab`}
+                className={`rounded-2xl border border-border/60 bg-card/40 p-4 transition-colors ${active ? "border-primary/70 bg-card/80" : ""} ${gated ? "opacity-50" : ""}`.trim()}
+              >
+                {tab.id === "separate" ? (
+                  <section className="space-y-4">
+                    <div className="space-y-1">
+                      <h2 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+                        Separate Music Into Stems
+                      </h2>
+                      <p className="text-sm text-muted-foreground sm:text-base">
+                        Extract Vocals, Drums, Bass, and Other instruments
+                        locally in your browser using neural network models.
+                      </p>
+                    </div>
 
-          {/* Previous Session Recovery Prompt */}
-          {detectedSession && !decodedSourceMix && !isDecoding && (
-            <SessionRecovery
-              title={detectedSession.title}
-              duration={detectedSession.duration}
-              onResume={handleResumeSession}
-              onDiscard={handleDiscardSession}
-              isResuming={isResumingSession}
-            />
-          )}
-
-          {/* Decoding In-Progress Indicator */}
-          {isDecoding && (
-            <div className="flex flex-col items-center justify-center rounded-2xl border border-border bg-card/60 p-12 text-center shadow-sm">
-              <Loader2 className="h-8 w-8 animate-spin text-primary mb-3" />
-              <h3 className="text-base font-semibold text-foreground">
-                Decoding Audio Buffer
-              </h3>
-              <p className="text-xs text-muted-foreground mt-1">
-                Extracting PCM data and computing peak envelopes for waveform
-                rendering...
-              </p>
-            </div>
-          )}
-
-          {/* Model Profile Selector & Device Advisory */}
-          {separationPhase === "idle" && (
-            <ModelSelector
-              selectedModelId={selectedModelId}
-              onSelectModel={setSelectedModelId}
-              isMobile={isMobile}
-            />
-          )}
-
-          {/* Render Source Mix Dropzone when no audio is loaded and not decoding */}
-          {!isDecoding && !decodedSourceMix && (
-            <SourceMixDropzone
-              onSourceMixSelected={handleSourceMixSelected}
-              selectedFile={selectedFile}
-              onClearFile={handleClearSourceMix}
-            />
-          )}
-
-          {/* Render Decoded Source Mix: Metadata Card and Master Waveform */}
-          {!isDecoding && decodedSourceMix && (
-            <div className="space-y-4">
-              <SourceMixCard
-                metadata={decodedSourceMix.metadata}
-                onStartSeparation={handleStartSeparation}
-                onChangeFile={handleChangeFile}
-                onRemove={handleClearSourceMix}
-              />
-
-              {/* Separation Progress Card (Visible during downloading / separating / error) */}
-              <SeparationProgress
-                phase={separationPhase}
-                downloadProgress={downloadProgress}
-                chunkProgress={chunkProgress}
-                chunkStart={chunkStart}
-                modelProfile={getModelProfile(selectedModelId)}
-                error={separationError}
-                onCancel={handleCancelSeparation}
-                onRetry={handleStartSeparation}
-              />
-
-              {/* Stems Separated Banner (Visible on completion) */}
-              {separationPhase === "completed" && separatedStems && (
-                <div
-                  role="region"
-                  aria-label="Separation Complete"
-                  className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-5 shadow-sm space-y-3"
-                >
-                  <div className="flex items-center gap-2.5 text-emerald-600 dark:text-emerald-400">
-                    <CheckCircle2 className="h-5 w-5 shrink-0" />
-                    <h3 className="text-base font-semibold">
-                      Separation Complete: 4 Discrete Stems Generated
-                    </h3>
-                  </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
-                    {STEM_NAMES.map((stem) => (
+                    {/* Decoding Error Alert */}
+                    {decodeError && (
                       <div
-                        key={stem}
-                        className="flex items-center gap-2 rounded-xl border border-border bg-card/80 p-3 shadow-xs"
+                        role="alert"
+                        className="flex items-start gap-3 rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive"
                       >
-                        <Music className="h-4 w-4 text-primary shrink-0" />
-                        <div>
-                          <div className="text-xs font-semibold capitalize text-foreground">
-                            {stem}
-                          </div>
-                          <div className="text-[10px] text-muted-foreground">
-                            {separatedStems[stem][0]?.length.toLocaleString()}{" "}
-                            samples
-                          </div>
+                        <AlertCircle className="h-5 w-5 shrink-0 mt-0.5" />
+                        <div className="flex-1">
+                          <h4 className="font-semibold">
+                            Unable to Decode Audio
+                          </h4>
+                          <p className="mt-0.5 text-xs text-destructive/90">
+                            {decodeError}
+                          </p>
                         </div>
+                        <button
+                          type="button"
+                          onClick={() => setDecodeError(null)}
+                          className="rounded-lg border border-destructive/20 px-2 py-1 text-xs font-medium hover:bg-destructive/20 transition-colors"
+                        >
+                          Dismiss
+                        </button>
                       </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+                    )}
 
-              {/* Render Stem Player when separation completes; otherwise render Source Mix Master Waveform */}
-              {separationPhase === "completed" && separatedStems ? (
-                <StemPlayer
-                  stems={separatedStems}
-                  sampleRate={decodedSourceMix.metadata.sampleRate}
-                  duration={decodedSourceMix.metadata.duration}
-                  sourceMixBuffer={decodedSourceMix.buffer}
-                  masterPeaks={waveformPeaks}
-                  initialMixerStates={restoredMixerState?.stems}
-                  initialMasterVolume={restoredMixerState?.masterVolume}
-                  initialCurrentTime={restoredMixerState?.currentTime}
-                  onMixerChange={handleMixerChange}
-                  onPurgeSession={handlePurgeSession}
-                  sourceMixTitle={decodedSourceMix.metadata.fileName}
-                />
-              ) : (
-                <MasterWaveform
-                  peaks={waveformPeaks}
-                  audioBuffer={decodedSourceMix.buffer}
-                  duration={decodedSourceMix.metadata.duration}
-                  currentTime={currentTime}
-                  onSeek={handleSeek}
-                />
-              )}
-            </div>
-          )}
-        </section>
+                    {/* Hidden File Input for Replace / Change actions */}
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      id="app-source-mix-input"
+                      aria-label="Change Source Mix file"
+                      accept={
+                        SUPPORTED_EXTENSIONS.join(",") +
+                        "," +
+                        SUPPORTED_MIME_TYPES.join(",")
+                      }
+                      className="sr-only"
+                      onChange={handleFileInputChange}
+                    />
+
+                    {/* Previous Session Recovery Prompt */}
+                    {detectedSession && !decodedSourceMix && !isDecoding && (
+                      <SessionRecovery
+                        title={detectedSession.title}
+                        duration={detectedSession.duration}
+                        onResume={handleResumeSession}
+                        onDiscard={handleDiscardSession}
+                        isResuming={isResumingSession}
+                      />
+                    )}
+
+                    {/* Decoding In-Progress Indicator */}
+                    {isDecoding && (
+                      <div className="flex flex-col items-center justify-center rounded-2xl border border-border bg-card/60 p-12 text-center shadow-sm">
+                        <Loader2 className="h-8 w-8 animate-spin text-primary mb-3" />
+                        <h3 className="text-base font-semibold text-foreground">
+                          Decoding Audio Buffer
+                        </h3>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Extracting PCM data and computing peak envelopes for
+                          waveform rendering...
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Model Profile Selector & Device Advisory */}
+                    {separationPhase === "idle" && (
+                      <ModelSelector
+                        selectedModelId={selectedModelId}
+                        onSelectModel={setSelectedModelId}
+                        isMobile={isMobile}
+                      />
+                    )}
+
+                    {/* Render Source Mix Dropzone when no audio is loaded and not decoding */}
+                    {!isDecoding && !decodedSourceMix && (
+                      <SourceMixDropzone
+                        onSourceMixSelected={handleSourceMixSelected}
+                        selectedFile={selectedFile}
+                        onClearFile={handleClearSourceMix}
+                      />
+                    )}
+
+                    {/* Render Decoded Source Mix: Metadata Card and Master Waveform */}
+                    {!isDecoding && decodedSourceMix && (
+                      <div className="space-y-4">
+                        <SourceMixCard
+                          metadata={decodedSourceMix.metadata}
+                          onStartSeparation={handleStartSeparation}
+                          onChangeFile={handleChangeFile}
+                          onRemove={handleClearSourceMix}
+                        />
+
+                        {/* Separation Progress Card (Visible during downloading / separating / error) */}
+                        <SeparationProgress
+                          phase={separationPhase}
+                          downloadProgress={downloadProgress}
+                          chunkProgress={chunkProgress}
+                          chunkStart={chunkStart}
+                          modelProfile={getModelProfile(selectedModelId)}
+                          error={separationError}
+                          onCancel={handleCancelSeparation}
+                          onRetry={handleStartSeparation}
+                        />
+
+                        {/* Stems Separated Banner (Visible on completion) */}
+                        {separationPhase === "completed" && separatedStems && (
+                          <div
+                            role="region"
+                            aria-label="Separation Complete"
+                            className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-5 shadow-sm space-y-3"
+                          >
+                            <div className="flex items-center gap-2.5 text-emerald-600 dark:text-emerald-400">
+                              <CheckCircle2 className="h-5 w-5 shrink-0" />
+                              <h3 className="text-base font-semibold">
+                                Separation Complete: 4 Discrete Stems Generated
+                              </h3>
+                            </div>
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
+                              {STEM_NAMES.map((stem) => (
+                                <div
+                                  key={stem}
+                                  className="flex items-center gap-2 rounded-xl border border-border bg-card/80 p-3 shadow-xs"
+                                >
+                                  <Music className="h-4 w-4 text-primary shrink-0" />
+                                  <div>
+                                    <div className="text-xs font-semibold capitalize text-foreground">
+                                      {stem}
+                                    </div>
+                                    <div className="text-[10px] text-muted-foreground">
+                                      {separatedStems[
+                                        stem
+                                      ][0]?.length.toLocaleString()}{" "}
+                                      samples
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Render Stem Player when separation completes; otherwise render Source Mix Master Waveform */}
+                        {separationPhase === "completed" && separatedStems ? (
+                          <StemPlayer
+                            stems={separatedStems}
+                            sampleRate={decodedSourceMix.metadata.sampleRate}
+                            duration={decodedSourceMix.metadata.duration}
+                            sourceMixBuffer={decodedSourceMix.buffer}
+                            masterPeaks={waveformPeaks}
+                            initialMixerStates={restoredMixerState?.stems}
+                            initialMasterVolume={
+                              restoredMixerState?.masterVolume
+                            }
+                            initialCurrentTime={restoredMixerState?.currentTime}
+                            onMixerChange={handleMixerChange}
+                            onPurgeSession={handlePurgeSession}
+                            sourceMixTitle={decodedSourceMix.metadata.fileName}
+                          />
+                        ) : (
+                          <MasterWaveform
+                            peaks={waveformPeaks}
+                            audioBuffer={decodedSourceMix.buffer}
+                            duration={decodedSourceMix.metadata.duration}
+                            currentTime={currentTime}
+                            onSeek={handleSeek}
+                          />
+                        )}
+                      </div>
+                    )}
+                  </section>
+                ) : (
+                  <div className="flex items-center justify-between gap-2">
+                    <h3 className="text-base font-semibold tracking-tight text-foreground sm:text-lg">
+                      {tab.title} Tab
+                    </h3>
+                    <p className="text-sm text-muted-foreground">
+                      {gated
+                        ? TAB_GATING_REASON
+                        : `Tools for the ${tab.title} Tab land with the tool relocation ticket.`}
+                    </p>
+                  </div>
+                )}
+              </section>
+            );
+          })}
+        </div>
       </main>
 
       <ToastContainer />

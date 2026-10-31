@@ -832,4 +832,154 @@ describe("App UI Shell", () => {
       );
     });
   });
+
+  it("opens in a Tab Shell with five pinned Tab rail entries in canonical order", async () => {
+    vi.spyOn(webgpuModule, "detectWebGPUCapability").mockResolvedValue({
+      supported: true,
+      isFallback: false,
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/webgpu active/i)).toBeInTheDocument();
+    });
+
+    const rail = screen.getByRole("navigation", { name: /tab rail/i });
+    const railEntries = within(rail).getAllByRole("button");
+    expect(railEntries).toHaveLength(5);
+    expect(
+      railEntries.map((entry) => entry.getAttribute("aria-label"))
+    ).toEqual(["Separate", "Listen", "Mix", "Export", "System"]);
+
+    // 44x44px minimum touch targets on every rail entry
+    for (const entry of railEntries) {
+      const classes = entry.getAttribute("class") ?? "";
+      expect(classes).toContain("min-h-[44px]");
+      expect(classes).toContain("min-w-[44px]");
+    }
+
+    // All five Tab panels stay pinned in the DOM even with no Source Mix
+    const tabPanels = screen.getAllByRole("region", {
+      name: /^(Separate|Listen|Mix|Export|System) Tab$/,
+    });
+    expect(tabPanels).toHaveLength(5);
+  });
+
+  it("greys out Listen, Mix, and Export with a reason line until Separation is complete", async () => {
+    vi.spyOn(webgpuModule, "detectWebGPUCapability").mockResolvedValue({
+      supported: true,
+      isFallback: false,
+    });
+    vi.spyOn(InferenceClient.prototype, "init").mockResolvedValue({
+      backend: "webgpu",
+    });
+    vi.spyOn(InferenceClient.prototype, "separate").mockResolvedValue({
+      stems: {
+        vocals: [new Float32Array(500), new Float32Array(500)],
+        drums: [new Float32Array(500), new Float32Array(500)],
+        bass: [new Float32Array(500), new Float32Array(500)],
+        other: [new Float32Array(500), new Float32Array(500)],
+      },
+      duration: 180,
+    });
+
+    render(<App />);
+
+    const rail = screen.getByRole("navigation", { name: /tab rail/i });
+    const gatedEntries = ["Listen", "Mix", "Export"].map((name) =>
+      within(rail).getByRole("button", { name })
+    );
+    for (const entry of gatedEntries) {
+      expect(entry.getAttribute("class") ?? "").toContain("opacity-50");
+      expect(within(entry).getByText(/no Stems yet/i)).toBeInTheDocument();
+    }
+
+    // Drive the state machine to completion
+    const file = new File(["audio"], "song_master.mp3", {
+      type: "audio/mp3",
+    });
+    const fileInput = screen.getByLabelText(/select source mix file/i, {
+      selector: "input",
+    });
+    fireEvent.change(fileInput, { target: { files: [file] } });
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: /separate stems|start separation/i })
+      ).toBeInTheDocument();
+    });
+
+    const separateBtn = screen.getByRole("button", {
+      name: /separate stems|start separation/i,
+    });
+    fireEvent.click(separateBtn);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("region", { name: /separation complete/i })
+      ).toBeInTheDocument();
+    });
+
+    // Gating mask lifts once separated Stems exist
+    expect(screen.queryByText(/no Stems yet/i)).not.toBeInTheDocument();
+  });
+
+  it("moves active-Tab focus from Separate to Listen when Separation is complete", async () => {
+    vi.spyOn(webgpuModule, "detectWebGPUCapability").mockResolvedValue({
+      supported: true,
+      isFallback: false,
+    });
+    vi.spyOn(InferenceClient.prototype, "init").mockResolvedValue({
+      backend: "webgpu",
+    });
+    vi.spyOn(InferenceClient.prototype, "separate").mockResolvedValue({
+      stems: {
+        vocals: [new Float32Array(500), new Float32Array(500)],
+        drums: [new Float32Array(500), new Float32Array(500)],
+        bass: [new Float32Array(500), new Float32Array(500)],
+        other: [new Float32Array(500), new Float32Array(500)],
+      },
+      duration: 180,
+    });
+
+    render(<App />);
+
+    const focusedWhileIdle = screen
+      .getAllByRole("button")
+      .filter((entry) => entry.getAttribute("aria-current") === "true");
+    expect(focusedWhileIdle).toHaveLength(1);
+    expect(focusedWhileIdle[0].getAttribute("aria-label")).toBe("Separate");
+
+    const file = new File(["audio"], "song_master.mp3", {
+      type: "audio/mp3",
+    });
+    const fileInput = screen.getByLabelText(/select source mix file/i, {
+      selector: "input",
+    });
+    fireEvent.change(fileInput, { target: { files: [file] } });
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: /separate stems|start separation/i })
+      ).toBeInTheDocument();
+    });
+
+    const separateBtn = screen.getByRole("button", {
+      name: /separate stems|start separation/i,
+    });
+    fireEvent.click(separateBtn);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("region", { name: /separation complete/i })
+      ).toBeInTheDocument();
+    });
+
+    const focusedOnComplete = screen
+      .getAllByRole("button")
+      .filter((entry) => entry.getAttribute("aria-current") === "true");
+    expect(focusedOnComplete).toHaveLength(1);
+    expect(focusedOnComplete[0].getAttribute("aria-label")).toBe("Listen");
+  });
 });
