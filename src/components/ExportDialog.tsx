@@ -439,553 +439,540 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-xs animate-in fade-in duration-200"
-      onClick={() => {
-        if (!isExporting) onClose();
-      }}
+    <section
+      role="region"
+      aria-labelledby="export-dialog-title"
+      className="w-full rounded-2xl border border-border bg-card p-6 sm:p-8 space-y-6 relative"
     >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="export-dialog-title"
-        className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl border border-border bg-card p-6 shadow-2xl space-y-6 relative"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex items-start justify-between border-b border-border/60 pb-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 border border-primary/20 text-primary">
-              <Download className="h-5 w-5" />
-            </div>
-            <div>
-              <h2
-                id="export-dialog-title"
-                className="text-lg font-bold tracking-tight text-foreground"
-              >
-                Export Audio Stems
-              </h2>
-              <p className="text-xs text-muted-foreground">
-                Save isolated stems as pristine WAV or compressed MP3 files
-              </p>
-            </div>
+      {/* Header */}
+      <div className="flex items-start justify-between border-b border-border/60 pb-4">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 border border-primary/20 text-primary">
+            <Download className="h-5 w-5" />
           </div>
-          <button
-            type="button"
-            aria-label="Close dialog"
-            onClick={onClose}
-            disabled={isExporting}
-            className="rounded-lg p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground transition-all disabled:opacity-50"
-          >
-            <X className="h-5 w-5" />
-          </button>
+          <div>
+            <h2
+              id="export-dialog-title"
+              className="text-lg font-bold tracking-tight text-foreground"
+            >
+              Export Audio Stems
+            </h2>
+            <p className="text-xs text-muted-foreground">
+              Save isolated stems as pristine WAV or compressed MP3 files
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          aria-label="Close dialog"
+          onClick={onClose}
+          disabled={isExporting}
+          className="rounded-lg p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground transition-all disabled:opacity-50"
+        >
+          <X className="h-5 w-5" />
+        </button>
+      </div>
+
+      {/* Form Body */}
+      <div className="space-y-5">
+        {/* Export Mode Selection */}
+        <div className="space-y-2">
+          <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Export Mode
+          </label>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            <label
+              className={cn(
+                "flex items-center gap-2.5 p-3 rounded-xl border cursor-pointer transition-all",
+                mode === "single"
+                  ? "border-primary bg-primary/10 text-foreground font-medium shadow-xs"
+                  : "border-border bg-secondary/40 text-muted-foreground hover:bg-secondary/70"
+              )}
+            >
+              <input
+                type="radio"
+                name="export-mode"
+                value="single"
+                checked={mode === "single"}
+                onChange={() => setMode("single")}
+                disabled={isExporting}
+                className="accent-primary"
+              />
+              <div className="flex items-center gap-1.5 truncate">
+                <Music className="h-4 w-4 text-primary shrink-0" />
+                <span className="text-xs sm:text-sm font-medium truncate">
+                  Single Stem
+                </span>
+              </div>
+            </label>
+
+            <label
+              className={cn(
+                "flex items-center gap-2.5 p-3 rounded-xl border cursor-pointer transition-all",
+                mode === "bundle"
+                  ? "border-primary bg-primary/10 text-foreground font-medium shadow-xs"
+                  : "border-border bg-secondary/40 text-muted-foreground hover:bg-secondary/70"
+              )}
+            >
+              <input
+                type="radio"
+                name="export-mode"
+                value="bundle"
+                checked={mode === "bundle"}
+                onChange={() => setMode("bundle")}
+                disabled={isExporting}
+                className="accent-primary"
+              />
+              <div className="flex items-center gap-1.5 truncate">
+                <FileArchive className="h-4 w-4 text-primary shrink-0" />
+                <span className="text-xs sm:text-sm font-medium truncate">
+                  Full Export Bundle
+                </span>
+              </div>
+            </label>
+
+            <label
+              className={cn(
+                "flex items-center gap-2.5 p-3 rounded-xl border cursor-pointer transition-all",
+                mode === "mixdown"
+                  ? "border-primary bg-primary/10 text-foreground font-medium shadow-xs"
+                  : "border-border bg-secondary/40 text-muted-foreground hover:bg-secondary/70"
+              )}
+            >
+              <input
+                type="radio"
+                name="export-mode"
+                value="mixdown"
+                checked={mode === "mixdown"}
+                onChange={() => setMode("mixdown")}
+                disabled={isExporting}
+                className="accent-primary"
+              />
+              <div className="flex items-center gap-1.5 truncate">
+                <SlidersHorizontal className="h-4 w-4 text-primary shrink-0" />
+                <span className="text-xs sm:text-sm font-medium truncate">
+                  Custom Mixdown
+                </span>
+              </div>
+            </label>
+          </div>
         </div>
 
-        {/* Form Body */}
-        <div className="space-y-5">
-          {/* Export Mode Selection */}
-          <div className="space-y-2">
-            <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Export Mode
-            </label>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-              <label
-                className={cn(
-                  "flex items-center gap-2.5 p-3 rounded-xl border cursor-pointer transition-all",
-                  mode === "single"
-                    ? "border-primary bg-primary/10 text-foreground font-medium shadow-xs"
-                    : "border-border bg-secondary/40 text-muted-foreground hover:bg-secondary/70"
-                )}
-              >
-                <input
-                  type="radio"
-                  name="export-mode"
-                  value="single"
-                  checked={mode === "single"}
-                  onChange={() => setMode("single")}
-                  disabled={isExporting}
-                  className="accent-primary"
-                />
-                <div className="flex items-center gap-1.5 truncate">
-                  <Music className="h-4 w-4 text-primary shrink-0" />
-                  <span className="text-xs sm:text-sm font-medium truncate">
-                    Single Stem
-                  </span>
-                </div>
-              </label>
-
-              <label
-                className={cn(
-                  "flex items-center gap-2.5 p-3 rounded-xl border cursor-pointer transition-all",
-                  mode === "bundle"
-                    ? "border-primary bg-primary/10 text-foreground font-medium shadow-xs"
-                    : "border-border bg-secondary/40 text-muted-foreground hover:bg-secondary/70"
-                )}
-              >
-                <input
-                  type="radio"
-                  name="export-mode"
-                  value="bundle"
-                  checked={mode === "bundle"}
-                  onChange={() => setMode("bundle")}
-                  disabled={isExporting}
-                  className="accent-primary"
-                />
-                <div className="flex items-center gap-1.5 truncate">
-                  <FileArchive className="h-4 w-4 text-primary shrink-0" />
-                  <span className="text-xs sm:text-sm font-medium truncate">
-                    Full Export Bundle
-                  </span>
-                </div>
-              </label>
-
-              <label
-                className={cn(
-                  "flex items-center gap-2.5 p-3 rounded-xl border cursor-pointer transition-all",
-                  mode === "mixdown"
-                    ? "border-primary bg-primary/10 text-foreground font-medium shadow-xs"
-                    : "border-border bg-secondary/40 text-muted-foreground hover:bg-secondary/70"
-                )}
-              >
-                <input
-                  type="radio"
-                  name="export-mode"
-                  value="mixdown"
-                  checked={mode === "mixdown"}
-                  onChange={() => setMode("mixdown")}
-                  disabled={isExporting}
-                  className="accent-primary"
-                />
-                <div className="flex items-center gap-1.5 truncate">
-                  <SlidersHorizontal className="h-4 w-4 text-primary shrink-0" />
-                  <span className="text-xs sm:text-sm font-medium truncate">
-                    Custom Mixdown
-                  </span>
-                </div>
-              </label>
-            </div>
-          </div>
-
-          {/* Active Pitch & Tempo Adjustments Checkbox */}
-          {hasActiveAdjustments && (
-            <div className="flex items-center justify-between p-3 rounded-xl border border-border/80 bg-secondary/40">
-              <label className="flex items-center gap-2.5 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={applyAdjustments}
-                  onChange={(e) => setApplyAdjustments(e.target.checked)}
-                  disabled={isExporting}
-                  className="rounded border-border text-primary focus:ring-primary h-4 w-4"
-                  aria-label="Apply active Pitch & Tempo adjustments"
-                />
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-semibold text-foreground">
-                    Apply active Pitch & Tempo adjustments
-                  </span>
-                  <span className="font-mono text-[11px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-md border border-primary/20">
-                    {[
-                      activePitch !== undefined && activePitch !== 0
-                        ? `${activePitch > 0 ? "+" : ""}${activePitch} st`
-                        : null,
-                      activeTempo !== undefined && activeTempo !== 1.0
-                        ? `${activeTempo.toFixed(2)}x`
-                        : null,
-                    ]
-                      .filter(Boolean)
-                      .join(", ")}
-                  </span>
-                </div>
-              </label>
-            </div>
-          )}
-
-          {/* Stem Selector (Visible only in Single Stem mode) */}
-          {mode === "single" && (
-            <div className="space-y-1.5">
-              <label
-                htmlFor="stem-select"
-                className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
-              >
-                Select Stem
-              </label>
-              <select
-                id="stem-select"
-                aria-label="Select Stem"
-                value={selectedStem}
-                onChange={(e) => setSelectedStem(e.target.value as StemName)}
+        {/* Active Pitch & Tempo Adjustments Checkbox */}
+        {hasActiveAdjustments && (
+          <div className="flex items-center justify-between p-3 rounded-xl border border-border/80 bg-secondary/40">
+            <label className="flex items-center gap-2.5 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={applyAdjustments}
+                onChange={(e) => setApplyAdjustments(e.target.checked)}
                 disabled={isExporting}
-                className="w-full rounded-xl border border-border bg-secondary/60 px-3.5 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 capitalize"
-              >
-                {STEM_NAMES.map((stem) => (
-                  <option
-                    key={stem}
-                    value={stem}
-                    className="capitalize bg-card text-foreground"
-                  >
-                    {stem}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {/* Custom Mixdown Controls (Visible only in Custom Mixdown mode) */}
-          {mode === "mixdown" && (
-            <div className="space-y-4">
-              {/* Presets */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Mixdown Presets
-                </label>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  {MIXDOWN_PRESETS.map((preset) => {
-                    const PresetIcon = preset.icon;
-                    return (
-                      <button
-                        key={preset.id}
-                        type="button"
-                        onClick={() => handleApplyPreset(preset.id)}
-                        disabled={isExporting}
-                        className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-lg border border-border bg-secondary/50 text-foreground hover:bg-secondary hover:border-primary/40 active:scale-95 transition-all text-center disabled:opacity-50"
-                      >
-                        {PresetIcon && <PresetIcon className="h-3 w-3" />}
-                        <span>{preset.label}</span>
-                      </button>
-                    );
-                  })}
-                </div>
+                className="rounded border-border text-primary focus:ring-primary h-4 w-4"
+                aria-label="Apply active Pitch & Tempo adjustments"
+              />
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-foreground">
+                  Apply active Pitch & Tempo adjustments
+                </span>
+                <span className="font-mono text-[11px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-md border border-primary/20">
+                  {[
+                    activePitch !== undefined && activePitch !== 0
+                      ? `${activePitch > 0 ? "+" : ""}${activePitch} st`
+                      : null,
+                    activeTempo !== undefined && activeTempo !== 1.0
+                      ? `${activeTempo.toFixed(2)}x`
+                      : null,
+                  ]
+                    .filter(Boolean)
+                    .join(", ")}
+                </span>
               </div>
+            </label>
+          </div>
+        )}
 
-              {/* Stem Controls: Checkboxes & Volume Sliders */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Stem Controls
-                </label>
-                <div className="space-y-2 rounded-xl border border-border bg-secondary/20 p-3">
-                  {STEM_NAMES.map((stem) => {
-                    const Icon = STEM_ICONS[stem];
-                    const { enabled, volume } = stemControls[stem];
-                    return (
-                      <div
-                        key={stem}
-                        className={cn(
-                          "flex items-center gap-3 p-2 rounded-lg transition-colors",
-                          enabled
-                            ? "bg-card/70 border border-border/50"
-                            : "opacity-50 bg-secondary/30"
-                        )}
-                      >
-                        <label className="flex items-center gap-2 cursor-pointer select-none shrink-0 w-24">
-                          <input
-                            type="checkbox"
-                            aria-label={`${stem} stem`}
-                            checked={enabled}
-                            onChange={(e) =>
-                              setStemControls((prev) => ({
-                                ...prev,
-                                [stem]: {
-                                  ...prev[stem],
-                                  enabled: e.target.checked,
-                                },
-                              }))
-                            }
-                            disabled={isExporting}
-                            className="accent-primary h-4 w-4 rounded cursor-pointer"
-                          />
-                          <div className="flex items-center gap-1.5">
-                            <Icon className="h-3.5 w-3.5 text-primary" />
-                            <span className="text-xs font-semibold capitalize text-foreground">
-                              {stem}
-                            </span>
-                          </div>
-                        </label>
+        {/* Stem Selector (Visible only in Single Stem mode) */}
+        {mode === "single" && (
+          <div className="space-y-1.5">
+            <label
+              htmlFor="stem-select"
+              className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+            >
+              Select Stem
+            </label>
+            <select
+              id="stem-select"
+              aria-label="Select Stem"
+              value={selectedStem}
+              onChange={(e) => setSelectedStem(e.target.value as StemName)}
+              disabled={isExporting}
+              className="w-full rounded-xl border border-border bg-secondary/60 px-3.5 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 capitalize"
+            >
+              {STEM_NAMES.map((stem) => (
+                <option
+                  key={stem}
+                  value={stem}
+                  className="capitalize bg-card text-foreground"
+                >
+                  {stem}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
-                        <div className="flex items-center gap-2 flex-1">
-                          <input
-                            type="range"
-                            min={0}
-                            max={1}
-                            step={0.01}
-                            value={volume}
-                            onChange={(e) =>
-                              setStemControls((prev) => ({
-                                ...prev,
-                                [stem]: {
-                                  ...prev[stem],
-                                  volume: parseFloat(e.target.value),
-                                },
-                              }))
-                            }
-                            aria-label={`${stem} volume`}
-                            disabled={!enabled || isExporting}
-                            className="w-full accent-primary cursor-pointer h-1.5 bg-secondary rounded-lg appearance-none disabled:opacity-50"
-                          />
-                          <span className="text-[11px] font-mono text-muted-foreground w-8 text-right">
-                            {Math.round((enabled ? volume : 0) * 100)}%
+        {/* Custom Mixdown Controls (Visible only in Custom Mixdown mode) */}
+        {mode === "mixdown" && (
+          <div className="space-y-4">
+            {/* Presets */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Mixdown Presets
+              </label>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {MIXDOWN_PRESETS.map((preset) => {
+                  const PresetIcon = preset.icon;
+                  return (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      onClick={() => handleApplyPreset(preset.id)}
+                      disabled={isExporting}
+                      className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-lg border border-border bg-secondary/50 text-foreground hover:bg-secondary hover:border-primary/40 active:scale-95 transition-all text-center disabled:opacity-50"
+                    >
+                      {PresetIcon && <PresetIcon className="h-3 w-3" />}
+                      <span>{preset.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Stem Controls: Checkboxes & Volume Sliders */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Stem Controls
+              </label>
+              <div className="space-y-2 rounded-xl border border-border bg-secondary/20 p-3">
+                {STEM_NAMES.map((stem) => {
+                  const Icon = STEM_ICONS[stem];
+                  const { enabled, volume } = stemControls[stem];
+                  return (
+                    <div
+                      key={stem}
+                      className={cn(
+                        "flex items-center gap-3 p-2 rounded-lg transition-colors",
+                        enabled
+                          ? "bg-card/70 border border-border/50"
+                          : "opacity-50 bg-secondary/30"
+                      )}
+                    >
+                      <label className="flex items-center gap-2 cursor-pointer select-none shrink-0 w-24">
+                        <input
+                          type="checkbox"
+                          aria-label={`${stem} stem`}
+                          checked={enabled}
+                          onChange={(e) =>
+                            setStemControls((prev) => ({
+                              ...prev,
+                              [stem]: {
+                                ...prev[stem],
+                                enabled: e.target.checked,
+                              },
+                            }))
+                          }
+                          disabled={isExporting}
+                          className="accent-primary h-4 w-4 rounded cursor-pointer"
+                        />
+                        <div className="flex items-center gap-1.5">
+                          <Icon className="h-3.5 w-3.5 text-primary" />
+                          <span className="text-xs font-semibold capitalize text-foreground">
+                            {stem}
                           </span>
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+                      </label>
 
-              {/* Master Volume and Anti-Clipping controls */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                <div className="space-y-1.5 rounded-xl border border-border bg-secondary/20 p-3">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-semibold text-foreground">
-                      Master Volume
-                    </span>
-                    <span className="font-mono text-muted-foreground font-semibold">
-                      {Math.round(masterGain * 100)}%
-                    </span>
-                  </div>
-                  <input
-                    type="range"
-                    min={0}
-                    max={1}
-                    step={0.01}
-                    value={masterGain}
-                    onChange={(e) => setMasterGain(parseFloat(e.target.value))}
-                    aria-label="Master Mixdown Volume"
-                    disabled={isExporting}
-                    className="w-full accent-primary cursor-pointer h-1.5 bg-secondary rounded-lg appearance-none"
-                  />
-                </div>
-
-                <div className="flex items-center rounded-xl border border-border bg-secondary/20 p-3">
-                  <label className="flex items-start gap-2.5 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      id="anti-clipping-toggle"
-                      aria-label="Anti-Clipping Protection"
-                      checked={antiClipping}
-                      onChange={(e) => setAntiClipping(e.target.checked)}
-                      disabled={isExporting}
-                      className="accent-primary h-4 w-4 rounded mt-0.5 cursor-pointer"
-                    />
-                    <div>
-                      <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
-                        <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
-                        <span>Anti-Clipping Protection</span>
+                      <div className="flex items-center gap-2 flex-1">
+                        <input
+                          type="range"
+                          min={0}
+                          max={1}
+                          step={0.01}
+                          value={volume}
+                          onChange={(e) =>
+                            setStemControls((prev) => ({
+                              ...prev,
+                              [stem]: {
+                                ...prev[stem],
+                                volume: parseFloat(e.target.value),
+                              },
+                            }))
+                          }
+                          aria-label={`${stem} volume`}
+                          disabled={!enabled || isExporting}
+                          className="w-full accent-primary cursor-pointer h-1.5 bg-secondary rounded-lg appearance-none disabled:opacity-50"
+                        />
+                        <span className="text-[11px] font-mono text-muted-foreground w-8 text-right">
+                          {Math.round((enabled ? volume : 0) * 100)}%
+                        </span>
                       </div>
-                      <p className="text-[10px] text-muted-foreground leading-tight mt-0.5">
-                        Automatic -0.3 dBFS safety ceiling prevents digital
-                        clipping
-                      </p>
                     </div>
-                  </label>
-                </div>
+                  );
+                })}
               </div>
             </div>
-          )}
 
-          {/* Format Selector: WAV vs MP3 */}
-          <div className="space-y-2">
-            <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Audio Format
-            </label>
-            <div className="grid grid-cols-2 gap-3">
-              <label
-                className={cn(
-                  "flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all",
-                  format === "wav"
-                    ? "border-primary bg-primary/10 text-foreground font-medium shadow-xs"
-                    : "border-border bg-secondary/40 text-muted-foreground hover:bg-secondary/70"
-                )}
-              >
-                <input
-                  type="radio"
-                  name="export-format"
-                  value="wav"
-                  checked={format === "wav"}
-                  onChange={() => setFormat("wav")}
-                  disabled={isExporting}
-                  className="accent-primary"
-                />
-                <div>
-                  <div className="text-sm">WAV</div>
-                  <div className="text-[11px] text-muted-foreground">
-                    Lossless PCM
-                  </div>
+            {/* Master Volume and Anti-Clipping controls */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+              <div className="space-y-1.5 rounded-xl border border-border bg-secondary/20 p-3">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-semibold text-foreground">
+                    Master Volume
+                  </span>
+                  <span className="font-mono text-muted-foreground font-semibold">
+                    {Math.round(masterGain * 100)}%
+                  </span>
                 </div>
-              </label>
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  value={masterGain}
+                  onChange={(e) => setMasterGain(parseFloat(e.target.value))}
+                  aria-label="Master Mixdown Volume"
+                  disabled={isExporting}
+                  className="w-full accent-primary cursor-pointer h-1.5 bg-secondary rounded-lg appearance-none"
+                />
+              </div>
 
-              <label
-                className={cn(
-                  "flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all",
-                  format === "mp3"
-                    ? "border-primary bg-primary/10 text-foreground font-medium shadow-xs"
-                    : "border-border bg-secondary/40 text-muted-foreground hover:bg-secondary/70"
-                )}
-              >
-                <input
-                  type="radio"
-                  name="export-format"
-                  value="mp3"
-                  checked={format === "mp3"}
-                  onChange={() => setFormat("mp3")}
-                  disabled={isExporting}
-                  className="accent-primary"
-                />
-                <div>
-                  <div className="text-sm">MP3</div>
-                  <div className="text-[11px] text-muted-foreground">
-                    Compressed MPEG-1
+              <div className="flex items-center rounded-xl border border-border bg-secondary/20 p-3">
+                <label className="flex items-start gap-2.5 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    id="anti-clipping-toggle"
+                    aria-label="Anti-Clipping Protection"
+                    checked={antiClipping}
+                    onChange={(e) => setAntiClipping(e.target.checked)}
+                    disabled={isExporting}
+                    className="accent-primary h-4 w-4 rounded mt-0.5 cursor-pointer"
+                  />
+                  <div>
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                      <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
+                      <span>Anti-Clipping Protection</span>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground leading-tight mt-0.5">
+                      Automatic -0.3 dBFS safety ceiling prevents digital
+                      clipping
+                    </p>
                   </div>
-                </div>
-              </label>
+                </label>
+              </div>
             </div>
           </div>
+        )}
 
-          {/* Sub-Format Options */}
-          {format === "wav" ? (
-            <div className="space-y-1.5">
-              <label
-                htmlFor="bit-depth-select"
-                className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
-              >
-                Bit Depth
-              </label>
-              <select
-                id="bit-depth-select"
-                aria-label="Bit Depth"
-                value={bitDepth}
-                onChange={(e) =>
-                  setBitDepth(parseInt(e.target.value, 10) as 16 | 24)
-                }
+        {/* Format Selector: WAV vs MP3 */}
+        <div className="space-y-2">
+          <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Audio Format
+          </label>
+          <div className="grid grid-cols-2 gap-3">
+            <label
+              className={cn(
+                "flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all",
+                format === "wav"
+                  ? "border-primary bg-primary/10 text-foreground font-medium shadow-xs"
+                  : "border-border bg-secondary/40 text-muted-foreground hover:bg-secondary/70"
+              )}
+            >
+              <input
+                type="radio"
+                name="export-format"
+                value="wav"
+                checked={format === "wav"}
+                onChange={() => setFormat("wav")}
                 disabled={isExporting}
-                className="w-full rounded-xl border border-border bg-secondary/60 px-3.5 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
-              >
-                <option value="16" className="bg-card text-foreground">
-                  16-bit PCM (CD Standard)
-                </option>
-                <option value="24" className="bg-card text-foreground">
-                  24-bit PCM (Studio Studio High-Res)
-                </option>
-              </select>
-            </div>
-          ) : (
-            <div className="space-y-1.5">
-              <label
-                htmlFor="bitrate-select"
-                className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
-              >
-                MP3 Bitrate
-              </label>
-              <select
-                id="bitrate-select"
-                aria-label="Bitrate"
-                value={bitrate}
-                onChange={(e) =>
-                  setBitrate(parseInt(e.target.value, 10) as Mp3Bitrate)
-                }
-                disabled={isExporting}
-                className="w-full rounded-xl border border-border bg-secondary/60 px-3.5 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
-              >
-                {VALID_MP3_BITRATES.map((br) => (
-                  <option
-                    key={br}
-                    value={br}
-                    className="bg-card text-foreground"
-                  >
-                    {br} kbps{" "}
-                    {br === 320
-                      ? "(Maximum Quality)"
-                      : br === 192
-                        ? "(Balanced)"
-                        : ""}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {/* Progress Indicator (Visible while exporting or upon recent progress) */}
-          {(isExporting || (progress > 0 && !error)) && (
-            <div className="space-y-2 rounded-xl border border-primary/20 bg-primary/5 p-3.5">
-              <div className="flex items-center justify-between text-xs">
-                <span className="flex items-center gap-1.5 text-primary font-medium">
-                  {isExporting ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
-                  )}
-                  {statusMessage || "Encoding..."}
-                </span>
-                <span className="font-mono text-primary font-bold">
-                  {progress}%
-                </span>
+                className="accent-primary"
+              />
+              <div>
+                <div className="text-sm">WAV</div>
+                <div className="text-[11px] text-muted-foreground">
+                  Lossless PCM
+                </div>
               </div>
+            </label>
+
+            <label
+              className={cn(
+                "flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all",
+                format === "mp3"
+                  ? "border-primary bg-primary/10 text-foreground font-medium shadow-xs"
+                  : "border-border bg-secondary/40 text-muted-foreground hover:bg-secondary/70"
+              )}
+            >
+              <input
+                type="radio"
+                name="export-format"
+                value="mp3"
+                checked={format === "mp3"}
+                onChange={() => setFormat("mp3")}
+                disabled={isExporting}
+                className="accent-primary"
+              />
+              <div>
+                <div className="text-sm">MP3</div>
+                <div className="text-[11px] text-muted-foreground">
+                  Compressed MPEG-1
+                </div>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        {/* Sub-Format Options */}
+        {format === "wav" ? (
+          <div className="space-y-1.5">
+            <label
+              htmlFor="bit-depth-select"
+              className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+            >
+              Bit Depth
+            </label>
+            <select
+              id="bit-depth-select"
+              aria-label="Bit Depth"
+              value={bitDepth}
+              onChange={(e) =>
+                setBitDepth(parseInt(e.target.value, 10) as 16 | 24)
+              }
+              disabled={isExporting}
+              className="w-full rounded-xl border border-border bg-secondary/60 px-3.5 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+            >
+              <option value="16" className="bg-card text-foreground">
+                16-bit PCM (CD Standard)
+              </option>
+              <option value="24" className="bg-card text-foreground">
+                24-bit PCM (Studio Studio High-Res)
+              </option>
+            </select>
+          </div>
+        ) : (
+          <div className="space-y-1.5">
+            <label
+              htmlFor="bitrate-select"
+              className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+            >
+              MP3 Bitrate
+            </label>
+            <select
+              id="bitrate-select"
+              aria-label="Bitrate"
+              value={bitrate}
+              onChange={(e) =>
+                setBitrate(parseInt(e.target.value, 10) as Mp3Bitrate)
+              }
+              disabled={isExporting}
+              className="w-full rounded-xl border border-border bg-secondary/60 px-3.5 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+            >
+              {VALID_MP3_BITRATES.map((br) => (
+                <option key={br} value={br} className="bg-card text-foreground">
+                  {br} kbps{" "}
+                  {br === 320
+                    ? "(Maximum Quality)"
+                    : br === 192
+                      ? "(Balanced)"
+                      : ""}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {/* Progress Indicator (Visible while exporting or upon recent progress) */}
+        {(isExporting || (progress > 0 && !error)) && (
+          <div className="space-y-2 rounded-xl border border-primary/20 bg-primary/5 p-3.5">
+            <div className="flex items-center justify-between text-xs">
+              <span className="flex items-center gap-1.5 text-primary font-medium">
+                {isExporting ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+                )}
+                {statusMessage || "Encoding..."}
+              </span>
+              <span className="font-mono text-primary font-bold">
+                {progress}%
+              </span>
+            </div>
+            <div
+              role="progressbar"
+              aria-valuenow={progress}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              className="h-2 w-full overflow-hidden rounded-full bg-secondary"
+            >
               <div
-                role="progressbar"
-                aria-valuenow={progress}
-                aria-valuemin={0}
-                aria-valuemax={100}
-                className="h-2 w-full overflow-hidden rounded-full bg-secondary"
-              >
-                <div
-                  className="h-full bg-primary transition-all duration-300 ease-out"
-                  style={{ width: `${progress}%` }}
-                />
-              </div>
+                className="h-full bg-primary transition-all duration-300 ease-out"
+                style={{ width: `${progress}%` }}
+              />
             </div>
-          )}
+          </div>
+        )}
 
-          {/* Success Notification */}
-          {successNotification && (
-            <div
-              role="status"
-              className="flex items-center gap-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3.5 text-xs text-emerald-600 dark:text-emerald-400"
-            >
-              <CheckCircle2 className="h-4 w-4 shrink-0" />
-              <span>{successNotification}</span>
-            </div>
-          )}
-
-          {/* Error Notification */}
-          {error && (
-            <div
-              role="alert"
-              className="flex items-center gap-2.5 rounded-xl border border-destructive/30 bg-destructive/10 p-3.5 text-xs text-destructive"
-            >
-              <AlertTriangle className="h-4 w-4 shrink-0" />
-              <span>Export failed: {error}</span>
-            </div>
-          )}
-        </div>
-
-        {/* Dialog Actions */}
-        <div className="flex items-center justify-end gap-3 border-t border-border/60 pt-4">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={isExporting}
-            className="px-4 py-2 text-sm font-medium rounded-xl border border-border bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground transition-all disabled:opacity-50"
+        {/* Success Notification */}
+        {successNotification && (
+          <div
+            role="status"
+            className="flex items-center gap-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3.5 text-xs text-emerald-600 dark:text-emerald-400"
           >
-            Close
-          </button>
-          <button
-            type="button"
-            onClick={handleExport}
-            disabled={isExporting || isMixdownExportDisabled}
-            className="flex items-center gap-2 px-5 py-2 text-sm font-semibold rounded-xl bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 active:scale-95 transition-all disabled:opacity-50"
+            <CheckCircle2 className="h-4 w-4 shrink-0" />
+            <span>{successNotification}</span>
+          </div>
+        )}
+
+        {/* Error Notification */}
+        {error && (
+          <div
+            role="alert"
+            className="flex items-center gap-2.5 rounded-xl border border-destructive/30 bg-destructive/10 p-3.5 text-xs text-destructive"
           >
-            {isExporting ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                <span>Exporting...</span>
-              </>
-            ) : (
-              <>
-                <Download className="h-4 w-4" />
-                <span>Export &amp; Download</span>
-              </>
-            )}
-          </button>
-        </div>
+            <AlertTriangle className="h-4 w-4 shrink-0" />
+            <span>Export failed: {error}</span>
+          </div>
+        )}
       </div>
-    </div>
+
+      {/* Dialog Actions */}
+      <div className="flex items-center justify-end gap-3 border-t border-border/60 pt-4">
+        <button
+          type="button"
+          onClick={onClose}
+          disabled={isExporting}
+          className="px-4 py-2 text-sm font-medium rounded-xl border border-border bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground transition-all disabled:opacity-50"
+        >
+          Close
+        </button>
+        <button
+          type="button"
+          onClick={handleExport}
+          disabled={isExporting || isMixdownExportDisabled}
+          className="flex items-center gap-2 px-5 py-2 text-sm font-semibold rounded-xl bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 active:scale-95 transition-all disabled:opacity-50"
+        >
+          {isExporting ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span>Exporting...</span>
+            </>
+          ) : (
+            <>
+              <Download className="h-4 w-4" />
+              <span>Export &amp; Download</span>
+            </>
+          )}
+        </button>
+      </div>
+    </section>
   );
 };

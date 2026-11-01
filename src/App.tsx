@@ -756,7 +756,7 @@ export const App: React.FC = () => {
             )}
           </section>
 
-          {/* Export Tab: Export panel mounted at the app level (modal-styled until ticket 04) */}
+          {/* Export Tab: Export panel mounted at the app level (inline, no modal) */}
           <section
             role="region"
             aria-label="Export Tab"

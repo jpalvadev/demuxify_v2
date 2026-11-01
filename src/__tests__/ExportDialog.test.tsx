@@ -40,7 +40,9 @@ describe("ExportDialog", () => {
       />
     );
 
-    expect(screen.getByRole("dialog", { name: /export/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("region", { name: /export audio stems/i })
+    ).toBeInTheDocument();
     expect(screen.getByText(/Export Audio Stems/i)).toBeInTheDocument();
     expect(
       screen.getByRole("radio", { name: /single stem/i })

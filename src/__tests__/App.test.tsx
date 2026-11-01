@@ -1070,14 +1070,14 @@ describe("App UI Shell", () => {
 
     const exportTab = screen.getByRole("region", { name: /export tab/i });
     expect(
-      within(exportTab).queryByRole("dialog", { name: /export/i })
+      within(exportTab).queryByRole("region", { name: /export audio stems/i })
     ).not.toBeInTheDocument();
 
     const exportBtn = screen.getByRole("button", { name: /export stems/i });
     fireEvent.click(exportBtn);
 
     const exportPanel = await waitFor(() =>
-      within(exportTab).getByRole("dialog", { name: /export/i })
+      within(exportTab).getByRole("region", { name: /export audio stems/i })
     );
     expect(exportPanel).toBeInTheDocument();
 
@@ -1087,7 +1087,7 @@ describe("App UI Shell", () => {
     fireEvent.click(closeBtn);
     await waitFor(() => {
       expect(
-        within(exportTab).queryByRole("dialog", { name: /export/i })
+        within(exportTab).queryByRole("region", { name: /export audio stems/i })
       ).not.toBeInTheDocument();
     });
   });
@@ -1122,7 +1122,7 @@ describe("App UI Shell", () => {
 
     const exportTab = screen.getByRole("region", { name: /export tab/i });
     const exportPanel = await waitFor(() =>
-      within(exportTab).getByRole("dialog", { name: /export/i })
+      within(exportTab).getByRole("region", { name: /export audio stems/i })
     );
 
     // Switch to Custom Mixdown and verify synchronized stem state

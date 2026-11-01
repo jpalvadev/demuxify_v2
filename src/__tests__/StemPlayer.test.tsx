@@ -293,7 +293,9 @@ describe("StemPlayer UI Component", () => {
 
     fireEvent.click(exportBtn);
 
-    expect(screen.getByRole("dialog", { name: /export/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("region", { name: /export audio stems/i })
+    ).toBeInTheDocument();
   });
 
   it("synchronizes stem player mixer levels and master volume into Custom Mixdown export dialog", async () => {
@@ -323,9 +325,9 @@ describe("StemPlayer UI Component", () => {
     const exportBtn = screen.getByRole("button", { name: /export stems/i });
     await user.click(exportBtn);
 
-    const dialog = screen.getByRole("dialog", { name: /export/i });
-    expect(dialog).toBeInTheDocument();
-    const dialogScope = within(dialog);
+    const panel = screen.getByRole("region", { name: /export audio stems/i });
+    expect(panel).toBeInTheDocument();
+    const dialogScope = within(panel);
 
     // 5. Switch to Custom Mixdown mode
     const mixdownRadio = dialogScope.getByRole("radio", {
@@ -387,9 +389,9 @@ describe("StemPlayer UI Component", () => {
     const exportBtn = screen.getByRole("button", { name: /export stems/i });
     await user.click(exportBtn);
 
-    const dialog = screen.getByRole("dialog", { name: /export/i });
-    expect(dialog).toBeInTheDocument();
-    const dialogScope = within(dialog);
+    const panel = screen.getByRole("region", { name: /export audio stems/i });
+    expect(panel).toBeInTheDocument();
+    const dialogScope = within(panel);
 
     // Switch to Custom Mixdown mode
     await user.click(
@@ -442,8 +444,8 @@ describe("StemPlayer UI Component", () => {
     const exportBtn = screen.getByRole("button", { name: /export stems/i });
     await user.click(exportBtn);
 
-    const dialog = screen.getByRole("dialog", { name: /export/i });
-    const dialogScope = within(dialog);
+    const panel = screen.getByRole("region", { name: /export audio stems/i });
+    const dialogScope = within(panel);
 
     // Switch to Custom Mixdown mode
     await user.click(
