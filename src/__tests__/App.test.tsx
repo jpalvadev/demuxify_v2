@@ -112,7 +112,7 @@ describe("App UI Shell", () => {
     });
   });
 
-  it("decodes audio and displays SourceMixCard and MasterWaveform when a file is selected", async () => {
+  it("decodes audio and displays the Source Mix card while the timeline stays gated", async () => {
     vi.spyOn(webgpuModule, "detectWebGPUCapability").mockResolvedValue({
       supported: true,
       isFallback: false,
@@ -143,55 +143,56 @@ describe("App UI Shell", () => {
       expect(
         screen.getByRole("button", { name: /separate stems|start separation/i })
       ).toBeInTheDocument();
-      // Master waveform
+      // No timeline surface yet: the Mix Tab owns the spine and stays gated
       expect(
-        screen.getByRole("slider", { name: /master waveform timeline/i })
-      ).toBeInTheDocument();
+        screen.queryByRole("slider", { name: /master waveform timeline/i })
+      ).toBeNull();
+      const rail = screen.getByRole("navigation", { name: /tab rail/i });
+      const mixChip = within(rail).getByRole("button", { name: /^Mix$/i });
+      expect(mixChip.getAttribute("class") ?? "").toContain("opacity-50");
     });
   });
 
   it("allows interactive scrubbing on the Master Waveform to seek playback position", async () => {
-    vi.spyOn(webgpuModule, "detectWebGPUCapability").mockResolvedValue({
-      supported: true,
-      isFallback: false,
-    });
+    completeSeparationMocks();
 
     render(<App />);
+    await loadAndSeparate();
 
-    const file = new File(["audio"], "song_master.mp3", { type: "audio/mp3" });
-    const fileInput = screen.getByLabelText(/select source mix file/i, {
-      selector: "input",
-    });
-    fireEvent.change(fileInput, { target: { files: [file] } });
-
-    await waitFor(() => {
-      expect(
-        screen.getByRole("slider", { name: /master waveform timeline/i })
-      ).toBeInTheDocument();
-    });
-
-    const slider = screen.getByRole("slider", {
+    const mixTab = screen.getByRole("region", { name: /mix tab/i });
+    const spine = within(mixTab).getByRole("slider", {
       name: /master waveform timeline/i,
     });
-    vi.spyOn(slider, "getBoundingClientRect").mockReturnValue({
+
+    // Keyboard scrub: arrows walk the shared transport by 5s steps
+    fireEvent.keyDown(spine, { key: "ArrowRight" });
+    await waitFor(() => {
+      expect(spine).toHaveAttribute("aria-valuenow", "5");
+    });
+
+    fireEvent.keyDown(spine, { key: "ArrowRight", shift: true });
+    await waitFor(() => {
+      expect(spine).toHaveAttribute("aria-valuenow", "10");
+    });
+
+    // Pointer scrub: drag the playhead to 75% of the track
+    vi.spyOn(spine, "getBoundingClientRect").mockReturnValue({
       left: 0,
       top: 0,
       width: 600,
-      height: 100,
+      height: 84,
       right: 600,
-      bottom: 100,
+      bottom: 84,
       x: 0,
       y: 0,
       toJSON: () => {},
     });
-
-    // Seek via arrow key (5 seconds)
-    fireEvent.keyDown(slider, { key: "ArrowRight" });
-    expect(slider).toHaveAttribute("aria-valuenow", "5");
-
-    // Seek via pointer at 50% (300px / 600px * 180s = 90s)
-    fireEvent.pointerDown(slider, { clientX: 300, pointerId: 1 });
-    expect(slider).toHaveAttribute("aria-valuenow", "90");
+    fireEvent.pointerDown(spine, { clientX: 450, clientY: 40, pointerId: 1 });
+    fireEvent.pointerMove(spine, { clientX: 450, clientY: 40, pointerId: 1 });
+    await waitFor(() => {
+      expect(spine).toHaveAttribute("aria-valuenow", "135");
+    });
+    fireEvent.pointerUp(spine, { clientX: 450, clientY: 40, pointerId: 1 });
   });
 
   it("allows removing the loaded Source Mix to return to the dropzone", async () => {
@@ -592,6 +593,12 @@ describe("App UI Shell", () => {
       screen.queryByRole("region", { name: /previous session recovery/i })
     ).not.toBeInTheDocument();
 
+    // Resuming lands the shell on the Mix Tab, where the Stem Player lives
+    const rail = screen.getByRole("navigation", { name: /tab rail/i });
+    expect(
+      within(rail).getByRole("button", { name: /^Mix$/i })
+    ).toHaveAttribute("aria-current", "true");
+
     // Verify Stem Player has the restored state (e.g. Drums muted, Bass solo)
     const stemPlayerRegion = screen.getByRole("region", {
       name: /stem player/i,
@@ -830,7 +837,7 @@ describe("App UI Shell", () => {
     });
   });
 
-  it("opens in a Tab Shell with five pinned Tab rail entries in canonical order", async () => {
+  it("opens in a Tab Shell with four pinned Tab rail entries in canonical order", async () => {
     vi.spyOn(webgpuModule, "detectWebGPUCapability").mockResolvedValue({
       supported: true,
       isFallback: false,
@@ -844,10 +851,10 @@ describe("App UI Shell", () => {
 
     const rail = screen.getByRole("navigation", { name: /tab rail/i });
     const railEntries = within(rail).getAllByRole("button");
-    expect(railEntries).toHaveLength(5);
+    expect(railEntries).toHaveLength(4);
     expect(
       railEntries.map((entry) => entry.getAttribute("aria-label"))
-    ).toEqual(["Separate", "Listen", "Mix", "Export", "System"]);
+    ).toEqual(["Separate", "Mix", "Export", "System"]);
 
     // 44x44px minimum touch targets on every rail entry
     for (const entry of railEntries) {
@@ -856,14 +863,27 @@ describe("App UI Shell", () => {
       expect(classes).toContain("min-w-[44px]");
     }
 
-    // All five Tab panels stay pinned in the DOM even with no Source Mix
+    // All four Tab panels stay pinned in the DOM even with no Source Mix
     const tabPanels = screen.getAllByRole("region", {
-      name: /^(Separate|Listen|Mix|Export|System) Tab$/,
+      name: /^(Separate|Mix|Export|System) Tab$/,
     });
-    expect(tabPanels).toHaveLength(5);
+    expect(tabPanels).toHaveLength(4);
+
+    // grz-18: rail chrome is grizzly — hairline border (grz-600/40) on every
+    // chip, no rounded corner
+    for (const entry of railEntries) {
+      const classes = entry.getAttribute("class") ?? "";
+      expect(classes).not.toMatch(/(^|\s)rounded(?!-none)/);
+      expect(classes).toContain("border-grz-600/40");
+    }
+
+    // The Listen surface is gone: no Listen button, region, or banner anywhere
+    expect(screen.queryByRole("button", { name: /^listen$/i })).toBeNull();
+    expect(screen.queryByRole("region", { name: /listen tab/i })).toBeNull();
+    expect(screen.queryByRole("heading", { name: /^listen$/i })).toBeNull();
   });
 
-  it("greys out Listen, Mix, and Export with a reason line until Separation is complete", async () => {
+  it("greys out Mix and Export with a reason line until Separation is complete", async () => {
     vi.spyOn(webgpuModule, "detectWebGPUCapability").mockResolvedValue({
       supported: true,
       isFallback: false,
@@ -884,7 +904,7 @@ describe("App UI Shell", () => {
     render(<App />);
 
     const rail = screen.getByRole("navigation", { name: /tab rail/i });
-    const gatedEntries = ["Listen", "Mix", "Export"].map((name) =>
+    const gatedEntries = ["Mix", "Export"].map((name) =>
       within(rail).getByRole("button", { name })
     );
     for (const entry of gatedEntries) {
@@ -926,8 +946,10 @@ describe("App UI Shell", () => {
     render(<App />);
 
     const rail = screen.getByRole("navigation", { name: /tab rail/i });
+    // Four Tab cells, each a fixed 112px chip
+    expect(rail.getAttribute("class") ?? "").toContain("grid-cols-4");
     expect(rail.getAttribute("class") ?? "").toContain(
-      "grid-cols-[112px_112px_112px]"
+      "grid-cols-[112px_112px_112px_112px]"
     );
 
     const separatePanel = screen.getByRole("region", {
@@ -937,7 +959,7 @@ describe("App UI Shell", () => {
     expect(stage?.getAttribute("class") ?? "").toContain("overflow-hidden");
   });
 
-  it("moves active-Tab focus from Separate to Listen when Separation is complete", async () => {
+  it("moves active-Tab focus from Separate to Mix when Separation is complete", async () => {
     vi.spyOn(webgpuModule, "detectWebGPUCapability").mockResolvedValue({
       supported: true,
       isFallback: false,
@@ -992,7 +1014,7 @@ describe("App UI Shell", () => {
       .getAllByRole("button")
       .filter((entry) => entry.getAttribute("aria-current") === "true");
     expect(focusedOnComplete).toHaveLength(1);
-    expect(focusedOnComplete[0].getAttribute("aria-label")).toBe("Listen");
+    expect(focusedOnComplete[0].getAttribute("aria-label")).toBe("Mix");
   });
 
   const completeSeparationMocks = () => {
@@ -1007,6 +1029,22 @@ describe("App UI Shell", () => {
         other: [new Float32Array(500), new Float32Array(500)],
       },
       duration: 180,
+    });
+  };
+
+  const clickTabButton = async (name: string) => {
+    const rail = screen.getByRole("navigation", { name: /tab rail/i });
+    const button = within(rail).getByRole("button", {
+      name: new RegExp(`^${name}$`, "i"),
+    });
+    fireEvent.click(button);
+    await waitFor(() => {
+      expect(
+        within(screen.getByRole("navigation", { name: /tab rail/i })).getByRole(
+          "button",
+          { name: new RegExp(`^${name}$`, "i") }
+        )
+      ).toHaveAttribute("aria-current", "true");
     });
   };
 
@@ -1045,28 +1083,28 @@ describe("App UI Shell", () => {
     render(<App />);
     await loadAndSeparate();
 
-    // Separation completion auto-activates the Listen Tab
+    // Separation completion auto-activates the Mix Tab
     const rail = screen.getByRole("navigation", { name: /tab rail/i });
-    const listenRailBtn = within(rail).getByRole("button", {
-      name: /^Listen$/i,
-    });
     const mixRailBtn = within(rail).getByRole("button", { name: /^Mix$/i });
-    expect(listenRailBtn.getAttribute("aria-current")).toBe("true");
-
-    fireEvent.click(mixRailBtn);
-
+    const exportRailBtn = within(rail).getByRole("button", {
+      name: /^Export$/i,
+    });
     expect(mixRailBtn.getAttribute("aria-current")).toBe("true");
-    expect(listenRailBtn.getAttribute("aria-current")).toBeNull();
+
+    fireEvent.click(exportRailBtn);
+
+    expect(exportRailBtn.getAttribute("aria-current")).toBe("true");
+    expect(mixRailBtn.getAttribute("aria-current")).toBeNull();
 
     // Stage invariant: only the ACTIVE Tab panel paints; the rest are hidden
-    const listenPanel = screen.getByRole("region", { name: /^Listen Tab$/ });
     const mixPanel = screen.getByRole("region", { name: /^Mix Tab$/ });
-    const listenClasses = (listenPanel.getAttribute("class") ?? "").split(" ");
+    const exportPanel = screen.getByRole("region", { name: /^Export Tab$/ });
     const mixClasses = (mixPanel.getAttribute("class") ?? "").split(" ");
-    expect(listenClasses).toContain("hidden");
-    expect(mixClasses).not.toContain("hidden");
+    const exportClasses = (exportPanel.getAttribute("class") ?? "").split(" ");
+    expect(mixClasses).toContain("hidden");
+    expect(exportClasses).not.toContain("hidden");
     const panels = screen.getAllByRole("region", {
-      name: /^(Separate|Listen|Mix|Export|System) Tab$/,
+      name: /^(Separate|Mix|Export|System) Tab$/,
     });
     expect(
       panels.filter((p) => (p.getAttribute("class") ?? "").includes("absolute"))
@@ -1112,16 +1150,13 @@ describe("App UI Shell", () => {
       within(separateTab).getByRole("button", { name: /remove source mix/i })
     ).toBeInTheDocument();
 
-    // Listen Tab hosts the shared Master Waveform spine
-    const listenTab = screen.getByRole("region", { name: /listen tab/i });
+    // Mix Tab hosts the shared Master Waveform spine and the Stem Player
+    const mixTab = screen.getByRole("region", { name: /mix tab/i });
     expect(
-      within(listenTab).getByRole("slider", {
+      within(mixTab).getByRole("slider", {
         name: /master waveform timeline/i,
       })
     ).toBeInTheDocument();
-
-    // Mix Tab hosts the Stem Player
-    const mixTab = screen.getByRole("region", { name: /mix tab/i });
     expect(
       within(mixTab).getByRole("region", { name: /stem player/i })
     ).toBeInTheDocument();
@@ -1163,6 +1198,48 @@ describe("App UI Shell", () => {
         within(exportTab).queryByRole("region", { name: /export audio stems/i })
       ).not.toBeInTheDocument();
     });
+  });
+
+  it("runs the Grizzly header band only in the System Tab and keeps the other Tabs chrome-free", async () => {
+    vi.spyOn(webgpuModule, "detectWebGPUCapability").mockResolvedValue({
+      supported: true,
+      isFallback: false,
+    });
+    completeSeparationMocks();
+
+    render(<App />);
+
+    // Separation incomplete: the shell is parked on the Separate Tab, so the
+    // band cannot run.
+    expect(screen.queryByTestId("header-band")).toBeNull();
+
+    await loadAndSeparate();
+
+    // Separated but parked on the Separate Tab: still nowhere.
+    expect(screen.queryByTestId("header-band")).toBeNull();
+
+    await clickTabButton("mix");
+    expect(screen.queryByTestId("header-band")).toBeNull();
+
+    await clickTabButton("export");
+    expect(screen.queryByTestId("header-band")).toBeNull();
+
+    // Only the System Tab carries the band: a bordered chrome strip with the
+    // Tab title and its two named faces — chrome, never a modal.
+    await clickTabButton("system");
+    const band = screen.getByTestId("header-band");
+    expect(band).toHaveClass("border-grz-600/40");
+    expect(within(band).getByText(/^System$/i)).toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).toBeNull();
+    const faces = screen.getAllByTestId("header-band-face");
+    expect(faces).toHaveLength(2);
+    expect(faces[0]).toHaveAccessibleName(/grz-01/);
+    expect(faces[1]).toHaveAccessibleName(/grz-02/);
+
+    // Leaving the System Tab kills the band everywhere else.
+    await clickTabButton("separate");
+    expect(screen.queryByTestId("header-band")).toBeNull();
+    expect(screen.queryByTestId("header-band-face")).toBeNull();
   });
 
   it("mirrors live Stem Player mixer state into the Export Tab panel", async () => {
@@ -1245,7 +1322,7 @@ describe("App UI Shell", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
-  it("renders dedicated Play/Pause transport buttons with seek-to-start and mono readout in Listen", async () => {
+  it("renders dedicated Play/Pause transport buttons with seek-to-start and mono readout on the Mix Tab", async () => {
     vi.spyOn(webgpuModule, "detectWebGPUCapability").mockResolvedValue({
       supported: true,
       isFallback: false,
@@ -1255,37 +1332,30 @@ describe("App UI Shell", () => {
     render(<App />);
     await loadAndSeparate();
 
-    const listenTab = screen.getByRole("region", { name: /listen tab/i });
+    const mixTab = screen.getByRole("region", { name: /mix tab/i });
     expect(
-      within(listenTab).getByRole("button", { name: /^play$/i })
+      within(mixTab).getByRole("button", { name: /^play$/i })
     ).toBeInTheDocument();
     expect(
-      within(listenTab).getByRole("button", { name: /^pause$/i })
+      within(mixTab).getByRole("button", { name: /^pause$/i })
     ).toBeInTheDocument();
     expect(
-      within(listenTab).getByRole("button", { name: /seek to start/i })
+      within(mixTab).getByRole("button", { name: /seek to start/i })
     ).toBeInTheDocument();
     expect(
-      within(listenTab).getAllByText(/\d{2}:\d{2}/).length
+      within(mixTab).getAllByText(/\d{2}:\d{2}/).length
     ).toBeGreaterThanOrEqual(2);
 
-    // Pressing the Listen Tab Play button drives the shared Stem Player engine
-    const listenPlayBtn = within(listenTab).getByRole("button", {
-      name: /^play$/i,
-    });
-    fireEvent.click(listenPlayBtn);
-
-    const mixTab = screen.getByRole("region", { name: /mix tab/i });
+    // Pressing the Mix Tab Play button drives the shared Stem Player engine
     const mixPlayBtn = within(mixTab).getByRole("button", {
       name: /^play$/i,
     });
+    fireEvent.click(mixPlayBtn);
     await waitFor(() => {
       expect(mixPlayBtn).toHaveAttribute("aria-pressed", "true");
     });
 
-    fireEvent.click(
-      within(listenTab).getByRole("button", { name: /^pause$/i })
-    );
+    fireEvent.click(within(mixTab).getByRole("button", { name: /^pause$/i }));
     await waitFor(() => {
       expect(mixPlayBtn).toHaveAttribute("aria-pressed", "false");
     });
@@ -1297,61 +1367,52 @@ describe("App UI Shell", () => {
     render(<App />);
     await loadAndSeparate();
 
-    const listenTab = screen.getByRole("region", { name: /listen tab/i });
+    const mixTab = screen.getByRole("region", { name: /mix tab/i });
 
     // Display face: branding h1 + Tab banners (the bundled Archivo Black subset)
     const branding = screen.getByRole("heading", { level: 1 });
-    const listenBanner = within(listenTab).getByRole("heading", {
+    const mixBanner = within(mixTab).getByRole("heading", {
       level: 3,
-      name: /^listen$/i,
+      name: /multi-track stem player/i,
     });
     expect(window.getComputedStyle(branding).fontFamily).toMatch(
       /Archivo Black/
     );
-    expect(window.getComputedStyle(listenBanner).fontFamily).toMatch(
+    expect(window.getComputedStyle(mixBanner).fontFamily).toMatch(
       /Archivo Black/
     );
     expect(window.getComputedStyle(branding).fontFamily).toMatch(
       /sans-serif\s*$/
     );
 
-    // Mono face: Transport readouts + Stem Player time display (JetBrains Mono subset)
-    const transportReadout = screen.getByTestId("transport-readout");
+    // Mono face: Stem Player time display (JetBrains Mono subset)
     const stemPlayerTime = screen.getByTestId("stem-player-time");
-    expect(window.getComputedStyle(transportReadout).fontFamily).toMatch(
-      /JetBrains Mono/
-    );
     expect(window.getComputedStyle(stemPlayerTime).fontFamily).toMatch(
       /JetBrains Mono/
     );
-    expect(window.getComputedStyle(transportReadout).fontFamily).toMatch(
+    expect(window.getComputedStyle(stemPlayerTime).fontFamily).toMatch(
       /monospace\s*$/
     );
   });
 
-  it("shares the Master Waveform spine across Listen and Mix at the identical playhead", async () => {
+  it("hosts the Master Waveform spine on the Mix Tab and mirrors the shared playhead", async () => {
     completeSeparationMocks();
 
     render(<App />);
     await loadAndSeparate();
 
-    const listenTab = screen.getByRole("region", { name: /listen tab/i });
     const mixTab = screen.getByRole("region", { name: /mix tab/i });
-    const listenSpine = within(listenTab).getByRole("slider", {
-      name: /master waveform timeline/i,
-    });
     const mixSpine = within(mixTab).getByRole("slider", {
       name: /master waveform timeline/i,
     });
 
-    // Keyboard scrub on the Listen spine: the Mix Tab spine mirrors the spot
-    fireEvent.keyDown(listenSpine, { key: "ArrowRight" });
+    // Keyboard scrub on the Mix spine walks the shared transport
+    fireEvent.keyDown(mixSpine, { key: "ArrowRight" });
     await waitFor(() => {
-      expect(listenSpine).toHaveAttribute("aria-valuenow", "5");
+      expect(mixSpine).toHaveAttribute("aria-valuenow", "5");
     });
-    expect(mixSpine).toHaveAttribute("aria-valuenow", "5");
 
-    // Pointer scrub on the Mix spine resumes at the identical spot in Listen
+    // Pointer scrub resumes at the identical spot on the shared engine
     vi.spyOn(mixSpine, "getBoundingClientRect").mockReturnValue({
       left: 0,
       top: 0,
@@ -1365,9 +1426,8 @@ describe("App UI Shell", () => {
     });
     fireEvent.pointerDown(mixSpine, { clientX: 300, pointerId: 1 });
     await waitFor(() => {
-      expect(listenSpine).toHaveAttribute("aria-valuenow", "90");
+      expect(mixSpine).toHaveAttribute("aria-valuenow", "90");
     });
-    expect(mixSpine).toHaveAttribute("aria-valuenow", "90");
 
     // The spine is absent from Separate, Export, and System panels
     for (const panelName of [/separate tab/i, /export tab/i, /system tab/i]) {

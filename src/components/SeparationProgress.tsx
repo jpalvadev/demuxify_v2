@@ -114,7 +114,7 @@ export const SeparationProgress: React.FC<SeparationProgressProps> = ({
                 "Initializing Neural Network Inference..."}
               {isError && "Separation Error"}
               {isSeparating && (
-                <span className="inline-flex items-center gap-1 rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-mono text-primary font-normal">
+                <span className="inline-flex items-center gap-1 rounded-none bg-primary/10 px-1.5 py-0.5 text-[10px] font-mono text-primary font-normal">
                   <Loader2 className="h-3 w-3 animate-spin" />
                   {activeSeconds}s
                 </span>

@@ -47,6 +47,13 @@ export default {
         // Status hues (ticket 09 follow-up): sheet's --ok / --warn tokens.
         "status-ok": "hsl(var(--status-ok) / <alpha-value>)",
         "status-warn": "hsl(var(--status-warn) / <alpha-value>)",
+        // Grizzly chrome ramp (grz-15/18): band + rail hairline colors.
+        "grz-01": "hsl(var(--grz-01) / <alpha-value>)",
+        "grz-02": "hsl(var(--grz-02) / <alpha-value>)",
+        "grz-03": "hsl(var(--grz-03) / <alpha-value>)",
+        "grz-04": "hsl(var(--grz-04) / <alpha-value>)",
+        "grz-05": "hsl(var(--grz-05) / <alpha-value>)",
+        "grz-600": "hsl(var(--grz-600) / <alpha-value>)",
       },
       fontFamily: {
         // Bold pairing (ticket 01 sheet): Archivo Black display for
@@ -78,6 +85,9 @@ export default {
         ],
       },
       borderRadius: {
+        // grz-15: chrome-0 radius everywhere — bare `rounded` now resolves to
+        // the zero --radius token, not Tailwind's 0.25rem default.
+        default: "var(--radius)",
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",

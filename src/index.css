@@ -78,6 +78,16 @@
     --color-grizzly-peach: 23 77% 76%;
     --color-grizzly-red: 358 84% 61%;
     --color-grizzly-deep-red: 358 61% 47%;
+
+    /* Grizzly chrome ramp (grz-15/18): the named chrome-only ramp behind the
+       System-Tab band, rail hairlines and chrome-0 radii. Same HSL components
+       as the identity set — no surface reads the default Tailwind palette. */
+    --grz-01: 358 84% 61%;
+    --grz-02: 46 23% 89%;
+    --grz-03: 47 8% 56%;
+    --grz-04: 0 2% 8%;
+    --grz-05: 23 77% 76%;
+    --grz-600: 358 61% 47%;
     --background: 0 2% 8%;
     --foreground: 46 23% 89%;
     --card: 0 2% 12%;
@@ -159,7 +169,10 @@
 /* Grizzlython skin chrome (grz-02): primitives ported from the OpenDesign
    grizzlython-skin artifact (Bold design-system plugin). Zero-radius chips come
    from the token retune (--radius: 0) plus rounded-none utilities; the rules
-   below add the canvas grid, the fading hero band and the brand pulse. */
+   below add the canvas grid, the brand pulse, and the Separate-tab hero rule.
+   (The hero band is now an IN-FLOW slim band ported from the grz-03 run-7
+   artifact `separate-header-grizzly.html`; the old fading-mask variant painted
+   over the header type and erased its hairline seam — see that ticket.) */
 .grizzly-grid {
   background-image:
     linear-gradient(
@@ -174,9 +187,24 @@
   background-size: 32px 32px;
 }
 
-.grizzly-hero-fade {
-  -webkit-mask-image: linear-gradient(to bottom, black 10%, transparent 100%);
-  mask-image: linear-gradient(to bottom, black 10%, transparent 100%);
+/* Hero rule (grz-03, OpenDesign run 7): mobile portrait gets the slim coral→0
+   strip (capped at 44px) that fades into the canvas behind the dashed tan seam;
+   at sm+ the same element is a FLAT SOLID coral rule — the sheet keeps the fade
+   only in the mobile strip ("40 · SOLID coral, flat matte · no fade"). Declared
+   outside the utility layer so the responsive swap lives here, not in a
+   `sm:bg-primary` utility that this rule would otherwise override. */
+.grizzly-hero-strip {
+  background: linear-gradient(
+    180deg,
+    hsl(var(--primary)) 0%,
+    hsl(var(--primary) / 0) 100%
+  );
+}
+
+@media (min-width: 640px) {
+  .grizzly-hero-strip {
+    background: hsl(var(--primary));
+  }
 }
 
 .grizzly-pulse {

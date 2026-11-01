@@ -289,7 +289,7 @@ export const MasterWaveform: React.FC<MasterWaveformProps> = ({
           <span className="font-semibold text-foreground tracking-wide uppercase text-[11px]">
             Master Waveform
           </span>
-          <span className="rounded bg-secondary/80 px-2 py-0.5 text-[10px] text-muted-foreground">
+          <span className="rounded-none bg-secondary/80 px-2 py-0.5 text-[10px] text-muted-foreground">
             Overview
           </span>
         </div>

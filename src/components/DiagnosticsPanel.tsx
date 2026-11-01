@@ -73,7 +73,7 @@ export const DiagnosticsPanel: React.FC = () => {
             System Diagnostics
           </h2>
           {errorCount > 0 && (
-            <span className="rounded bg-destructive/20 px-2 py-0.5 text-xs font-semibold text-destructive">
+            <span className="rounded-none bg-destructive/20 px-2 py-0.5 text-xs font-semibold text-destructive">
               {errorCount} error{errorCount > 1 ? "s" : ""}
             </span>
           )}
@@ -114,7 +114,7 @@ export const DiagnosticsPanel: React.FC = () => {
                 key={lvl}
                 type="button"
                 onClick={() => setFilterLevel(lvl)}
-                className={`rounded px-2 py-1 uppercase text-[10px] font-semibold transition-colors ${
+                className={`rounded-none px-2 py-1 uppercase text-[10px] font-semibold transition-colors ${
                   filterLevel === lvl
                     ? "bg-primary text-primary-foreground"
                     : "text-muted-foreground hover:bg-muted"
@@ -169,14 +169,14 @@ export const DiagnosticsPanel: React.FC = () => {
                     {log.message}
                   </p>
                   {log.data !== undefined && (
-                    <pre className="mt-1 overflow-x-auto rounded bg-black/40 p-1.5 text-[10px] text-muted-foreground">
+                    <pre className="mt-1 overflow-x-auto rounded-none bg-black/40 p-1.5 text-[10px] text-muted-foreground">
                       {typeof log.data === "object"
                         ? JSON.stringify(log.data, null, 2)
                         : String(log.data)}
                     </pre>
                   )}
                   {log.stack && (
-                    <pre className="mt-1 overflow-x-auto rounded bg-destructive/20 p-1.5 text-[10px] text-destructive">
+                    <pre className="mt-1 overflow-x-auto rounded-none bg-destructive/20 p-1.5 text-[10px] text-destructive">
                       {log.stack}
                     </pre>
                   )}
@@ -195,7 +195,7 @@ export const DiagnosticsPanel: React.FC = () => {
                 {Object.entries(envReport).map(([key, value]) => (
                   <div
                     key={key}
-                    className="rounded border border-border bg-muted/20 p-1.5"
+                    className="rounded-none border border-border bg-muted/20 p-1.5"
                   >
                     <span className="font-bold text-muted-foreground uppercase text-[10px] block">
                       {key}

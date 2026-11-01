@@ -19,7 +19,7 @@ export const FallbackAdvisory: React.FC<FallbackAdvisoryProps> = ({
         <div className="space-y-1 text-sm">
           <div className="font-semibold text-status-warn flex items-center gap-2">
             <span>Running in CPU/WASM Fallback Mode</span>
-            <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded bg-status-warn/20 text-status-warn font-mono">
+            <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-none bg-status-warn/20 text-status-warn font-mono">
               <Cpu className="w-3 h-3" /> WASM
             </span>
           </div>

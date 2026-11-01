@@ -1,13 +1,11 @@
-import React, { useEffect, useState, useRef, ChangeEvent } from "react";
-import {
-  AlertCircle,
-  Loader2,
-  CheckCircle2,
-  Music,
-  SkipBack,
-  Play,
-  Pause,
-} from "lucide-react";
+import React, {
+  useEffect,
+  useState,
+  useRef,
+  ChangeEvent,
+  createElement,
+} from "react";
+import { AlertCircle, Loader2, CheckCircle2, Music } from "lucide-react";
 import { Header } from "./components/Header";
 import { SourceMixDropzone } from "./components/SourceMixDropzone";
 import { FallbackAdvisory } from "./components/FallbackAdvisory";
@@ -28,6 +26,7 @@ import {
 import { ToastContainer } from "./components/Toast";
 import { toast } from "./lib/toast";
 import { DiagnosticsPanel } from "./components/DiagnosticsPanel";
+import { grz01, grz02, grzNames, faceElements } from "./lib/grizzly";
 import { ModelCacheStatus } from "./components/ModelCacheStatus";
 import { ModelSelector } from "./components/ModelSelector";
 import {
@@ -57,14 +56,14 @@ import {
   SessionMixerState,
 } from "./lib/sessionStore";
 import { StemMixerStates } from "./lib/stemPlayerEngine";
-import { DISPLAY_FONT_STACK, MONO_FONT_STACK } from "./lib/typography";
+import { DISPLAY_FONT_STACK } from "./lib/typography";
 
 // Bold pairing (ticket 10): the bundled display face paints the focal Tab banners and
-// branding, the bundled mono face paints Transport readouts. These focal nodes carry the
-// stack inline (in addition to the `font-display`/`font-mono` utilities elsewhere) so the
-// css-asserted app-shell seam can read the applied face through getComputedStyle.
+// branding; the bundled mono face is painted inline by the Transport readouts inside the
+// Stem Player. These focal nodes carry the stack inline (in addition to the `font-display`
+// utilities elsewhere) so the css-asserted app-shell seam can read the applied face
+// through getComputedStyle.
 const BANNER_FONT = { fontFamily: DISPLAY_FONT_STACK };
-const READOUT_FONT = { fontFamily: MONO_FONT_STACK };
 
 const SUPPORTED_EXTENSIONS = [".mp3", ".wav", ".flac", ".ogg", ".aac", ".m4a"];
 const SUPPORTED_MIME_TYPES = [
@@ -78,24 +77,16 @@ const SUPPORTED_MIME_TYPES = [
   "audio/*",
 ];
 
-// Tab Shell registry (ADR-0007): one registry drives the desktop left rail,
-// the mobile top strip, and the five pinned Tab panels.
-function formatTransportTime(totalSeconds: number): string {
-  if (isNaN(totalSeconds) || totalSeconds < 0) return "00:00";
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = Math.floor(totalSeconds % 60);
-  return `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
-}
-
 interface TabEntry {
   id: string;
   title: string;
   gatedUntilStems: boolean;
 }
 
+// Tab Shell registry (ADR-0008): one registry drives the desktop left rail,
+// the mobile top strip, and the four pinned Tab panels.
 const TAB_REGISTRY: TabEntry[] = [
   { id: "separate", title: "Separate", gatedUntilStems: false },
-  { id: "listen", title: "Listen", gatedUntilStems: true },
   { id: "mix", title: "Mix", gatedUntilStems: true },
   { id: "export", title: "Export", gatedUntilStems: true },
   { id: "system", title: "System", gatedUntilStems: false },
@@ -168,8 +159,8 @@ export const App: React.FC = () => {
     useState<ExportDialogState | null>(null);
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
 
-  // Transport bridge: the Listen Tab's Transport row drives the Stem Player
-  // engine (registered by StemPlayer on init, ADR-0007 Tab Shell bridge).
+  // Transport bridge: the Mix Tab's spine scrubbing drives the Stem Player
+  // engine (registered by StemPlayer on init, ADR-0008 Tab Shell bridge).
   const transportActionsRef = useRef<TransportControls>({
     play: () => {},
     pause: () => {},
@@ -359,7 +350,8 @@ export const App: React.FC = () => {
       setCurrentTime(session.mixer.currentTime ?? 0);
       setSeparationPhase("completed");
       setDetectedSession(null);
-      setSelectedTab("listen");
+      // ADR-0008: resuming lands on the Mix Tab, where playback lives
+      setSelectedTab("mix");
     } catch (err) {
       setDecodeError("Failed to resume previous session.");
     } finally {
@@ -386,8 +378,8 @@ export const App: React.FC = () => {
     masterVolume: number;
     currentTime: number;
   }) => {
-    // Shared spine (ADR-0007): mirror the live playhead so the Mix Tab's
-    // mini spine and the Listen Tab readout stay in lockstep with playback.
+    // Shared spine (ADR-0008): mirror the live playhead so the Mix Tab's
+    // spine readout stays in lockstep with playback.
     setCurrentTime(mixer.currentTime);
     if (!cachedSessionRef.current) return;
     const updatedSession: DemuxifySession = {
@@ -425,7 +417,7 @@ export const App: React.FC = () => {
 
   const handleSeek = (seekTime: number) => {
     setCurrentTime(seekTime);
-    // Shared spine (ADR-0007): scrubbing on either Tab's spine drives the
+    // Shared spine (ADR-0008): scrubbing on the Mix Tab's spine drives the
     // same Stem Player engine through the transport bridge.
     transportActionsRef.current.seek(seekTime);
   };
@@ -481,7 +473,8 @@ export const App: React.FC = () => {
 
       setSeparatedStems(result.stems);
       setSeparationPhase("completed");
-      setSelectedTab("listen");
+      // ADR-0008: Separation completes on the Mix Tab, ready for playback
+      setSelectedTab("mix");
 
       const initialMixerState: SessionMixerState = {
         stems: {
@@ -564,7 +557,7 @@ export const App: React.FC = () => {
         {/* Tab rail: horizontal top strip on mobile portrait, vertical left rail at md+ */}
         <nav
           aria-label="Tab rail"
-          className="grid grid-cols-5 gap-1 items-stretch py-2.5 pb-4 overflow-hidden w-full bg-card/50 sm:grid-cols-[112px_112px_112px_112px_112px] md:grid-cols-[112px_112px_112px] md:w-[250px] lg:w-[280px] md:flex md:flex-col md:no-wrap md:justify-start md:items-start md:gap-2.5 md:border-r md:border-border/60"
+          className="grid grid-cols-4 gap-1 items-stretch py-2.5 pb-4 overflow-hidden w-full bg-card/50 sm:grid-cols-[112px_112px_112px_112px] md:grid-cols-[112px_112px_112px_112px] md:w-[250px] lg:w-[280px] md:flex md:flex-col md:no-wrap md:justify-start md:items-start md:gap-2.5 md:border-r md:border-grz-600/40"
         >
           {TAB_REGISTRY.map((tab) => {
             const gated = tab.gatedUntilStems && !stemsReady;
@@ -576,7 +569,7 @@ export const App: React.FC = () => {
                 aria-label={tab.title}
                 aria-current={active ? "true" : undefined}
                 onClick={() => handleSelectTab(tab.id)}
-                className={`flex flex-col items-center justify-center gap-1 rounded-none px-[3px] py-2 min-h-[44px] min-w-[44px] text-[7px] sm:text-[9px] md:text-sm font-bold uppercase tracking-[0.2em] text-muted-foreground border border-muted/60 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:w-full md:px-3 md:py-2.5 md:text-sm md:flex-row md:justify-start md:items-center md:gap-3 ${gated ? "opacity-50 text-muted-foreground" : ""} ${active ? "bg-primary text-primary-foreground border-primary" : ""}`.trim()}
+                className={`flex flex-col items-center justify-center gap-1 rounded-none px-[3px] py-2 min-h-[44px] min-w-[44px] text-[7px] sm:text-[9px] md:text-sm font-bold uppercase tracking-[0.2em] text-muted-foreground border border-grz-600/40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:w-full md:px-3 md:py-2.5 md:text-sm md:flex-row md:justify-start md:items-center md:gap-3 ${gated ? "opacity-50 text-muted-foreground" : ""} ${active ? "bg-primary text-primary-foreground border-primary" : ""}`.trim()}
               >
                 <span className="whitespace-nowrap">{tab.title}</span>
                 {gated && (
@@ -594,7 +587,7 @@ export const App: React.FC = () => {
           <ToastContainer />
         </nav>
 
-        {/* Tab stage: five pinned Tab panels, always present in the DOM; the
+        {/* Tab stage: four pinned Tab panels, always present in the DOM; the
             stage shows only the ACTIVE Tab panel (artifact `.stage` + `.panel`). */}
         <div className="relative flex-1 min-h-[340px] overflow-hidden">
           {/* Separate Tab: Session Recovery, Model Selector, Source Mix ingestion, Inference Engine */}
@@ -604,20 +597,39 @@ export const App: React.FC = () => {
             className={tabPanelClass(false, activeTab === "separate")}
           >
             <section className="relative space-y-4">
-              {/* Grizzlython hero band (grz-02): full-bleed coral block fading
-                  downward behind the stage top — the snapshot's hero moment. */}
+              {/* Grizzlython header zone (grz-03, OpenDesign run 7 `separate-header-grizzly.html`
+                  via the design-system-bold plugin): the band is an IN-FLOW slim rule, never a
+                  wash behind the words. Mobile portrait: a 44px coral→0 gradient strip with a 1px
+                  DASHED tan hairline seam that carries NO type. Desktop (sm+): FLAT SOLID 40px
+                  coral rule carrying only a 9px ink mono tagline (tracking 0.14em) plus a 6×12
+                  ink tick — the active rail chip's `bg-primary` + cream pairing flipped to ink-on-coral.
+                  The UPPERCASE display title is the card's FIRST LINE OF TYPE under the seam:
+                  15px / leading-18 / 0.07em mobile, 22px / leading-26 / 0.06em desktop, cream on
+                  canvas. Below it a tan-2 mono meta line (10px / 0.14em) with a peach state pip,
+                  then the subtitle as cream body copy (13/leading-20 mobile, 15/leading-23 desktop,
+                  660px measure). Vertical rhythm per the sheet: 40 · 1 · 16 · 26 · 12 · 13 · 14 ·
+                  46 · 20 desktop, 44 · 1 · 14 · 18 · 6 · 11 · 10 · 60 · 14 mobile. */}
               <div
                 aria-hidden="true"
-                className="absolute left-0 right-0 top-0 h-11 bg-primary/70 border-b-1 border-dashed border-muted-foreground/50 pointer-events-none grizzly-hero-fade"
-              />
-              <div className="space-y-1">
+                className="grizzly-hero-strip h-11 sm:h-10 flex items-center justify-between gap-6 px-3.5 sm:px-4"
+              >
+                <span className="hidden sm:flex font-mono text-[9px] font-medium uppercase tracking-[0.14em] whitespace-nowrap text-background">
+                  In-browser · nothing uploaded
+                </span>
+                <span className="hidden sm:block w-1.5 h-3 bg-background" />
+              </div>
+              <div className="border-t-[1px] border-dashed sm:border-solid border-muted-foreground/60 px-3.5 sm:px-4 pt-3.5 sm:pt-4 pb-4.5 sm:pb-5">
                 <h2
-                  className="font-display text-2xl font-bold tracking-tight text-foreground sm:text-3xl"
+                  className="font-display text-[15px] leading-[18px] font-bold uppercase tracking-[0.07em] text-foreground sm:text-[22px] sm:leading-[26px] sm:tracking-[0.06em]"
                   style={BANNER_FONT}
                 >
                   Separate Music Into Stems
                 </h2>
-                <p className="text-sm text-muted-foreground sm:text-base">
+                <div className="mt-1.5 sm:mt-3 font-mono text-[10px] leading-[11px] sm:leading-[13px] uppercase tracking-[0.14em] text-muted-foreground">
+                  HT-DEMUCS 4-STEM <span className="text-status-ok">·</span>{" "}
+                  local onnx
+                </div>
+                <p className="mt-2.5 sm:mt-3.5 text-[13px] leading-[20px] text-foreground sm:text-[15px] sm:leading-[23px] sm:max-w-[660px]">
                   Extract Vocals, Drums, Bass, and Other instruments locally in
                   your browser using neural network models.
                 </p>
@@ -767,96 +779,6 @@ export const App: React.FC = () => {
             </section>
           </section>
 
-          {/* Listen Tab: shared Master Waveform spine + playback transport */}
-          <section
-            role="region"
-            aria-label="Listen Tab"
-            className={tabPanelClass(!stemsReady, activeTab === "listen")}
-          >
-            <div className="flex items-center justify-between gap-2">
-              <h3
-                className="font-display text-base font-semibold tracking-tight text-foreground sm:text-lg"
-                style={BANNER_FONT}
-              >
-                Listen
-              </h3>
-              <p className="text-sm text-muted-foreground">
-                {waveformPeaks && decodedSourceMix
-                  ? "Scrub the shared spine here; the playhead stays put when switching Tabs."
-                  : TAB_GATING_REASON}
-              </p>
-            </div>
-            {waveformPeaks && decodedSourceMix && (
-              <div className="pt-1 space-y-3">
-                <MasterWaveform
-                  peaks={waveformPeaks}
-                  audioBuffer={decodedSourceMix.buffer}
-                  duration={decodedSourceMix.metadata.duration}
-                  currentTime={currentTime}
-                  onSeek={handleSeek}
-                />
-
-                {/* Transport row (Tab Shell port): dedicated Seek/Play/Pause + mono readout */}
-                <div
-                  role="group"
-                  aria-label="Transport"
-                  className="flex flex-wrap items-center gap-2"
-                >
-                  <button
-                    type="button"
-                    aria-label="Seek to Start"
-                    title="Seek to start"
-                    onClick={() => {
-                      transportActionsRef.current.seekToStart();
-                      handleSeek(0);
-                    }}
-                    className="flex h-11 w-11 items-center justify-center rounded-none border border-border bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground transition-all"
-                  >
-                    <SkipBack className="h-4 w-4" />
-                    <span className="font-mono uppercase text-[9px] font-bold tracking-wider">
-                      Seek
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    aria-label="Play"
-                    title="Play (Space)"
-                    onClick={() => transportActionsRef.current.play()}
-                    className="flex h-11 px-4 items-center justify-center gap-2 rounded-none bg-primary text-primary-foreground font-semibold shadow-sm hover:bg-primary/90 active:scale-95 transition-all"
-                  >
-                    <Play className="h-4 w-4 fill-current" />
-                    <span className="font-mono text-[10px] font-bold uppercase">
-                      Play
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    aria-label="Pause"
-                    title="Pause (Space)"
-                    onClick={() => transportActionsRef.current.pause()}
-                    className="flex h-11 px-4 items-center justify-center gap-2 rounded-none border border-border bg-secondary/60 text-foreground hover:bg-secondary transition-all"
-                  >
-                    <Pause className="h-4 w-4 fill-current" />
-                    <span className="font-mono text-[10px] font-bold uppercase">
-                      Pause
-                    </span>
-                  </button>
-                </div>
-                <p
-                  data-testid="transport-readout"
-                  className="font-mono font-extrabold tracking-tight text-lg text-foreground"
-                  style={READOUT_FONT}
-                >
-                  <span>{formatTransportTime(currentTime)}</span>
-                  <span className="text-muted-foreground"> / </span>
-                  <span>
-                    {formatTransportTime(decodedSourceMix.metadata.duration)}
-                  </span>
-                </p>
-              </div>
-            )}
-          </section>
-
           {/* Mix Tab: Stem Player (strips, mute/solo/volume, Time-Stretch & Pitch, transport) */}
           <section
             role="region"
@@ -867,8 +789,8 @@ export const App: React.FC = () => {
             separatedStems &&
             decodedSourceMix ? (
               <>
-                {/* Shared Master Waveform spine port: mini overview, playhead
-                    locked to the Listen Tab spine (data-od-id="spine-mini") */}
+                {/* Master Waveform spine (ADR-0008): the Mix Tab owns the single
+                    timeline surface; scrubbing it drives the Stem Player playhead. */}
                 <div className="pt-2">
                   <MasterWaveform
                     peaks={waveformPeaks}
@@ -960,14 +882,67 @@ export const App: React.FC = () => {
             aria-label="System Tab"
             className={tabPanelClass(false, activeTab === "system")}
           >
-            <div className="flex items-center justify-between gap-2">
-              <h3 className="font-display text-base font-semibold tracking-tight text-foreground sm:text-lg">
-                System
-              </h3>
-              <p className="text-sm text-muted-foreground">
-                Hardware acceleration, Model Cache and on-device diagnostics.
-              </p>
-            </div>
+            {activeTab === "system" ? (
+              /* System-Tab Grizzly band (grz-11/13/15/18, grizzlython-skin):
+                  the app's header band re-homed into the System Tab — it runs
+                  ONLY while this Tab is the active stage panel, is chrome
+                  (bordered in-flow strip, chrome-0 radius, grz-600 hairline),
+                  and is never a modal dialog. Two named faces flank the Tab
+                  title: grz-01 Demuxer (round ears, broad snout, lowered brows)
+                  and grz-02 Mixer (smaller ears, cocked brow, carries a machete). */
+              <div
+                data-testid="header-band"
+                className="grid items-center gap-3 rounded-none border border-grz-600/40 bg-card/40 px-3 py-2 mb-3.5"
+              >
+                <h2
+                  className="font-display text-[15px] leading-[18px] font-bold uppercase tracking-[0.07em] text-foreground sm:text-[22px] sm:leading-[26px] sm:tracking-[0.06em]"
+                  style={BANNER_FONT}
+                >
+                  System
+                </h2>
+                <span
+                  data-testid="header-band-face"
+                  aria-label={`grz-01 — ${grzNames.grz01}`}
+                  className="inline-flex w-7 h-7 pointer-events-none"
+                >
+                  <svg
+                    viewBox="0 0 100 100"
+                    className="w-full h-full"
+                    role="presentation"
+                    aria-hidden="true"
+                  >
+                    {faceElements(grz01).map((el) =>
+                      createElement(el.tag, el.attrs)
+                    )}
+                  </svg>
+                </span>
+                <span
+                  data-testid="header-band-face"
+                  aria-label={`grz-02 — ${grzNames.grz02}`}
+                  className="inline-flex w-7 h-7 pointer-events-none"
+                >
+                  <svg
+                    viewBox="0 0 100 100"
+                    className="w-full h-full"
+                    role="presentation"
+                    aria-hidden="true"
+                  >
+                    {faceElements(grz02).map((el) =>
+                      createElement(el.tag, el.attrs)
+                    )}
+                  </svg>
+                </span>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="font-display text-base font-semibold tracking-tight text-foreground sm:text-lg">
+                  System
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Hardware acceleration, Model Cache and on-device diagnostics.
+                </p>
+              </div>
+            )}
             <div className="pt-1 space-y-3">
               <WebGPUStatusBadge
                 capability={capability}

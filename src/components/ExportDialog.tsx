@@ -567,7 +567,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
                 checked={applyAdjustments}
                 onChange={(e) => setApplyAdjustments(e.target.checked)}
                 disabled={isExporting}
-                className="rounded border-border text-primary focus:ring-primary h-4 w-4"
+                className="rounded-none border-border text-primary focus:ring-primary h-4 w-4"
                 aria-label="Apply active Pitch & Tempo adjustments"
               />
               <div className="flex items-center gap-2">
@@ -682,7 +682,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
                             }))
                           }
                           disabled={isExporting}
-                          className="accent-primary h-4 w-4 rounded cursor-pointer"
+                          className="accent-primary h-4 w-4 rounded-none cursor-pointer"
                         />
                         <div className="flex items-center gap-1.5">
                           <Icon className="h-3.5 w-3.5 text-primary" />
@@ -755,7 +755,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
                     checked={antiClipping}
                     onChange={(e) => setAntiClipping(e.target.checked)}
                     disabled={isExporting}
-                    className="accent-primary h-4 w-4 rounded mt-0.5 cursor-pointer"
+                    className="accent-primary h-4 w-4 rounded-none mt-0.5 cursor-pointer"
                   />
                   <div>
                     <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">

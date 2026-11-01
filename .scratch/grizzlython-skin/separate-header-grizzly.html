@@ -1,0 +1,1008 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Separate · Header Zone — Grizzlython / Demuxify</title>
+    <meta
+      name="description"
+      content="One-component design sheet: header zone redesign for the Separate tab stage in the Grizzlython skin, desktop 1400 and mobile portrait 390."
+    />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600&family=Archivo+Narrow:wght@400;600;700&family=JetBrains+Mono:wght@400;500&display=block"
+    />
+    <style>
+      /* ============================================================
+   GRIZZLYTHON · IDENTITY TOKENS — the ONLY palette in use.
+   Demuxify skin tokens; they supersede any system default hex.
+   Zero border-radius everywhere · 1px tan hairlines · chamfered
+   card corners · flat matte fills · no shadows · no new hues.
+   ============================================================ */
+      :root {
+        --bg: #161515; /* canvas */
+        --grid: color-mix(
+          in oklab,
+          var(--muted) 7%,
+          transparent
+        ); /* faint 32px tan grid */
+        --surface: color-mix(
+          in oklab,
+          var(--bg),
+          white 4%
+        ); /* stage plate = bg +0.04 L, 0 chroma */
+        --plate-rail: color-mix(
+          in oklab,
+          var(--bg),
+          white 2%
+        ); /* rail plate  = bg +0.02 L, 0 chroma */
+        --fg: #eae7dd; /* ink cream */
+        --fg-2: color-mix(in oklab, var(--fg), var(--muted) 34%); /* ink 66% */
+        --muted: #979385; /* secondary tan-2 */
+        --hair: #979385; /* hairline tan-2, always 1px */
+        --on-coral: #161515; /* ink-on-coral (mono micro copy) */
+        --accent: #ef474a; /* coral — hero band + active rail chip */
+        --warn: #c12f2f; /* deep red */
+        --ok: #f1b994; /* peach */
+        --coral-0: color-mix(
+          in oklab,
+          var(--accent),
+          transparent 100%
+        ); /* coral at 0 alpha — mobile strip endpoint */
+
+        --display:
+          "Archivo Narrow", "Roboto Condensed", "Liberation Sans Narrow",
+          "Arial Narrow", Arial, sans-serif;
+        --body: "Archivo", Helvetica, Arial, sans-serif;
+        --mono: "JetBrains Mono", "SFMono-Regular", Menlo, Consolas, monospace;
+
+        --chamfer: 14px; /* notched card corners */
+        --gutter-desk: 24px; /* stage gutter, desktop */
+        --gutter-mob: 14px; /* stage gutter, mobile portrait */
+        --band-desk: 40px; /* hero band height, desktop */
+        --band-mob: 44px; /* hero strip height, mobile (max) */
+        --track-disp: 0.06em;
+        --track-meta: 0.14em;
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+        border-radius: 0;
+      }
+      html {
+        background: var(--bg);
+      }
+      body {
+        background:
+          linear-gradient(var(--grid) 1px, transparent 1px),
+          linear-gradient(90deg, var(--grid) 1px, transparent 1px), var(--bg);
+        background-size:
+          32px 32px,
+          32px 32px,
+          auto; /* the skin's faint 32px tan grid */
+        color: var(--fg);
+        font-family: var(--body);
+        font-size: 15px;
+        line-height: 1.55;
+        -webkit-font-smoothing: antialiased;
+      }
+      .page {
+        max-width: 1372px;
+        padding: 24px 20px 32px;
+      }
+
+      /* ---------- sheet masthead ---------- */
+      .mast {
+        border: 1px solid var(--hair);
+        border-top: 0;
+        padding: 20px 22px 18px;
+      }
+      .eyebrow {
+        font-family: var(--mono);
+        font-size: 10px;
+        letter-spacing: var(--track-meta);
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+      .mast h1 {
+        font-family: var(--display);
+        font-size: 34px;
+        font-weight: 700;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+        line-height: 1.04;
+      }
+      .mast .lede {
+        color: var(--fg-2);
+        max-width: 720px;
+      }
+      .mast-grid {
+        display: grid;
+        grid-template-columns: 320px 1fr;
+        gap: 32px;
+      }
+      .mast .rule {
+        border-top: 1px solid var(--hair);
+      }
+
+      /* ---------- specimen frame + chamfer primitives ---------- */
+      .spec-hd {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-family: var(--mono);
+        font-size: 10px;
+        letter-spacing: var(--track-meta);
+        text-transform: uppercase;
+        color: var(--fg);
+      }
+      .spec-hd .sp-dim {
+        color: var(--muted);
+      }
+      .specimen {
+        border: 1px solid var(--hair);
+        background: var(--surface);
+      }
+
+      /* chamfer = outer tan block + 1px-inset canvas block. Zero radius, true 1px hairline. */
+      .ring {
+        position: relative;
+        background: var(--hair);
+      }
+      .in {
+        margin: 1px;
+        background: var(--bg);
+      } /* card field, inset 1px on all four sides */
+      .o14 {
+        clip-path: polygon(
+          0 14px,
+          14px 0,
+          calc(100% - 14px) 0,
+          100% 14px,
+          100% calc(100% - 14px),
+          calc(100% - 14px) 100%,
+          14px 100%,
+          0 calc(100% - 14px)
+        );
+      }
+      .o13 {
+        clip-path: polygon(
+          0 13px,
+          13px 0,
+          calc(100% - 13px) 0,
+          100% 13px,
+          100% calc(100% - 13px),
+          calc(100% - 13px) 100%,
+          13px 100%,
+          0 calc(100% - 13px)
+        );
+      }
+      .o10 {
+        clip-path: polygon(
+          0 10px,
+          10px 0,
+          calc(100% - 10px) 0,
+          100% 10px,
+          100% calc(100% - 10px),
+          calc(100% - 10px) 100%,
+          10px 100%,
+          0 calc(100% - 10px)
+        );
+      }
+      .o9 {
+        clip-path: polygon(
+          0 9px,
+          9px 0,
+          calc(100% - 9px) 0,
+          100% 9px,
+          100% calc(100% - 9px),
+          calc(100% - 9px) 100%,
+          9px 100%,
+          0 calc(100% - 9px)
+        );
+      }
+      .notch-r {
+        clip-path: polygon(
+          0 0,
+          calc(100% - 12px) 0,
+          100% 12px,
+          100% 100%,
+          0 100%
+        );
+      }
+      .notch-r-in {
+        clip-path: polygon(
+          0 0,
+          calc(100% - 11px) 0,
+          100% 11px,
+          100% 100%,
+          0 100%
+        );
+      }
+      .band-top {
+        clip-path: polygon(
+          0 13px,
+          13px 0,
+          calc(100% - 13px) 0,
+          100% 13px,
+          100% 100%,
+          0 100%
+        );
+      }
+
+      /* ---------- desktop stage: rail 250 (cropped left → 172px visible edge) + stage 1150 ---------- */
+      .stage-desk {
+        display: grid;
+        grid-template-columns: 172px 1150px;
+        background: var(--surface);
+        border: 1px solid var(--hair);
+      }
+      .stage-desk > .railcol {
+        padding: 24px 12px 0 0;
+        border-right: 1px solid var(--hair);
+        background: var(--plate-rail);
+      }
+      .stage-desk > .col {
+        padding: var(--gutter-desk);
+      }
+
+      /* rail chips: 44px tall, 12px pitch, tan hairline separators, active = solid coral */
+      .chip {
+        min-height: 44px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0 12px;
+        border-bottom: 1px solid var(--hair);
+        font-family: var(--display);
+        font-weight: 700;
+        font-size: 13px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--fg-2);
+      }
+      .chip + .chip {
+        margin-top: 12px;
+      }
+      .chip .chip-meta {
+        font-family: var(--mono);
+        font-size: 9px;
+        letter-spacing: var(--track-meta);
+        color: var(--muted);
+      }
+      .chip.on {
+        background: var(--accent);
+        color: var(--fg);
+      } /* coral + cream = the active-chip pairing */
+      .chip.on .chip-meta {
+        color: var(--on-coral);
+      }
+      .chip.off {
+        color: var(--fg-2);
+      }
+
+      /* ---------- header zone ---------- */
+      .hdr {
+        position: relative;
+      } /* ring carrier */
+      .stage-desk .body-card {
+        margin-top: 20px;
+      } /* 20px: header card → content card top edge */
+      .stage-mob .body-card {
+        margin-top: 18px;
+      }
+      .hdr .hero {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 24px;
+        padding: 0 16px;
+      }
+      .hdr-desk .hero {
+        height: var(--band-desk);
+        background: var(--accent);
+      } /* SOLID, 40px */
+      .hdr-mob .hero {
+        height: var(--band-mob); /* 44px = the cap on any hero strip */
+        background: linear-gradient(
+          180deg,
+          var(--accent) 0%,
+          var(--coral-0) 100%
+        );
+      }
+      .hdr-desk .hero .tag {
+        font-family: var(--mono);
+        font-size: 9px;
+        font-weight: 500;
+        letter-spacing: var(--track-meta);
+        text-transform: uppercase;
+        color: var(--on-coral);
+      }
+      .hdr-desk .hero .pip {
+        font-family: var(--mono);
+        font-size: 10px;
+        color: var(--on-coral);
+      }
+      .hdr .copy-solid {
+        border-top: 1px solid var(--hair);
+        padding: 16px 16px 20px;
+      }
+      .hdr .copy-dash {
+        border-top: 1px dashed var(--hair);
+        padding: 14px 14px 14px;
+      }
+      .hdr-desk .meta {
+        margin-top: 12px;
+      }
+      .hdr-mob .meta {
+        margin-top: 6px;
+      }
+      .hdr-desk .sub-desk {
+        margin-top: 14px;
+      }
+      .hdr-mob .sub-mob {
+        margin-top: 10px;
+      }
+      .hdr .ttl-desk {
+        font-family: var(--display);
+        font-weight: 700;
+        font-size: 22px;
+        line-height: 26px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--fg);
+      }
+      .hdr .ttl-mob {
+        font-family: var(--display);
+        font-weight: 700;
+        font-size: 15px;
+        line-height: 18px;
+        letter-spacing: 0.07em;
+        text-transform: uppercase;
+        color: var(--fg);
+      }
+      .hdr .meta {
+        font-family: var(--mono);
+        font-size: 10px;
+        letter-spacing: var(--track-meta);
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+      .hdr .meta .pip {
+        color: var(--accent);
+      }
+      .hdr .sub-desk {
+        font-size: 15px;
+        line-height: 23px;
+        color: var(--fg);
+        max-width: 660px;
+      }
+      .hdr .sub-mob {
+        font-size: 13px;
+        line-height: 20px;
+        color: var(--fg);
+      }
+      /* mobile hero strip carries NO type: the title is the card's first text line */
+      .hdr-mob .hero {
+        display: block;
+      }
+      .hdr-mob .copy-dash {
+        padding: 14px 14px 14px;
+      }
+
+      /* ---------- content card: only its top edge is in scope ---------- */
+      .body-card {
+        position: relative;
+      }
+      .body-card .row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 0 16px;
+      }
+      .stage-mob .body-card .row {
+        padding: 0 14px;
+      }
+      .body-card .row + .row {
+        margin-top: 10px;
+      }
+      .body-card .lbl {
+        font-family: var(--mono);
+        font-size: 9px;
+        letter-spacing: var(--track-meta);
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+      /* stem rows: flat matte fills, 1px hairline, coral = the selected stem */
+      .body-card .stem {
+        display: block;
+        height: 10px;
+        border: 1px solid var(--hair);
+        background: var(--surface);
+      }
+      .body-card .stem.on {
+        background: var(--accent);
+      }
+      .w-168 {
+        width: 168px;
+      }
+      .w-120 {
+        width: 120px;
+      }
+      .w-96 {
+        width: 96px;
+      }
+      .w-140 {
+        width: 140px;
+      }
+      .hdr .meta .pip {
+        color: var(--ok);
+      }
+      .hdr .tick {
+        width: 6px;
+        height: 12px;
+        background: var(--on-coral);
+      }
+
+      /* ---------- mobile stage: 390 portrait, rail strip above stage ---------- */
+      .stage-mob {
+        width: 390px;
+        display: grid;
+        grid-template-columns: 1fr;
+        background: var(--surface);
+        border: 1px solid var(--hair);
+      }
+      .stage-mob > .col {
+        padding: var(--gutter-mob);
+      }
+      /* mobile rail: one horizontal strip, 5 chips × 66px with 8px gaps = 362px */
+      .rail-strip {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 18px;
+      }
+      .chip-sm {
+        min-height: 30px;
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0 6px;
+        border-bottom: 1px solid var(--hair);
+        font-family: var(--display);
+        font-weight: 700;
+        font-size: 10px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--fg-2);
+      }
+      .chip-sm.on {
+        background: var(--accent);
+        color: var(--fg);
+      }
+
+      /* the desktop specimen is 1324px of true pixel work; narrow previews zoom it to fit
+   (progressive enhancement — unsupported browsers keep the frame at 1:1 inside a scroller) */
+      .spec-desk {
+        overflow-x: auto;
+      }
+      @media (max-width: 1360px) {
+        .spec-desk .stage-desk {
+          zoom: 0.86;
+        }
+      }
+      @media (max-width: 1160px) {
+        .spec-desk .stage-desk {
+          zoom: 0.68;
+        }
+      }
+      @media (max-width: 920px) {
+        .spec-desk .stage-desk {
+          zoom: 0.52;
+        }
+      }
+
+      /* ---------- specs + ledger ---------- */
+      .cols {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 24px;
+      }
+      .card-blk {
+        border: 1px solid var(--hair);
+        padding: 16px 18px;
+      }
+      .card-blk h3 {
+        font-family: var(--display);
+        font-weight: 700;
+        font-size: 17px;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+      }
+      .kv {
+        display: grid;
+        grid-template-columns: 132px 1fr;
+        gap: 4px 10px;
+      }
+      .kv .k {
+        font-family: var(--mono);
+        font-size: 9px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+      .kv .v {
+        font-family: var(--mono);
+        font-size: 11px;
+        color: var(--fg-2);
+      }
+      .ledger li {
+        font-family: var(--mono);
+        font-size: 11px;
+        color: var(--fg-2);
+        list-style: none;
+      }
+      .ledger .bad {
+        text-decoration: line-through wavy var(--warn);
+      }
+      .portmap {
+        border: 1px solid var(--hair);
+        padding: 14px 16px;
+      }
+      .portmap .p {
+        font-family: var(--mono);
+        font-size: 10px;
+        letter-spacing: 0.08em;
+        color: var(--fg);
+      }
+      .foot {
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .note {
+        display: none;
+      }
+
+      .mast-meta {
+        display: grid;
+        grid-template-columns: 92px 1fr;
+        gap: 4px 12px;
+        margin-top: 16px;
+      }
+      .k {
+        font-family: var(--mono);
+        font-size: 9px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+      .v {
+        font-family: var(--mono);
+        font-size: 11px;
+        color: var(--fg-2);
+      }
+      .lede b {
+        color: var(--fg);
+        font-weight: 600;
+      }
+      .spec-block {
+        margin-bottom: 32px;
+      }
+      .spec-block .spec-desk {
+        margin-top: 26px;
+      }
+      .spec-mob {
+        margin-top: 26px;
+      }
+      .ledger {
+        margin: 14px 0 0 0;
+      }
+      .ledger .good {
+        color: var(--fg);
+      }
+      .ledger .bad {
+        text-decoration: line-through solid var(--warn);
+        text-decoration-thickness: 1px;
+      }
+      .ledger .bad span {
+        color: var(--warn);
+      }
+
+      /* ---------- mobile rail strip above the stage ---------- */
+      .spec-mob {
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+      }
+      .mob-rail {
+        width: 390px;
+        padding: 0 14px;
+        background: var(--plate-rail);
+        border: 1px solid var(--hair);
+        border-bottom: 0;
+      }
+
+      /* ---------- specs + port map ---------- */
+      .specs {
+        margin-top: 8px;
+      }
+      .specs .cols {
+        margin-bottom: 20px;
+      }
+      .specs .card-blk + .card-blk {
+        margin-top: 20px;
+      }
+      .specs > .card-blk {
+        margin-top: 20px;
+      }
+      .pm-cap {
+        font-family: var(--mono);
+        font-size: 10px;
+        letter-spacing: var(--track-meta);
+        text-transform: uppercase;
+        color: var(--muted);
+        margin-bottom: 10px;
+      }
+      .pm-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 8px 14px;
+      }
+      .p {
+        font-family: var(--mono);
+        font-size: 10px;
+        letter-spacing: 0.08em;
+        color: var(--fg);
+      }
+      .foot {
+        margin-top: 24px;
+        max-width: 1000px;
+      }
+      @media (max-width: 960px) {
+        .mast-grid,
+        .cols,
+        .mast-meta {
+          grid-template-columns: 1fr;
+        }
+        .stage-mob {
+          margin: 0 auto;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page" data-od-id="sheet">
+      <header class="mast" data-od-id="sheet-masthead">
+        <div class="mast-grid">
+          <div>
+            <p class="eyebrow">
+              HT-SEP · Grizzlython · Separate stage · header zone v3
+            </p>
+            <h1>Separate — header zone</h1>
+          </div>
+          <div>
+            <p class="lede">
+              The Separate stage no longer opens with a full-bleed coral banner.
+              The hero band is a <b>solid 40px coral rule</b> on desktop and a
+              <b>44px coral→0 strip</b> on mobile — the skin's two hero shapes,
+              at their real heights. Type moves out of the wash and into the
+              chamfered hairline card: the title becomes the card's first line
+              of type, the subtitle becomes readable body copy.
+            </p>
+            <div class="mast-meta">
+              <span class="k">Hero cap</span
+              ><span class="v"
+                >40px solid (desktop) · 44px coral→0 + dashed tan hairline
+                (mobile)</span
+              >
+              <span class="k">Title</span
+              ><span class="v"
+                >condensed grotesk display · UPPERCASE · cream · welded to the
+                band edge</span
+              >
+              <span class="k">Card</span
+              ><span class="v"
+                >chamfer 14 / 10 · 1px tan hairline · zero radius · no shadow ·
+                flat fills</span
+              >
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <section class="spec-block" data-od-id="spec-block-desktop">
+        <div class="spec-hd">
+          <span>A · Desktop — rail edge + stage header zone</span>
+          <span class="sp-dim"
+            >1324 px visible · rail 250 (172 shown, cropped left) + stage 1150 ·
+            shown 1:1</span
+          >
+        </div>
+        <div class="spec-desk">
+          <div class="stage-desk">
+            <!-- RAIL (context only, out of scope) — real rail is 250px wide; its left 90px sits outside this frame.
+           Chips: 44px tall, 12px pitch, 1px tan hairline base, uppercase condensed 13px tracked 0.12em.
+           TAILWIND rail: w-64 bg-[canvas] border-r-px border-hairline flex-col gap-3 pt-6
+           TAILWIND chip: h-11 px-3 border-b-px border-hairline font-display font-bold uppercase tracking-[0.12em] text-ink/78
+           TAILWIND chip(active): bg-coral text-cream   ← identity pairing, not a marketing block -->
+            <div class="railcol" data-od-id="rail-edge-desk">
+              <div class="chip on" data-od-id="rail-chip-separate">
+                Separate
+              </div>
+              <div class="chip off" data-od-id="rail-chip-listen">Listen</div>
+              <div class="chip off" data-od-id="rail-chip-mix">Mix</div>
+            </div>
+            <div class="col">
+              <!-- HEADER CARD · desktop · card 1102 wide (stage 1150 − 2 × 24 gutter), chamfer 14, 1px tan hairline.
+             VERTICAL RHYTHM (desktop): hero 40 · seam 1 · pad 16 · title 26 line box · 12 · meta 13 · 14 ·
+             body 2 × 23 = 46 · pad-bottom 20 → card 188px · 20px gap → content card top edge.
+             HORIZONTAL: band and copy share a 16px inset, so the title's left edge welds under the tagline's.
+             TAILWIND header: chamfer-x-14 border-px border-hairline bg-canvas -->
+              <div class="hdr hdr-desk ring o14" data-od-id="header-desktop">
+                <div class="in o13">
+                  <!-- HERO BAND · h-40 · SOLID coral, flat, no fade, no dashed edge (desktop skin truth).
+                 Carries ONLY a 9px ink mono tagline (tracking 0.14em) + a 6 × 12 ink tick.
+                 No display type here: a 1102px coral slab with a 30px sentence-case title is the banner the skin rejects.
+                 TAILWIND band: h-10 bg-coral flex items-center justify-between px-4 -->
+                  <div class="hero" data-od-id="hero-band-desk">
+                    <span class="tag">In-browser · nothing uploaded</span>
+                    <span class="tick"></span>
+                  </div>
+                  <!-- COPY BLOCK · 1px solid tan hairline seam under the band, then the card's type.
+                 TAILWIND copy: border-t-px border-hairline pt-4 -->
+                  <div class="copy-solid">
+                    <!-- TAILWIND title: font-display font-bold uppercase tracking-[0.06em] text-[22px] leading-26 text-cream mt-0 -->
+                    <h2 class="ttl-desk" data-od-id="header-title-desk">
+                      Separate Music Into Stems
+                    </h2>
+                    <!-- TAILWIND meta: font-mono text-[10px] uppercase tracking-[0.14em] text-tan-2 my-3 -->
+                    <div class="meta" data-od-id="header-meta-desk">
+                      HT-DEMUCS 4-STEM <span class="pip">·</span> local onnx
+                    </div>
+                    <!-- TAILWIND subtitle: text-[15px] leading-23 text-cream max-w-[660] mt-3  ← body copy INSIDE the card, never on the band -->
+                    <p class="sub-desk" data-od-id="header-subtitle-desk">
+                      Extract Vocals, Drums, Bass, and Other instruments locally
+                      in your browser using neural network models.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <!-- CONTENT CARD (out of scope) — only its top edge is in this sheet. Same chamfer family (10), same 1px tan hairline.
+             TAILWIND card: chamfer-x-10 border-px border-hairline bg-canvas mt-5 -->
+              <div class="body-card ring o10" data-od-id="content-card-desk">
+                <div class="in o9">
+                  <div class="row">
+                    <span class="lbl">Stem outputs</span
+                    ><span class="lbl">HT-DEMUCS · 4-STEM</span>
+                  </div>
+                  <div class="row">
+                    <span class="lbl">Vocals</span
+                    ><span class="stem w-168 on"></span>
+                  </div>
+                  <div class="row">
+                    <span class="lbl">Drums</span
+                    ><span class="stem w-120"></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+      <section class="spec-block" data-od-id="spec-block-mobile">
+        <div class="spec-hd">
+          <span>B · Mobile portrait — rail strip + stage header zone</span>
+          <span class="sp-dim"
+            >390 px wide · stage 390 · card 362 · shown 1:1</span
+          >
+        </div>
+        <div class="spec-mob">
+          <div class="mob-rail" data-od-id="rail-strip-mob">
+            <!-- MOBILE RAIL: one horizontal strip above the stage — 5 chips × 66px, 8px gaps, 30px tall,
+           1px tan hairline on the chip base, active chip = solid coral + cream.
+           TAILWIND chip: h-[30] flex-1 border-b-px border-hairline text-[10px] font-display uppercase tracking-[0.12em]
+           TAILWIND chip(active): bg-coral text-cream -->
+            <div class="rail-strip">
+              <div class="chip-sm on">Separate</div>
+              <div class="chip-sm off">Listen</div>
+              <div class="chip-sm off">Mix</div>
+              <div class="chip-sm off">Export</div>
+              <div class="chip-sm off">System</div>
+            </div>
+          </div>
+          <div class="stage-mob">
+            <div class="col">
+              <!-- HEADER CARD · mobile · card 362 wide (390 − 2 × 14 gutter), right two corners chamfered 12, 1px tan hairline.
+             VERTICAL RHYTHM (mobile): hero strip 44 · dashed seam 1 · pad 14 · title 18 line box · 6 · meta 11 ·
+             10 · body 3 × 20 = 60 · pad-bottom 14 → card ~164 · 18px gap → content card top edge.
+             TAILWIND card: chamfer-tr-3 chamfer-br-3 border-px border-hairline bg-canvas -->
+              <div class="hdr hdr-mob ring notch-r" data-od-id="header-mobile">
+                <div class="in notch-r-in">
+                  <!-- HERO STRIP · h-11 (44px cap) · coral 0% → coral-0 100% · dashed 1px tan hairline edge below the strip.
+                 Empty of type: the strip carries the skin's coral identity, the card carries the words.
+                 TAILWIND strip: h-11 bg-coral/[0] from-top + border-dashed border-b-px border-hairline -->
+                  <div class="hero" data-od-id="hero-band-mob"></div>
+                  <!-- TAILWIND copy: border-b-0 border-t-px border-dashed border-hairline px-3.5 pt-3.5 -->
+                  <div class="copy-dash">
+                    <!-- TAILWIND title: font-display font-bold uppercase text-[15px] leading-18 tracking-[0.07em] text-cream -->
+                    <h2 class="ttl-mob" data-od-id="header-title-mob">
+                      Separate Music Into Stems
+                    </h2>
+                    <div class="meta">
+                      HT-DEMUCS 4-STEM <span class="pip">·</span> local onnx
+                    </div>
+                    <p class="sub-mob" data-od-id="header-subtitle-mob">
+                      Extract Vocals, Drums, Bass, and Other instruments locally
+                      in your browser using neural network models.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <!-- CONTENT CARD (out of scope) — top edge only, same 12px chamfer family, same 1px tan hairline.
+             TAILWIND card: chamfer-tr-3 chamfer-br-3 border-px border-hairline mt-4.5 -->
+              <div class="body-card ring notch-r" data-od-id="content-card-mob">
+                <div class="in notch-r-in">
+                  <div class="row">
+                    <span class="lbl">Vocals</span
+                    ><span class="stem w-140 on"></span>
+                  </div>
+                  <div class="row">
+                    <span class="lbl">Drums</span
+                    ><span class="stem w-96"></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="specs" data-od-id="specs">
+        <div class="cols">
+          <div class="card-blk" data-od-id="spec-table-desktop">
+            <h3>Desktop · 1150 stage</h3>
+            <div class="kv">
+              <span class="k">Hero band</span
+              ><span class="v"
+                >h 40px · SOLID coral, flat matte · no fade · no dashed edge ·
+                ink-only mono</span
+              >
+              <span class="k">Band type</span
+              ><span class="v"
+                >mono 9px / tracking 0.14em / ink #161515 on coral · tick 6 ×
+                12px</span
+              >
+              <span class="k">Title</span
+              ><span class="v"
+                >22px Archivo Narrow 700 · uppercase · tracking 0.06em · line
+                box 26px · cream</span
+              >
+              <span class="k">Title seat</span
+              ><span class="v"
+                >16px below the band seam — the card's first line of type,
+                left-flush with the card edge</span
+              >
+              <span class="k">Meta line</span
+              ><span class="v"
+                >mono 10px / 0.14em / tan-2 · pip peach · 12px below title</span
+              >
+              <span class="k">Subtitle</span
+              ><span class="v"
+                >15px / 23px leading · cream · measure 660px · 14px below meta ·
+                2 lines</span
+              >
+              <span class="k">Rhythm</span
+              ><span class="v"
+                >40 · 1 · 16 · 26 · 12 · 13 · 14 · 46 · 20 → card 188px</span
+              >
+              <span class="k">Gap → card</span
+              ><span class="v"
+                >20px between header card bottom and content card top edge</span
+              >
+            </div>
+          </div>
+          <div class="card-blk" data-od-id="spec-table-mobile">
+            <h3>Mobile portrait · 390</h3>
+            <div class="kv">
+              <span class="k">Hero strip</span
+              ><span class="v"
+                >h 44px (the cap) · coral 100% → coral 0% top-to-bottom · 1px
+                dashed tan hairline edge</span
+              >
+              <span class="k">Band type</span
+              ><span class="v">none — the strip is a rule, not a banner</span>
+              <span class="k">Title</span
+              ><span class="v"
+                >15px Archivo Narrow 700 · uppercase · tracking 0.07em · line
+                box 18px · cream on canvas</span
+              >
+              <span class="k">Title seat</span
+              ><span class="v"
+                >first text line in the card, 14px below the dashed seam</span
+              >
+              <span class="k">Meta line</span
+              ><span class="v"
+                >mono 10px / 0.14em / tan-2 · 6px below title · single line,
+                220px wide</span
+              >
+              <span class="k">Subtitle</span
+              ><span class="v"
+                >13px / 20px leading · cream · 332px measure · 3 lines · 10px
+                below meta</span
+              >
+              <span class="k">Rhythm</span
+              ><span class="v"
+                >44 · 1 · 14 · 18 · 6 · 11 · 10 · 60 · 14 → card ~164px</span
+              >
+              <span class="k">Gap → card</span
+              ><span class="v">18px to the content card top edge</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card-blk" data-od-id="ledger">
+          <h3>Rejected → shipped</h3>
+          <ul class="ledger">
+            <li class="bad">
+              <span>Full-bleed coral band under the title</span> — replaced by a
+              40px solid rule (desktop) and a 44px coral→0 strip (mobile)
+            </li>
+            <li class="bad">
+              <span>Coral band fading out downward on desktop</span> — desktop
+              hero stays flat solid; the fade exists only in the mobile strip
+            </li>
+            <li class="bad">
+              <span>Dashed bottom edge on the desktop band</span> — the dashed
+              tan hairline belongs to the mobile strip
+            </li>
+            <li class="bad">
+              <span>Sentence-case 30px title floating on the wash</span> — 22px
+              / 15px condensed UPPERCASE, welded to the card's first line
+            </li>
+            <li class="bad">
+              <span>Subtitle riding on the band</span> — it is body copy inside
+              the card, 15px / 23px on desktop, 13px / 20px on mobile
+            </li>
+            <li class="good">
+              Solid coral + cream stays reserved for the active rail chip and
+              the hero rule; the title borrows that pairing by sitting directly
+              under it
+            </li>
+            <li class="good">
+              One accent (coral) per viewport as a field, peach only as a
+              1-glyph state pip, deep red held for warnings
+            </li>
+          </ul>
+        </div>
+
+        <div class="portmap" data-od-id="portmap">
+          <div class="pm-cap">
+            Component slots — stable names for the port layer
+          </div>
+          <div class="pm-grid">
+            <span class="p">header-desktop</span
+            ><span class="p">hero-band-desk</span>
+            <span class="p">header-title-desk</span
+            ><span class="p">header-subtitle-desk</span>
+            <span class="p">header-mobile</span
+            ><span class="p">hero-band-mob</span>
+            <span class="p">header-title-mob</span
+            ><span class="p">header-subtitle-mob</span>
+          </div>
+        </div>
+      </section>
+
+      <p class="foot">
+        Grizzlython identity only — canvas #161515 with a 7%-tan 32px grid,
+        cream #eae7dd, tan-2 #979385 hairlines, coral #ef474a, deep red #c12f2f,
+        peach #f1b994. Zero radius, 1px hairlines, chamfered corners, flat matte
+        fills, no shadows. Type roles: condensed grotesk for display (UPPERCASE,
+        tracked) · neutral grotesk for body prose · mono for meta at 9–10px,
+        tracked 0.14em.
+      </p>
+    </main>
+  </body>
+</html>
