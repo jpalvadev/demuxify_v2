@@ -65,9 +65,9 @@ The persistent application frame that organizes the tools into fixed, mutually e
 _Avoid_: Workspace, menu, dashboard, card stack
 
 **Tab**:
-One of the five persistent, mutually exclusive tool surfaces inside the Tab Shell — Separate, Listen, Mix, Export, or System — always visible and never opened as a modal.
-_Avoid_: Modal, popup, overlay, dialog
+One of the four persistent, mutually exclusive tool surfaces inside the Tab Shell — Separate, Mix, Export, or System — always visible and never opened as a modal; Mix and Export are unavailable (grayscaled) until Stems exist.
+_Avoid_: Modal, popup, overlay, dialog, Listen tab
 
 **Transport**:
-The row of dedicated playback controls inside the Stem Player: separate Play and Pause buttons, seek-to-start, time readout, and Master Volume.
-_Avoid_: Play/pause toggle, pill button, playback control bar
+The row of dedicated playback controls inside the Stem Player: a single Play/Pause toggle whose icon shows the action coming next, time readout, and Master Volume.
+_Avoid_: Separate Play and Pause buttons, seek-to-start button, pill button

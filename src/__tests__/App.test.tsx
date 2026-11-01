@@ -1322,7 +1322,7 @@ describe("App UI Shell", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
-  it("renders dedicated Play/Pause transport buttons with seek-to-start and mono readout on the Mix Tab", async () => {
+  it("renders a single Play/Pause toggle transport with mono readout on the Mix Tab", async () => {
     vi.spyOn(webgpuModule, "detectWebGPUCapability").mockResolvedValue({
       supported: true,
       isFallback: false,
@@ -1333,31 +1333,42 @@ describe("App UI Shell", () => {
     await loadAndSeparate();
 
     const mixTab = screen.getByRole("region", { name: /mix tab/i });
+
+    // One Transport toggle; no dedicated Play, Pause, or Seek-to-start buttons
+    const mixToggleBtn = within(mixTab).getByRole("button", {
+      name: /^play\/pause$/i,
+    });
+    expect(mixToggleBtn).toBeInTheDocument();
     expect(
-      within(mixTab).getByRole("button", { name: /^play$/i })
-    ).toBeInTheDocument();
+      within(mixTab).queryByRole("button", { name: /^play$/i })
+    ).toBeNull();
     expect(
-      within(mixTab).getByRole("button", { name: /^pause$/i })
-    ).toBeInTheDocument();
+      within(mixTab).queryByRole("button", { name: /^pause$/i })
+    ).toBeNull();
     expect(
-      within(mixTab).getByRole("button", { name: /seek to start/i })
-    ).toBeInTheDocument();
+      within(mixTab).queryByRole("button", { name: /seek to start/i })
+    ).toBeNull();
     expect(
       within(mixTab).getAllByText(/\d{2}:\d{2}/).length
     ).toBeGreaterThanOrEqual(2);
 
-    // Pressing the Mix Tab Play button drives the shared Stem Player engine
-    const mixPlayBtn = within(mixTab).getByRole("button", {
-      name: /^play$/i,
-    });
-    fireEvent.click(mixPlayBtn);
+    // Pressing the toggle drives the shared Stem Player engine
+    expect(mixToggleBtn).toHaveAttribute("aria-pressed", "false");
+    fireEvent.click(mixToggleBtn);
     await waitFor(() => {
-      expect(mixPlayBtn).toHaveAttribute("aria-pressed", "true");
+      expect(mixToggleBtn).toHaveAttribute("aria-pressed", "true");
     });
 
-    fireEvent.click(within(mixTab).getByRole("button", { name: /^pause$/i }));
+    // Pressing the same toggle again pauses
+    fireEvent.click(mixToggleBtn);
     await waitFor(() => {
-      expect(mixPlayBtn).toHaveAttribute("aria-pressed", "false");
+      expect(mixToggleBtn).toHaveAttribute("aria-pressed", "false");
+    });
+
+    // Space key toggles that same control
+    fireEvent.keyDown(window, { code: "Space", key: " " });
+    await waitFor(() => {
+      expect(mixToggleBtn).toHaveAttribute("aria-pressed", "true");
     });
   });
 

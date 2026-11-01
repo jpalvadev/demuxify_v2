@@ -9,6 +9,7 @@ import {
 import userEvent from "@testing-library/user-event";
 import { StemPlayer } from "../components/StemPlayer";
 import { StemName } from "../lib/chunkOverlapAdd";
+import { StemPlayerEngine } from "../lib/stemPlayerEngine";
 import * as customMixdown from "../lib/customMixdown";
 
 // Mock Web Audio API
@@ -91,14 +92,13 @@ describe("StemPlayer UI Component", () => {
       screen.getByRole("region", { name: /stem player/i })
     ).toBeInTheDocument();
 
-    // Transport controls: dedicated Play and Pause buttons plus seek-to-start
-    expect(screen.getByRole("button", { name: /^play$/i })).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: /^pause$/i })
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: /seek to start/i })
-    ).toBeInTheDocument();
+    // Transport: one Play/Pause toggle, no dedicated Play/Pause/Seek buttons
+    const toggleBtn = screen.getByRole("button", { name: /^play\/pause$/i });
+    expect(toggleBtn).toBeInTheDocument();
+    expect(toggleBtn).toHaveAttribute("aria-pressed", "false");
+    expect(screen.queryByRole("button", { name: /^play$/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^pause$/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /seek to start/i })).toBeNull();
     expect(screen.getByText(/00:00/)).toBeInTheDocument();
 
     // 4 Stem tracks
@@ -113,7 +113,10 @@ describe("StemPlayer UI Component", () => {
     ).toBeInTheDocument();
   });
 
-  it("toggles playback via the dedicated Play and Pause buttons", async () => {
+  it("toggles playback with the single Play/Pause toggle", async () => {
+    const playSpy = vi.spyOn(StemPlayerEngine.prototype, "play");
+    const pauseSpy = vi.spyOn(StemPlayerEngine.prototype, "pause");
+
     render(
       <StemPlayer
         stems={dummyStems}
@@ -122,24 +125,24 @@ describe("StemPlayer UI Component", () => {
       />
     );
 
-    const playBtn = screen.getByRole("button", { name: /^play$/i });
-    const pauseBtn = screen.getByRole("button", { name: /^pause$/i });
+    const toggleBtn = screen.getByRole("button", { name: /^play\/pause$/i });
 
-    // Initially paused: Play unpressed, Pause pressed
-    expect(playBtn).toHaveAttribute("aria-pressed", "false");
-    expect(pauseBtn).toHaveAttribute("aria-pressed", "true");
+    // Paused: icon promises play, assistive tech reports unpressed
+    expect(toggleBtn).toHaveAttribute("aria-pressed", "false");
 
-    // Pressing Play starts playback
-    fireEvent.click(playBtn);
+    // One press starts playback: engine gets play, button reports pressed
+    fireEvent.click(toggleBtn);
     await waitFor(() => {
-      expect(playBtn).toHaveAttribute("aria-pressed", "true");
+      expect(toggleBtn).toHaveAttribute("aria-pressed", "true");
     });
+    expect(playSpy).toHaveBeenCalled();
 
-    // Pressing Pause stops playback
-    fireEvent.click(pauseBtn);
+    // Pressing the same button again stops playback: engine gets pause
+    fireEvent.click(toggleBtn);
     await waitFor(() => {
-      expect(playBtn).toHaveAttribute("aria-pressed", "false");
+      expect(toggleBtn).toHaveAttribute("aria-pressed", "false");
     });
+    expect(pauseSpy).toHaveBeenCalled();
   });
 
   it("toggles playback using Spacebar hotkey listener", async () => {
@@ -151,23 +154,19 @@ describe("StemPlayer UI Component", () => {
       />
     );
 
-    expect(screen.getByRole("button", { name: /^play$/i })).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: /^pause$/i })
-    ).toBeInTheDocument();
+    const toggleBtn = screen.getByRole("button", { name: /^play\/pause$/i });
+    expect(toggleBtn).toHaveAttribute("aria-pressed", "false");
 
-    const playBtn = screen.getByRole("button", { name: /^play$/i });
-
-    // Press Spacebar
+    // Press Spacebar: the same control starts playback
     fireEvent.keyDown(window, { code: "Space", key: " " });
     await waitFor(() => {
-      expect(playBtn).toHaveAttribute("aria-pressed", "true");
+      expect(toggleBtn).toHaveAttribute("aria-pressed", "true");
     });
 
-    // Press Spacebar again
+    // Press Spacebar again: it stops playback
     fireEvent.keyDown(window, { code: "Space", key: " " });
     await waitFor(() => {
-      expect(playBtn).toHaveAttribute("aria-pressed", "false");
+      expect(toggleBtn).toHaveAttribute("aria-pressed", "false");
     });
   });
 
@@ -240,7 +239,7 @@ describe("StemPlayer UI Component", () => {
     expect(screen.getByText(/00:05/)).toBeInTheDocument();
   });
 
-  it("resets playback to beginning when Reset button is clicked", () => {
+  it("repositions the playhead with spine scrubbing instead of a Seek button", () => {
     render(
       <StemPlayer
         stems={dummyStems}
@@ -249,31 +248,19 @@ describe("StemPlayer UI Component", () => {
       />
     );
 
+    // The Seek-to-start button is gone from the Transport row
+    expect(screen.queryByRole("button", { name: /seek to start/i })).toBeNull();
+
     const slider = screen.getByRole("slider", {
       name: /master waveform timeline/i,
     });
-    vi.spyOn(slider, "getBoundingClientRect").mockReturnValue({
-      left: 0,
-      top: 0,
-      width: 500,
-      height: 100,
-      right: 500,
-      bottom: 100,
-      x: 0,
-      y: 0,
-      toJSON: () => {},
-    });
 
-    // Seek to 5s
+    // Scrub the spine forward to 5s
     fireEvent.keyDown(slider, { key: "ArrowRight" });
     expect(screen.getByText(/00:05/)).toBeInTheDocument();
 
-    // Click Seek to Start
-    const resetBtn = screen.getByRole("button", {
-      name: /seek to start/i,
-    });
-    fireEvent.click(resetBtn);
-
+    // Scrub the spine back to the start: one mechanism, no button
+    fireEvent.keyDown(slider, { key: "Home" });
     expect(screen.getByText(/00:00/)).toBeInTheDocument();
   });
 

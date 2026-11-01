@@ -3,7 +3,6 @@ import {
   Play,
   Pause,
   RotateCcw,
-  SkipBack,
   Volume2,
   Layers,
   Trash2,
@@ -36,9 +35,9 @@ export interface ExportDialogState {
   timeStretch: TimeStretchState;
 }
 
-// Tab Shell (ADR-0007): transport actions bridge so the Listen Tab can host
-// the shared Transport row (Play / Pause / Seek to start) driving the same
-// StemPlayerEngine instance. Engine interface unchanged.
+// Tab Shell bridge (ADR-0008): transport actions stay available to the app —
+// the Mix Tab's single Play/Pause toggle calls play or pause by state, and
+// spine scrubbing keeps using seek. Signature unchanged; engine untouched.
 export interface TransportControls {
   play: () => void;
   pause: () => void;
@@ -202,19 +201,6 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
     };
   }, []);
 
-  const togglePlayPause = useCallback(async () => {
-    const engine = engineRef.current;
-    if (!engine) return;
-
-    if (engine.isPlaying()) {
-      engine.pause();
-      setIsPlaying(false);
-    } else {
-      await engine.play();
-      setIsPlaying(true);
-    }
-  }, []);
-
   // Dedicated transport actions (Tab Shell): Play only starts, Pause only stops.
   const handlePlay = useCallback(async () => {
     const engine = engineRef.current;
@@ -229,6 +215,19 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
     engine.pause();
     setIsPlaying(false);
   }, []);
+
+  // Transport toggle (ADR-0008): one button, icon bound to the action coming
+  // next; it calls play or pause depending on state through the bridge actions.
+  const togglePlayPause = useCallback(async () => {
+    const engine = engineRef.current;
+    if (!engine) return;
+
+    if (engine.isPlaying()) {
+      handlePause();
+    } else {
+      await handlePlay();
+    }
+  }, [handlePlay, handlePause]);
 
   const handleSeek = useCallback(
     (seekTime: number) => {
@@ -445,43 +444,32 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
             </span>
           </div>
 
-          {/* Transport Controls: dedicated Seek-to-start / Play / Pause buttons (Bold port) */}
+          {/* Transport: single Play/Pause toggle (ADR-0008). Icon shows the
+              action coming next: ▶ while paused, ⏸ while playing; one stable
+              accessible name plus aria-pressed for assistive tech. The Seek-to-
+              start button is gone; the Master Waveform spine is the timeline. */}
           <div className="flex items-center gap-2">
             <button
               type="button"
-              aria-label="Seek to Start"
-              title="Seek to start"
-              onClick={handleReset}
-              className="flex h-11 w-11 items-center justify-center rounded-none border border-border bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground transition-all"
-            >
-              <SkipBack className="h-4 w-4" />
-              <span className="hidden sm:inline font-mono uppercase text-[10px] font-bold">
-                Seek
-              </span>
-            </button>
-
-            <button
-              type="button"
-              aria-label="Play"
+              aria-label="Play/Pause"
               aria-pressed={isPlaying}
-              title="Play (Space)"
-              onClick={handlePlay}
-              className="flex h-11 px-5 items-center justify-center gap-2 rounded-none bg-primary text-primary-foreground font-semibold shadow-sm hover:bg-primary/90 active:scale-95 transition-all"
+              title="Play/Pause (Space)"
+              onClick={togglePlayPause}
+              className={cn(
+                "flex h-11 px-5 items-center justify-center gap-2 rounded-none border transition-all font-semibold shadow-sm active:scale-95",
+                isPlaying
+                  ? "bg-primary text-primary-foreground border-primary hover:bg-primary/90"
+                  : "bg-secondary/60 text-foreground border-border hover:bg-secondary"
+              )}
             >
-              <Play className="h-4 w-4 fill-current" />
-              <span>Play</span>
-            </button>
-
-            <button
-              type="button"
-              aria-label="Pause"
-              aria-pressed={!isPlaying}
-              title="Pause (Space)"
-              onClick={handlePause}
-              className="flex h-11 px-5 items-center justify-center gap-2 rounded-none border border-border bg-secondary/60 text-foreground hover:bg-secondary transition-all"
-            >
-              <Pause className="h-4 w-4 fill-current" />
-              <span>Pause</span>
+              {isPlaying ? (
+                <Pause className="h-4 w-4 fill-current" />
+              ) : (
+                <Play className="h-4 w-4 fill-current" />
+              )}
+              <span className="hidden sm:inline font-mono uppercase text-[10px] font-bold">
+                Play/Pause
+              </span>
             </button>
 
             {onPurgeSession && (
