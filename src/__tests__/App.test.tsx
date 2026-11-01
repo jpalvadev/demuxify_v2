@@ -922,6 +922,21 @@ describe("App UI Shell", () => {
     expect(screen.queryByText(/no Stems yet/i)).not.toBeInTheDocument();
   });
 
+  it("keeps the shell chrome contract: clipped stage and fixed 112px rail cells", async () => {
+    render(<App />);
+
+    const rail = screen.getByRole("navigation", { name: /tab rail/i });
+    expect(rail.getAttribute("class") ?? "").toContain(
+      "grid-cols-[112px_112px_112px]"
+    );
+
+    const separatePanel = screen.getByRole("region", {
+      name: /^Separate Tab$/,
+    });
+    const stage = separatePanel.parentElement;
+    expect(stage?.getAttribute("class") ?? "").toContain("overflow-hidden");
+  });
+
   it("moves active-Tab focus from Separate to Listen when Separation is complete", async () => {
     vi.spyOn(webgpuModule, "detectWebGPUCapability").mockResolvedValue({
       supported: true,
