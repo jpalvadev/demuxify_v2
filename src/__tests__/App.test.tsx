@@ -671,13 +671,25 @@ describe("App UI Shell", () => {
       ).not.toBeInTheDocument();
     });
 
+    // Discard is now a full purge: the saved Session is gone from storage...
     expect(await sessionStore.hasActiveSession()).toBe(false);
+    // ...and the in-memory app state is cleared too — no lingering Stems or
+    // mixer anywhere
+    expect(screen.queryByRole("region", { name: /stem player/i })).toBeNull();
+    // A subsequent render shows the clean Separate Tab: dropzone restored and
+    // the Mix and Export rail chips gated (grayscaled) with the reason line
     expect(
       screen.getByText(/drag and drop your source mix/i)
     ).toBeInTheDocument();
+    const rail = screen.getByRole("navigation", { name: /tab rail/i });
+    for (const gatedName of ["Mix", "Export"]) {
+      const chip = within(rail).getByRole("button", { name: gatedName });
+      expect(chip.getAttribute("class") ?? "").toContain("opacity-50");
+      expect(within(chip).getByText(/no Stems yet/i)).toBeInTheDocument();
+    }
   });
 
-  it("allows purging the active session from Stem Player to return to clean state", async () => {
+  it("keeps the Mix Tab free of destructive controls — no Purge/Reset Session trash button", async () => {
     vi.spyOn(webgpuModule, "detectWebGPUCapability").mockResolvedValue({
       supported: true,
       isFallback: false,
@@ -721,20 +733,30 @@ describe("App UI Shell", () => {
       ).toBeInTheDocument();
     });
 
-    const purgeBtn = screen.getByRole("button", {
-      name: /purge session|reset session/i,
-    });
-    fireEvent.click(purgeBtn);
-
-    await waitFor(() => {
-      expect(
-        screen.queryByRole("region", { name: /stem player/i })
-      ).not.toBeInTheDocument();
-    });
-
+    // The Mix Tab's playback surface carries NO trash / Purge / Reset Session
+    // affordance (ADR-0008 ticket 04: the Mix purge died)...
+    const mixTab = screen.getByRole("region", { name: /^Mix Tab$/ });
     expect(
-      screen.getByText(/drag and drop your source mix/i)
+      within(mixTab).queryByRole("button", {
+        name: /purge session|reset session/i,
+      })
+    ).toBeNull();
+    // ...and nowhere else while Stems exist: the only confirmed wipe is
+    // Discard on the Separate Tab's Session Recovery panel, which needs a
+    // detected Session to appear at all
+    expect(
+      screen.queryByRole("button", { name: /purge session|reset session/i })
+    ).toBeNull();
+
+    // The Transport row itself stays intact — the single toggle is still there
+    expect(
+      within(mixTab).getByRole("button", { name: /^play\/pause$/i })
     ).toBeInTheDocument();
+
+    // Isolation: the auto-saver may have persisted a Session during
+    // separation — clear it so later renders don't see recovery prompts
+    const sessionStore = await import("../lib/sessionStore");
+    await sessionStore.clearActiveSession();
   });
 
   it("allows desktop users to select Balanced (HT-Demucs) model profile and initializes client with chosen profile", async () => {
@@ -1451,6 +1473,12 @@ describe("App UI Shell", () => {
     // No floating diagnostics pill and no modal overlay anywhere
     expect(screen.queryByRole("button", { name: /^diagnostics$/i })).toBeNull();
     expect(screen.queryByRole("dialog")).toBeNull();
+
+    // Ticket 04 swept destructive buttons out of the Mix Tab, not the System
+    // Tab: Clear Logs keeps its trash affordance and diagnostics stay clearable
+    expect(
+      within(systemTab).getByRole("button", { name: /clear logs/i })
+    ).toBeInTheDocument();
   });
 
   it("renders a single Play/Pause toggle transport with mono readout on the Mix Tab", async () => {

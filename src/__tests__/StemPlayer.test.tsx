@@ -99,6 +99,12 @@ describe("StemPlayer UI Component", () => {
     expect(screen.queryByRole("button", { name: /^play$/i })).toBeNull();
     expect(screen.queryByRole("button", { name: /^pause$/i })).toBeNull();
     expect(screen.queryByRole("button", { name: /seek to start/i })).toBeNull();
+    // ADR-0008 (ticket 04): no trash / Purge / Reset Session button in the
+    // action row — the interface has no onPurgeSession affordance at all, so
+    // the player can never mount a destructive Session wipe
+    expect(
+      screen.queryByRole("button", { name: /purge session|reset session/i })
+    ).toBeNull();
     expect(screen.getByText(/00:00/)).toBeInTheDocument();
 
     // 4 Stem tracks

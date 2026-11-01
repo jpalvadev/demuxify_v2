@@ -359,18 +359,24 @@ export const App: React.FC = () => {
     }
   };
 
-  const handleDiscardSession = async () => {
-    setDetectedSession(null);
-    cachedSessionRef.current = null;
-    autoSaverRef.current.cancel();
-    await clearActiveSession();
-  };
-
+  // ADR-0008 (ticket 04): the old Mix Tab purge routine, kept as the single
+  // full-purge wipe — cancel auto-saver, drop the cached Session, clear the
+  // saved Session from storage, and clear the in-memory Source Mix, Stems,
+  // mixer levels, and playhead (handleClearSourceMix).
   const handlePurgeSession = async () => {
     autoSaverRef.current.cancel();
     cachedSessionRef.current = null;
     await clearActiveSession();
     handleClearSourceMix();
+  };
+
+  // Discard (Session Recovery, Separate Tab) is now a full purge: it reuses
+  // the purge routine rather than duplicating the wipe. Clearing the
+  // detected Session keeps the recovery prompt from re-rendering after the
+  // purge, leaving a clean Separate Tab.
+  const handleDiscardSession = async () => {
+    setDetectedSession(null);
+    await handlePurgeSession();
   };
 
   const handleMixerChange = (mixer: {
@@ -806,7 +812,6 @@ export const App: React.FC = () => {
                   initialMasterVolume={restoredMixerState?.masterVolume}
                   initialCurrentTime={restoredMixerState?.currentTime}
                   onMixerChange={handleMixerChange}
-                  onPurgeSession={handlePurgeSession}
                   sourceMixTitle={decodedSourceMix.metadata.fileName}
                   exportDialogHosted
                   onExportDialogState={handleExportDialogStateChange}

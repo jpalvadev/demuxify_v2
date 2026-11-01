@@ -5,7 +5,6 @@ import {
   RotateCcw,
   Volume2,
   Layers,
-  Trash2,
   Download,
   Gauge,
   Music,
@@ -63,7 +62,9 @@ export interface StemPlayerProps {
     masterVolume: number;
     currentTime: number;
   }) => void;
-  onPurgeSession?: () => void;
+  // ADR-0008 (ticket 04): no onPurgeSession — the Mix Tab's playback surface
+  // carries no destructive Session-wipe affordance; the full purge lives on
+  // the Separate Tab's Session Recovery Discard.
   // Tab Shell (ADR-0008): the app hosts the Export panel inline in the Export
   // Tab, so the Mix Tab carries no Export Stems action and the player renders
   // no fallback panel of its own.
@@ -95,7 +96,6 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
   initialMasterVolume,
   initialCurrentTime,
   onMixerChange,
-  onPurgeSession,
   exportDialogHosted,
   onExportDialogState,
   onTransportControls,
@@ -479,18 +479,9 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
               </span>
             </button>
 
-            {onPurgeSession && (
-              <button
-                type="button"
-                aria-label="Purge Session"
-                title="Purge session and start fresh"
-                onClick={onPurgeSession}
-                className="flex h-10 px-3 items-center justify-center gap-1.5 rounded-none border border-border bg-secondary/60 text-muted-foreground hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30 transition-all text-xs font-semibold"
-              >
-                <Trash2 className="h-4 w-4" />
-                <span className="hidden sm:inline">Reset Session</span>
-              </button>
-            )}
+            {/* ADR-0008 (ticket 04): the trash / Purge Session button is dead —
+                nothing destructive sits in the playback surface. The full purge
+                is the Separate Tab's Session Recovery Discard. */}
 
             {/* Export Stems Action — standalone form only. The hosted app
                 form (exportDialogHosted) keeps the Export panel inline in the
