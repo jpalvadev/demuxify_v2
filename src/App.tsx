@@ -561,6 +561,11 @@ export const App: React.FC = () => {
               </button>
             );
           })}
+
+          {/* Toast stack (Tab Shell port, data-od-id="toast-stack"): notices
+              stack at the rail bottom (left column on desktop, below the top
+              strip on mobile portrait) instead of floating over content. */}
+          <ToastContainer />
         </nav>
 
         {/* Tab stage: five pinned Tab panels, always present in the DOM */}
@@ -941,8 +946,6 @@ export const App: React.FC = () => {
           </section>
         </div>
       </main>
-
-      <ToastContainer />
 
       <footer className="border-t border-border/60 py-6 text-center text-xs text-muted-foreground">
         <p>

@@ -10,6 +10,7 @@ import App from "../App";
 import * as webgpuModule from "../lib/webgpu";
 import * as audioDecoderModule from "../lib/audioDecoder";
 import { InferenceClient } from "../lib/inferenceClient";
+import * as toastModule from "../lib/toast";
 
 describe("App UI Shell", () => {
   const dummyBuffer = {
@@ -1267,5 +1268,27 @@ describe("App UI Shell", () => {
         })
       ).toBeNull();
     }
+  });
+
+  it("stacks toast notices at the rail bottom instead of floating over content", async () => {
+    vi.spyOn(webgpuModule, "detectWebGPUCapability").mockResolvedValue({
+      supported: true,
+      isFallback: false,
+    });
+
+    toastModule.toast.success("source mix queued · demo notice");
+
+    render(<App />);
+
+    const railNav = screen.getByRole("navigation", { name: /tab rail/i });
+    const stack = within(railNav).getByTestId("toast-stack");
+    expect(stack).toBeInTheDocument();
+    expect(within(railNav).getByText(/source mix queued/)).toBeInTheDocument();
+
+    // The stack is an in-flow notice area at the rail end, not a floating
+    // bottom-right container
+    expect(stack.className.includes("fixed")).toBe(false);
+
+    toastModule.toastManager.clear();
   });
 });
