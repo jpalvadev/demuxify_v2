@@ -1217,4 +1217,55 @@ describe("App UI Shell", () => {
       expect(mixPlayBtn).toHaveAttribute("aria-pressed", "false");
     });
   });
+
+  it("shares the Master Waveform spine across Listen and Mix at the identical playhead", async () => {
+    completeSeparationMocks();
+
+    render(<App />);
+    await loadAndSeparate();
+
+    const listenTab = screen.getByRole("region", { name: /listen tab/i });
+    const mixTab = screen.getByRole("region", { name: /mix tab/i });
+    const listenSpine = within(listenTab).getByRole("slider", {
+      name: /master waveform timeline/i,
+    });
+    const mixSpine = within(mixTab).getByRole("slider", {
+      name: /master waveform timeline/i,
+    });
+
+    // Keyboard scrub on the Listen spine: the Mix Tab spine mirrors the spot
+    fireEvent.keyDown(listenSpine, { key: "ArrowRight" });
+    await waitFor(() => {
+      expect(listenSpine).toHaveAttribute("aria-valuenow", "5");
+    });
+    expect(mixSpine).toHaveAttribute("aria-valuenow", "5");
+
+    // Pointer scrub on the Mix spine resumes at the identical spot in Listen
+    vi.spyOn(mixSpine, "getBoundingClientRect").mockReturnValue({
+      left: 0,
+      top: 0,
+      width: 600,
+      height: 84,
+      right: 600,
+      bottom: 84,
+      x: 0,
+      y: 0,
+      toJSON: () => {},
+    });
+    fireEvent.pointerDown(mixSpine, { clientX: 300, pointerId: 1 });
+    await waitFor(() => {
+      expect(listenSpine).toHaveAttribute("aria-valuenow", "90");
+    });
+    expect(mixSpine).toHaveAttribute("aria-valuenow", "90");
+
+    // The spine is absent from Separate, Export, and System panels
+    for (const panelName of [/separate tab/i, /export tab/i, /system tab/i]) {
+      const panel = screen.getByRole("region", { name: panelName });
+      expect(
+        within(panel).queryByRole("slider", {
+          name: /master waveform timeline/i,
+        })
+      ).toBeNull();
+    }
+  });
 });

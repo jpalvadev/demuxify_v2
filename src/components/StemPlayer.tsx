@@ -42,6 +42,7 @@ export interface TransportControls {
   play: () => void;
   pause: () => void;
   seekToStart: () => void;
+  seek: (seekTime: number) => void;
 }
 
 export interface StemPlayerProps {
@@ -65,6 +66,9 @@ export interface StemPlayerProps {
   onExportDialogOpen?: (state: ExportDialogState) => void;
   onExportDialogState?: (state: ExportDialogState) => void;
   onTransportControls?: (controls: TransportControls) => void;
+  // Tab Shell (ADR-0007): the shell hosts the shared Master Waveform spine in
+  // Listen and Mix, so the player's own overview waveform stays hidden.
+  masterWaveformHosted?: boolean;
 }
 
 function formatTime(totalSeconds: number): string {
@@ -91,6 +95,7 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
   onExportDialogOpen,
   onExportDialogState,
   onTransportControls,
+  masterWaveformHosted,
 }) => {
   const engineRef = useRef<StemPlayerEngine | null>(null);
 
@@ -129,6 +134,7 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
       play: () => void handlePlay(),
       pause: handlePause,
       seekToStart: handleReset,
+      seek: (seekTime) => void handleSeek(seekTime),
     });
 
     setDuration(engine.getDuration());
@@ -533,17 +539,19 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
         </div>
       </div>
 
-      {/* Master Overview Waveform */}
-      <div className="space-y-1">
-        <MasterWaveform
-          peaks={masterPeaks}
-          audioBuffer={sourceMixBuffer}
-          duration={duration}
-          currentTime={currentTime}
-          onSeek={handleSeek}
-          height={88}
-        />
-      </div>
+      {/* Master Overview Waveform: omitted when the Tab Shell owns the spine */}
+      {!masterWaveformHosted && (
+        <div className="space-y-1">
+          <MasterWaveform
+            peaks={masterPeaks}
+            audioBuffer={sourceMixBuffer}
+            duration={duration}
+            currentTime={currentTime}
+            onSeek={handleSeek}
+            height={88}
+          />
+        </div>
+      )}
 
       {/* Time-Stretch & Pitch Shift Controls */}
       <div className="rounded-xl border border-border/60 bg-secondary/30 p-4 space-y-4">

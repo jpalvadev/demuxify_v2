@@ -156,6 +156,7 @@ export const App: React.FC = () => {
     play: () => {},
     pause: () => {},
     seekToStart: () => {},
+    seek: () => {},
   });
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -375,6 +376,9 @@ export const App: React.FC = () => {
     masterVolume: number;
     currentTime: number;
   }) => {
+    // Shared spine (ADR-0007): mirror the live playhead so the Mix Tab's
+    // mini spine and the Listen Tab readout stay in lockstep with playback.
+    setCurrentTime(mixer.currentTime);
     if (!cachedSessionRef.current) return;
     const updatedSession: DemuxifySession = {
       ...cachedSessionRef.current,
@@ -411,6 +415,9 @@ export const App: React.FC = () => {
 
   const handleSeek = (seekTime: number) => {
     setCurrentTime(seekTime);
+    // Shared spine (ADR-0007): scrubbing on either Tab's spine drives the
+    // same Stem Player engine through the transport bridge.
+    transportActionsRef.current.seek(seekTime);
   };
 
   const handleStartSeparation = async () => {
@@ -811,24 +818,39 @@ export const App: React.FC = () => {
             {separationPhase === "completed" &&
             separatedStems &&
             decodedSourceMix ? (
-              <StemPlayer
-                stems={separatedStems}
-                sampleRate={decodedSourceMix.metadata.sampleRate}
-                duration={decodedSourceMix.metadata.duration}
-                sourceMixBuffer={decodedSourceMix.buffer}
-                masterPeaks={waveformPeaks}
-                initialMixerStates={restoredMixerState?.stems}
-                initialMasterVolume={restoredMixerState?.masterVolume}
-                initialCurrentTime={restoredMixerState?.currentTime}
-                onMixerChange={handleMixerChange}
-                onPurgeSession={handlePurgeSession}
-                sourceMixTitle={decodedSourceMix.metadata.fileName}
-                onExportDialogOpen={handleExportDialogOpen}
-                onExportDialogState={handleExportDialogStateChange}
-                onTransportControls={(controls) => {
-                  transportActionsRef.current = controls;
-                }}
-              />
+              <>
+                {/* Shared Master Waveform spine port: mini overview, playhead
+                    locked to the Listen Tab spine (data-od-id="spine-mini") */}
+                <div className="pt-2">
+                  <MasterWaveform
+                    peaks={waveformPeaks}
+                    audioBuffer={decodedSourceMix.buffer}
+                    duration={decodedSourceMix.metadata.duration}
+                    currentTime={currentTime}
+                    onSeek={handleSeek}
+                    height={84}
+                  />
+                </div>
+                <StemPlayer
+                  stems={separatedStems}
+                  sampleRate={decodedSourceMix.metadata.sampleRate}
+                  duration={decodedSourceMix.metadata.duration}
+                  sourceMixBuffer={decodedSourceMix.buffer}
+                  masterPeaks={waveformPeaks}
+                  initialMixerStates={restoredMixerState?.stems}
+                  initialMasterVolume={restoredMixerState?.masterVolume}
+                  initialCurrentTime={restoredMixerState?.currentTime}
+                  onMixerChange={handleMixerChange}
+                  onPurgeSession={handlePurgeSession}
+                  sourceMixTitle={decodedSourceMix.metadata.fileName}
+                  onExportDialogOpen={handleExportDialogOpen}
+                  onExportDialogState={handleExportDialogStateChange}
+                  onTransportControls={(controls) => {
+                    transportActionsRef.current = controls;
+                  }}
+                  masterWaveformHosted
+                />
+              </>
             ) : (
               <div className="flex items-center justify-between gap-2">
                 <h3 className="text-base font-semibold tracking-tight text-foreground sm:text-lg">
