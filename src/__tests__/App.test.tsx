@@ -254,7 +254,7 @@ describe("App UI Shell", () => {
     });
   });
 
-  it("toggles theme between dark and light", async () => {
+  it("ships dark-only with no theme toggle anywhere", async () => {
     vi.spyOn(webgpuModule, "detectWebGPUCapability").mockResolvedValue({
       supported: true,
       isFallback: false,
@@ -266,14 +266,10 @@ describe("App UI Shell", () => {
       expect(screen.getByText(/webgpu active/i)).toBeInTheDocument();
     });
 
-    const themeToggle = screen.getByRole("button", { name: /toggle theme/i });
+    // Dark-only contract: no toggle button, and html keeps the `dark` class
+    expect(screen.queryByRole("button", { name: /toggle theme/i })).toBeNull();
     expect(document.documentElement.classList.contains("dark")).toBe(true);
-
-    fireEvent.click(themeToggle);
-    expect(document.documentElement.classList.contains("dark")).toBe(false);
-
-    fireEvent.click(themeToggle);
-    expect(document.documentElement.classList.contains("dark")).toBe(true);
+    expect(document.documentElement.classList.contains("light")).toBe(false);
   });
 
   it("initiates stem separation when Separate Stems button is clicked and displays progress", async () => {

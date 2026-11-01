@@ -38,6 +38,25 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        // Bold stem quartet (ticket 09): single identity set for chips,
+        // canvases and strips, fed from the ticket 01 sheet's --stem-* vars.
+        "stem-vocals": "hsl(var(--stem-vocals) / <alpha-value>)",
+        "stem-drums": "hsl(var(--stem-drums) / <alpha-value>)",
+        "stem-bass": "hsl(var(--stem-bass) / <alpha-value>)",
+        "stem-other": "hsl(var(--stem-other) / <alpha-value>)",
+      },
+      fontFamily: {
+        // Bold pairing (ticket 01 sheet): Archivo Black display for
+        // headings/branding, JetBrains Mono for readouts. woff2 subsets are
+        // bundled in ticket 10; until then these fall back to the stacks.
+        display: ['"Archivo Black"', '"Archivo"', "Impact", "sans-serif"],
+        mono: [
+          '"JetBrains Mono"',
+          "ui-monospace",
+          "SFMono-Regular",
+          "Menlo",
+          "monospace",
+        ],
       },
       borderRadius: {
         lg: "var(--radius)",

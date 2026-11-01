@@ -1,6 +1,6 @@
-import React from 'react';
-import { History, Play, Trash2, Loader2, Music } from 'lucide-react';
-import { cn } from '../lib/utils';
+import React from "react";
+import { History, Play, Trash2, Loader2, Music } from "lucide-react";
+import { cn } from "../lib/utils";
 
 export interface SessionRecoveryProps {
   title: string;
@@ -12,10 +12,10 @@ export interface SessionRecoveryProps {
 }
 
 function formatDuration(totalSeconds: number): string {
-  if (isNaN(totalSeconds) || totalSeconds < 0) return '0:00';
+  if (isNaN(totalSeconds) || totalSeconds < 0) return "0:00";
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = Math.floor(totalSeconds % 60);
-  return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  return `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
 }
 
 export const SessionRecovery: React.FC<SessionRecoveryProps> = ({
@@ -31,26 +31,29 @@ export const SessionRecovery: React.FC<SessionRecoveryProps> = ({
       aria-label="Previous Session Recovery"
       role="region"
       className={cn(
-        'rounded-2xl border border-indigo-500/30 bg-indigo-500/10 p-4 sm:p-5 shadow-sm backdrop-blur-sm transition-all',
+        "rounded-2xl border border-border/60 bg-card/95 p-4 sm:p-5 shadow-sm backdrop-blur-sm transition-all",
         className
       )}
     >
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-start gap-3.5">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-indigo-500/20 text-indigo-400">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-secondary text-secondary-foreground">
             <History className="h-5 w-5" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-1 rounded-full bg-indigo-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-indigo-300">
+              <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-secondary-foreground">
                 <Music className="h-3 w-3" /> Auto-Saved Session
               </span>
             </div>
             <h3 className="mt-1 text-sm sm:text-base font-semibold text-foreground">
-              Previous session found: <span className="text-indigo-300">{title}</span> ({formatDuration(duration)}). Resume or Discard?
+              Previous session found:{" "}
+              <span className="text-primary">{title}</span> (
+              {formatDuration(duration)}). Resume or Discard?
             </h3>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Source Mix, separated Stems, and mixer levels were saved from your previous session.
+              Source Mix, separated Stems, and mixer levels were saved from your
+              previous session.
             </p>
           </div>
         </div>
@@ -69,7 +72,7 @@ export const SessionRecovery: React.FC<SessionRecoveryProps> = ({
 
           <button
             type="button"
-            aria-label={isResuming ? 'Restoring Session...' : 'Resume Session'}
+            aria-label={isResuming ? "Restoring Session..." : "Resume Session"}
             onClick={onResume}
             disabled={isResuming}
             className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 active:scale-95 transition-all disabled:opacity-70 disabled:pointer-events-none"

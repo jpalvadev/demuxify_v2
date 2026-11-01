@@ -43,30 +43,30 @@ const STEM_CONFIG: Record<
   vocals: {
     label: "Vocals",
     icon: Mic,
-    badgeClass: "bg-cyan-500/15 text-cyan-400 border-cyan-500/30",
-    activeColor: "#38bdf8", // sky-400
-    inactiveColor: "rgba(56, 189, 248, 0.25)",
+    badgeClass: "bg-stem-vocals/15 text-stem-vocals border-stem-vocals/40",
+    activeColor: "#f452be", // stem-vocals: hsl(320 88% 64%)
+    inactiveColor: "rgba(244, 82, 190, 0.25)",
   },
   drums: {
     label: "Drums",
     icon: Drum,
-    badgeClass: "bg-amber-500/15 text-amber-400 border-amber-500/30",
-    activeColor: "#fbbf24", // amber-400
-    inactiveColor: "rgba(251, 191, 36, 0.25)",
+    badgeClass: "bg-stem-drums/15 text-stem-drums border-stem-drums/40",
+    activeColor: "#a672f3", // stem-drums: hsl(264 84% 70%)
+    inactiveColor: "rgba(166, 114, 243, 0.25)",
   },
   bass: {
     label: "Bass",
     icon: Radio,
-    badgeClass: "bg-purple-500/15 text-purple-400 border-purple-500/30",
-    activeColor: "#c084fc", // purple-400
-    inactiveColor: "rgba(192, 132, 252, 0.25)",
+    badgeClass: "bg-stem-bass/15 text-stem-bass border-stem-bass/40",
+    activeColor: "#faa638", // stem-bass: hsl(34 95% 60%)
+    inactiveColor: "rgba(250, 166, 56, 0.25)",
   },
   other: {
     label: "Other",
     icon: Music,
-    badgeClass: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
-    activeColor: "#34d399", // emerald-400
-    inactiveColor: "rgba(52, 211, 153, 0.25)",
+    badgeClass: "bg-stem-other/15 text-stem-other border-stem-other/40",
+    activeColor: "#4bc5f1", // stem-other: hsl(196 86% 62%)
+    inactiveColor: "rgba(75, 197, 241, 0.25)",
   },
 };
 
@@ -294,7 +294,7 @@ export const StemStrip: React.FC<StemStripProps> = ({
             className={cn(
               "h-8 w-8 rounded-lg border text-xs font-bold transition-all flex items-center justify-center",
               solo
-                ? "border-amber-500/60 bg-amber-500 text-black shadow-xs font-black"
+                ? "border-primary/70 bg-muted text-foreground shadow-xs font-black"
                 : "border-border/70 bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground"
             )}
           >

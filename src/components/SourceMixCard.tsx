@@ -1,7 +1,15 @@
-import React from 'react';
-import { Music2, Clock, Activity, Disc, Sparkles, X, RefreshCw } from 'lucide-react';
-import { SourceMixMetadata } from '../lib/audioDecoder';
-import { cn } from '../lib/utils';
+import React from "react";
+import {
+  Music2,
+  Clock,
+  Activity,
+  Disc,
+  Sparkles,
+  X,
+  RefreshCw,
+} from "lucide-react";
+import { SourceMixMetadata } from "../lib/audioDecoder";
+import { cn } from "../lib/utils";
 
 export interface SourceMixCardProps {
   metadata: SourceMixMetadata;
@@ -13,27 +21,27 @@ export interface SourceMixCardProps {
 }
 
 function formatDuration(totalSeconds: number): string {
-  if (isNaN(totalSeconds) || totalSeconds < 0) return '0:00';
+  if (isNaN(totalSeconds) || totalSeconds < 0) return "0:00";
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = Math.floor(totalSeconds % 60);
-  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 }
 
 function formatSampleRate(sampleRate: number): string {
-  if (!sampleRate || isNaN(sampleRate)) return '44.1 kHz';
+  if (!sampleRate || isNaN(sampleRate)) return "44.1 kHz";
   return `${(sampleRate / 1000).toFixed(1)} kHz`;
 }
 
 function formatChannels(channels: number): string {
-  if (channels === 1) return 'Mono';
-  if (channels === 2) return 'Stereo';
+  if (channels === 1) return "Mono";
+  if (channels === 2) return "Stereo";
   return `${channels} Channels`;
 }
 
 function formatBytes(bytes: number): string {
-  if (!bytes || bytes === 0) return '0 B';
+  if (!bytes || bytes === 0) return "0 B";
   const k = 1024;
-  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const sizes = ["B", "KB", "MB", "GB"];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
 }
@@ -49,7 +57,7 @@ export const SourceMixCard: React.FC<SourceMixCardProps> = ({
   return (
     <div
       className={cn(
-        'rounded-2xl border border-border bg-card/90 p-5 shadow-sm backdrop-blur-sm transition-all sm:p-6',
+        "rounded-2xl border border-border bg-card/90 p-5 shadow-sm backdrop-blur-sm transition-all sm:p-6",
         className
       )}
     >
@@ -57,11 +65,11 @@ export const SourceMixCard: React.FC<SourceMixCardProps> = ({
         {/* File info */}
         <div className="flex items-start gap-3.5 min-w-0">
           <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-            <Music2 className="h-6 w-6 text-indigo-400" />
+            <Music2 className="h-6 w-6" />
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <span className="inline-flex items-center rounded-full bg-indigo-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-indigo-400">
+              <span className="inline-flex items-center rounded-full bg-muted/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-secondary-foreground">
                 Source Mix
               </span>
               <span className="text-xs text-muted-foreground">
@@ -107,7 +115,7 @@ export const SourceMixCard: React.FC<SourceMixCardProps> = ({
       {/* Metadata Badges Grid */}
       <div className="mt-4 grid grid-cols-3 gap-2.5 rounded-xl bg-secondary/40 p-3 sm:gap-4 sm:p-4">
         <div className="flex items-center gap-2.5">
-          <Clock className="h-4 w-4 text-indigo-400 shrink-0" />
+          <Clock className="h-4 w-4 text-secondary-foreground shrink-0" />
           <div>
             <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
               Duration
@@ -131,7 +139,7 @@ export const SourceMixCard: React.FC<SourceMixCardProps> = ({
         </div>
 
         <div className="flex items-center gap-2.5">
-          <Disc className="h-4 w-4 text-purple-400 shrink-0" />
+          <Disc className="h-4 w-4 text-secondary-foreground shrink-0" />
           <div>
             <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
               Channels
@@ -150,10 +158,12 @@ export const SourceMixCard: React.FC<SourceMixCardProps> = ({
             type="button"
             onClick={onStartSeparation}
             disabled={isProcessing}
-            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 px-6 py-2.5 text-sm font-semibold text-white shadow-md hover:from-indigo-600 hover:to-purple-700 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60 disabled:cursor-not-allowed"
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-primary border border-primary px-6 py-2.5 text-sm font-bold text-primary-foreground shadow-md hover:brightness-90 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60 disabled:cursor-not-allowed"
           >
             <Sparkles className="h-4 w-4 animate-pulse" />
-            <span>{isProcessing ? 'Separating Stems...' : 'Separate Stems'}</span>
+            <span>
+              {isProcessing ? "Separating Stems..." : "Separate Stems"}
+            </span>
           </button>
         </div>
       )}

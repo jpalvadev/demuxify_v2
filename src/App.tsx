@@ -100,7 +100,8 @@ const tabPanelClass = (gated: boolean, active: boolean) =>
   } ${gated ? "opacity-50" : ""}`.trim();
 
 export const App: React.FC = () => {
-  const [theme, setTheme] = useState<"dark" | "light">("dark");
+  // Dark-only contract (ticket 09): no theme state — html keeps `dark` forever
+  // and there is no light-token override block to switch into.
   const [capability, setCapability] = useState<WebGPUCapability | null>(null);
   const [isDetectingWebGPU, setIsDetectingWebGPU] = useState(true);
 
@@ -228,19 +229,10 @@ export const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    const root = document.documentElement;
-    if (theme === "dark") {
-      root.classList.add("dark");
-      root.classList.remove("light");
-    } else {
-      root.classList.add("light");
-      root.classList.remove("dark");
-    }
-  }, [theme]);
-
-  const handleToggleTheme = () => {
-    setTheme((prev) => (prev === "dark" ? "light" : "dark"));
-  };
+    // Dark-only skin: `html.dark` stays permanently so the shadcn dark token
+    // set is what every surface paints; no light override block exists.
+    document.documentElement.classList.add("dark");
+  }, []);
 
   const processAudioFile = async (file: File) => {
     setSelectedFile(file);
@@ -533,7 +525,7 @@ export const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col font-sans transition-colors duration-200">
-      <Header theme={theme} onToggleTheme={handleToggleTheme} />
+      <Header />
 
       <main className="flex-1 mx-auto w-full max-w-4xl px-4 py-8 sm:px-6 sm:py-12 flex flex-col md:flex-row gap-6 md:gap-8">
         {/* Tab rail: horizontal top strip on mobile portrait, vertical left rail at md+ */}

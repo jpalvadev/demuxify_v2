@@ -1,56 +1,33 @@
 import React from "react";
-import { Waves, Moon, Sun, ShieldCheck } from "lucide-react";
+import { Waves } from "lucide-react";
 
-interface HeaderProps {
-  theme: "dark" | "light";
-  onToggleTheme: () => void;
-}
-
-export const Header: React.FC<HeaderProps> = ({ theme, onToggleTheme }) => {
+// Bold skin (ticket 09): the artifact's `.brand` unit (Archivo Black wordmark,
+// 8px accent status dot, mono status line). Dark-only: no theme toggle, no
+// privacy shield pill.
+export const Header: React.FC = () => {
   return (
-    <header className="sticky top-0 z-30 border-b border-border/80 bg-background/80 backdrop-blur-md">
-      <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6">
+    <header className="sticky top-0 z-30 border-b border-border/80 bg-background/95 backdrop-blur-md">
+      <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-2.5 sm:px-6 sm:py-3">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-600 text-white shadow-md shadow-indigo-500/20">
-            <Waves className="h-5 w-5" />
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted border border-border text-primary">
+            <Waves className="h-4.5 w-4.5" />
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl font-bold tracking-tight bg-gradient-to-r from-foreground via-foreground/90 to-muted-foreground bg-clip-text">
-                Demuxify
-              </h1>
-              <span className="hidden sm:inline-block rounded-md bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-primary">
-                Web
-              </span>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Client-Side Stem Separation
-            </p>
+          <div className="flex items-center gap-2">
+            <h1 className="font-display text-transform-uppercase text-lg sm:text-xl font-black tracking-wide text-foreground">
+              Demuxify
+            </h1>
+            {/* .brand i: 8px accent status dot (dark-only state marker) */}
+            <span
+              data-testid="header-status-dot"
+              aria-hidden="true"
+              className="inline-block h-2 w-2 rounded-full bg-primary"
+            />
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          <div
-            className="hidden md:flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full bg-secondary text-secondary-foreground"
-            title="All audio processing stays on your device (100% private, zero uploads)"
-          >
-            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Private &amp; Offline</span>
-          </div>
-
-          <button
-            type="button"
-            onClick={onToggleTheme}
-            aria-label="Toggle theme"
-            className="rounded-xl border border-border bg-card p-2 text-foreground hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            {theme === "dark" ? (
-              <Sun className="h-4 w-4 text-amber-400" />
-            ) : (
-              <Moon className="h-4 w-4 text-indigo-400" />
-            )}
-          </button>
-        </div>
+        <p className="hidden sm:block font-mono text-xs font-medium tracking-wide text-muted-foreground">
+          Client-Side Stem Separation
+        </p>
       </div>
     </header>
   );

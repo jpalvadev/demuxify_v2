@@ -1,6 +1,12 @@
-import React, { useRef, useEffect, useState, useMemo, useCallback } from 'react';
-import { WaveformPeaks, computeWaveformPeaks } from '../lib/waveformPeaks';
-import { cn } from '../lib/utils';
+import React, {
+  useRef,
+  useEffect,
+  useState,
+  useMemo,
+  useCallback,
+} from "react";
+import { WaveformPeaks, computeWaveformPeaks } from "../lib/waveformPeaks";
+import { cn } from "../lib/utils";
 
 export interface MasterWaveformProps {
   peaks?: WaveformPeaks | null;
@@ -14,10 +20,10 @@ export interface MasterWaveformProps {
 }
 
 function formatTime(totalSeconds: number): string {
-  if (isNaN(totalSeconds) || totalSeconds < 0) return '0:00';
+  if (isNaN(totalSeconds) || totalSeconds < 0) return "0:00";
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = Math.floor(totalSeconds % 60);
-  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 }
 
 function calculateTickInterval(duration: number): number {
@@ -49,7 +55,9 @@ export const MasterWaveform: React.FC<MasterWaveformProps> = ({
   const effectivePeaks = useMemo(() => {
     if (providedPeaks) return providedPeaks;
     if (audioBuffer) {
-      return computeWaveformPeaks(audioBuffer, { targetBins: Math.max(200, Math.floor(containerWidth)) });
+      return computeWaveformPeaks(audioBuffer, {
+        targetBins: Math.max(200, Math.floor(containerWidth)),
+      });
     }
     return null;
   }, [providedPeaks, audioBuffer, containerWidth]);
@@ -68,7 +76,7 @@ export const MasterWaveform: React.FC<MasterWaveformProps> = ({
 
     updateWidth();
 
-    if (typeof ResizeObserver !== 'undefined') {
+    if (typeof ResizeObserver !== "undefined") {
       const observer = new ResizeObserver((entries) => {
         for (const entry of entries) {
           if (entry.contentRect.width > 0) {
@@ -86,7 +94,7 @@ export const MasterWaveform: React.FC<MasterWaveformProps> = ({
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
     const dpr = window.devicePixelRatio || 1;
@@ -102,37 +110,38 @@ export const MasterWaveform: React.FC<MasterWaveformProps> = ({
     // Clear background
     ctx.clearRect(0, 0, width, canvasHeight);
 
-    // Background fill
-    ctx.fillStyle = '#090d16';
+    // Background fill (--bg: hsl(232 12% 4%) = #09090b)
+    ctx.fillStyle = "#09090b";
     ctx.fillRect(0, 0, width, canvasHeight);
 
     // Calculate playhead pixel position
-    const playheadRatio = duration > 0 ? Math.max(0, Math.min(1, currentTime / duration)) : 0;
+    const playheadRatio =
+      duration > 0 ? Math.max(0, Math.min(1, currentTime / duration)) : 0;
     const playheadX = playheadRatio * width;
 
     // Draw timeline grid ticks
     const tickInterval = calculateTickInterval(duration);
-    ctx.font = '10px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'top';
+    ctx.font = "10px sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
 
     for (let t = 0; t <= duration; t += tickInterval) {
       const tickX = duration > 0 ? (t / duration) * width : 0;
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
       ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.moveTo(tickX, 0);
       ctx.lineTo(tickX, canvasHeight);
       ctx.stroke();
 
-      // Render tick time labels at bottom
-      ctx.fillStyle = 'rgba(148, 163, 184, 0.4)';
+      // Render tick time labels at bottom (--muted-foreground)
+      ctx.fillStyle = "rgba(136, 138, 149, 0.5)";
       ctx.fillText(formatTime(t), tickX, canvasHeight - 14);
     }
 
     // Midline
     const midY = (canvasHeight - 16) / 2;
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.05)";
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(0, midY);
@@ -154,11 +163,11 @@ export const MasterWaveform: React.FC<MasterWaveformProps> = ({
         const yBottom = midY - minVal * halfHeight;
         const barHeight = Math.max(1, yBottom - yTop);
 
-        // Highlight played portion
+        // Highlight played portion (accent lime) / unplayed (--fg-2 dim)
         if (x <= playheadX) {
-          ctx.fillStyle = '#818cf8'; // indigo-400
+          ctx.fillStyle = "#8dff29"; // Bold accent: hsl(92 100% 58%)
         } else {
-          ctx.fillStyle = 'rgba(148, 163, 184, 0.35)'; // slate-400 with opacity
+          ctx.fillStyle = "rgba(179, 180, 188, 0.35)"; // fg-2: hsl(232 6% 72%)
         }
 
         ctx.fillRect(x, yTop, Math.max(1, binWidth - 0.5), barHeight);
@@ -167,7 +176,7 @@ export const MasterWaveform: React.FC<MasterWaveformProps> = ({
 
     // Draw playhead cursor line
     if (duration > 0) {
-      ctx.strokeStyle = '#38bdf8'; // cyan-400
+      ctx.strokeStyle = "#8dff29"; // Bold accent playhead: hsl(92 100% 58%)
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.moveTo(playheadX, 0);
@@ -175,7 +184,7 @@ export const MasterWaveform: React.FC<MasterWaveformProps> = ({
       ctx.stroke();
 
       // Playhead head cap
-      ctx.fillStyle = '#38bdf8';
+      ctx.fillStyle = "#8dff29";
       ctx.beginPath();
       ctx.moveTo(playheadX - 5, 0);
       ctx.lineTo(playheadX + 5, 0);
@@ -197,7 +206,8 @@ export const MasterWaveform: React.FC<MasterWaveformProps> = ({
       const rect = container.getBoundingClientRect();
       if (!rect || rect.width <= 0) return;
 
-      const validClientX = typeof clientX === 'number' && !isNaN(clientX) ? clientX : 0;
+      const validClientX =
+        typeof clientX === "number" && !isNaN(clientX) ? clientX : 0;
       const offsetX = validClientX - rect.left;
       const ratio = Math.max(0, Math.min(1, offsetX / rect.width));
       const seekTime = ratio * duration;
@@ -243,18 +253,18 @@ export const MasterWaveform: React.FC<MasterWaveformProps> = ({
     const step = e.shiftKey ? 1 : 5;
 
     switch (e.key) {
-      case 'ArrowRight':
-      case 'ArrowUp':
+      case "ArrowRight":
+      case "ArrowUp":
         targetTime = Math.min(duration, currentTime + step);
         break;
-      case 'ArrowLeft':
-      case 'ArrowDown':
+      case "ArrowLeft":
+      case "ArrowDown":
         targetTime = Math.max(0, currentTime - step);
         break;
-      case 'Home':
+      case "Home":
         targetTime = 0;
         break;
-      case 'End':
+      case "End":
         targetTime = duration;
         break;
       default:
@@ -268,8 +278,8 @@ export const MasterWaveform: React.FC<MasterWaveformProps> = ({
   return (
     <div
       className={cn(
-        'group relative w-full overflow-hidden rounded-2xl border border-border bg-card/60 p-4 shadow-sm backdrop-blur-sm transition-all select-none',
-        disabled && 'opacity-60 pointer-events-none',
+        "group relative w-full overflow-hidden rounded-2xl border border-border bg-card/60 p-4 shadow-sm backdrop-blur-sm transition-all select-none",
+        disabled && "opacity-60 pointer-events-none",
         className
       )}
     >
@@ -284,9 +294,13 @@ export const MasterWaveform: React.FC<MasterWaveformProps> = ({
           </span>
         </div>
         <div className="flex items-center gap-1 font-semibold">
-          <span className="text-cyan-400 font-mono text-sm">{formatTime(currentTime)}</span>
+          <span className="text-primary font-mono text-sm">
+            {formatTime(currentTime)}
+          </span>
           <span className="text-muted-foreground/60">/</span>
-          <span className="text-muted-foreground font-mono text-sm">{formatTime(duration)}</span>
+          <span className="text-muted-foreground font-mono text-sm">
+            {formatTime(duration)}
+          </span>
         </div>
       </div>
 
@@ -306,8 +320,8 @@ export const MasterWaveform: React.FC<MasterWaveformProps> = ({
         onPointerCancel={handlePointerUp}
         onKeyDown={handleKeyDown}
         className={cn(
-          'relative w-full rounded-xl overflow-hidden cursor-pointer touch-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/80',
-          isScrubbing && 'cursor-ew-resize'
+          "relative w-full rounded-xl overflow-hidden cursor-pointer touch-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
+          isScrubbing && "cursor-ew-resize"
         )}
         style={{ height }}
       >

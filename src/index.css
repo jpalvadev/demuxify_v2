@@ -3,49 +3,37 @@
 @tailwind utilities;
 
 @layer base {
+  /* Bold identity (OpenDesign ticket 01 run, dark-only contract) mapped onto
+     the shadcn HSL CSS-variable architecture: token names unchanged, values
+     retuned to the ticket 01 sheet (:root verbatim, hsl() components only). */
   :root {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 240 10% 4.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 240 10% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 246 80% 60%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 240 3.7% 15.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
-    --accent: 240 3.7% 15.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 246 80% 60%;
+    --background: 232 12% 4%;
+    --foreground: 232 6% 96%;
+    --card: 232 10% 9%;
+    --card-foreground: 232 6% 96%;
+    --popover: 232 9% 13%;
+    --popover-foreground: 232 6% 96%;
+    --primary: 92 100% 58%;
+    --primary-foreground: 232 24% 6%;
+    --secondary: 232 9% 13%;
+    --secondary-foreground: 232 6% 72%;
+    --muted: 232 8% 18%;
+    --muted-foreground: 232 6% 56%;
+    --accent: 232 8% 18%;
+    --accent-foreground: 232 6% 72%;
+    --destructive: 358 78% 62%;
+    --destructive-foreground: 232 24% 6%;
+    --border: 232 12% 22%;
+    --input: 232 10% 16%;
+    --ring: 92 100% 58%;
     --radius: 0.75rem;
-  }
 
-  .light {
-    --background: 0 0% 100%;
-    --foreground: 240 10% 3.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 240 10% 3.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 3.9%;
-    --primary: 246 80% 60%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 240 4.8% 95.9%;
-    --secondary-foreground: 240 5.9% 10%;
-    --muted: 240 4.8% 95.9%;
-    --muted-foreground: 240 3.8% 46.1%;
-    --accent: 240 4.8% 95.9%;
-    --accent-foreground: 240 5.9% 10%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 5.9% 90%;
-    --input: 240 5.9% 90%;
-    --ring: 246 80% 60%;
+    /* Stem quartet (ticket 01 --stem-* tokens): the one identity set used
+       consistently across stem chips, waveform canvases and stem strips. */
+    --stem-vocals: 320 88% 64%;
+    --stem-drums: 264 84% 70%;
+    --stem-bass: 34 95% 60%;
+    --stem-other: 196 86% 62%;
   }
 }
 
