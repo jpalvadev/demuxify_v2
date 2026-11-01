@@ -1166,7 +1166,11 @@ describe("App UI Shell", () => {
     expect(within(systemTab).getByText(/webgpu active/i)).toBeInTheDocument();
   });
 
-  it("opens the Export panel inside the Export Tab when the Export Stems action is clicked", async () => {
+  it("keeps the Export panel inline in the Export Tab whenever Stems exist", async () => {
+    // Ticket 03 inverts the click-to-open flow: there is no Export Stems
+    // action on the Mix Tab anymore, and as soon as the Stems exist, the
+    // Export panel is simply present inside the active-Tab stage in the
+    // Export Tab, no click needed and nothing to dismiss.
     vi.spyOn(webgpuModule, "detectWebGPUCapability").mockResolvedValue({
       supported: true,
       isFallback: false,
@@ -1176,28 +1180,24 @@ describe("App UI Shell", () => {
     render(<App />);
     await loadAndSeparate();
 
+    // The action is gone from the Mix Tab and from the rest of the shell.
+    expect(screen.queryByRole("button", { name: /export stems/i })).toBeNull();
+
+    // The panel is present in the Export Tab without any action clicked.
     const exportTab = screen.getByRole("region", { name: /export tab/i });
-    expect(
-      within(exportTab).queryByRole("region", { name: /export audio stems/i })
-    ).not.toBeInTheDocument();
-
-    const exportBtn = screen.getByRole("button", { name: /export stems/i });
-    fireEvent.click(exportBtn);
-
     const exportPanel = await waitFor(() =>
       within(exportTab).getByRole("region", { name: /export audio stems/i })
     );
     expect(exportPanel).toBeInTheDocument();
 
-    const closeBtn = within(exportPanel).getByRole("button", {
-      name: /close dialog/i,
-    });
-    fireEvent.click(closeBtn);
-    await waitFor(() => {
-      expect(
-        within(exportTab).queryByRole("region", { name: /export audio stems/i })
-      ).not.toBeInTheDocument();
-    });
+    // Exactly one panel in the app: Stem Player's standalone fallback stays
+    // out of the hosted form.
+    expect(screen.getAllByText(/export audio stems/i)).toHaveLength(1);
+
+    // Without modal state there is nothing to dismiss: no Close control.
+    expect(
+      within(exportPanel).queryByRole("button", { name: /close/i })
+    ).toBeNull();
   });
 
   it("runs the Grizzly header band only in the System Tab and keeps the other Tabs chrome-free", async () => {
@@ -1267,9 +1267,8 @@ describe("App UI Shell", () => {
       })
     );
 
-    // Open the Export panel from the Stem Player action
-    fireEvent.click(screen.getByRole("button", { name: /export stems/i }));
-
+    // Ticket 03: the panel is already present in the Export Tab, no action
+    // opens it; the live trigger is simply that it is on screen.
     const exportTab = screen.getByRole("region", { name: /export tab/i });
     const exportPanel = await waitFor(() =>
       within(exportTab).getByRole("region", { name: /export audio stems/i })
@@ -1296,6 +1295,138 @@ describe("App UI Shell", () => {
         name: /master mixdown volume/i,
       })
     ).toHaveValue("1");
+
+    // Live tweak while the panel is on screen: bumping Drums volume in the
+    // Mix Tab to 0.7 mirrors into the panel right away.
+    fireEvent.change(
+      within(mixTab).getByRole("slider", { name: /drums volume/i }),
+      { target: { value: "0.7" } }
+    );
+    expect(
+      within(exportPanel).getByRole("slider", { name: /drums volume/i })
+    ).toHaveValue("0.7");
+  });
+
+  it("reflects live Time-Stretch, Pitch-Shift and Formant Preservation tweaks in the inline panel", async () => {
+    // Ticket 03: tweaks made while the panel is on screen appear in it —
+    // the Apply active Pitch & Tempo adjustments row and its readout chip
+    // follow the Transport bridge live.
+    vi.spyOn(webgpuModule, "detectWebGPUCapability").mockResolvedValue({
+      supported: true,
+      isFallback: false,
+    });
+    completeSeparationMocks();
+
+    render(<App />);
+    await loadAndSeparate();
+
+    const mixTab = screen.getByRole("region", { name: /mix tab/i });
+    const exportTab = screen.getByRole("region", { name: /export tab/i });
+    const exportPanel = await waitFor(() =>
+      within(exportTab).getByRole("region", { name: /export audio stems/i })
+    );
+
+    // Neutral session: no adjustments row to toggle.
+    expect(
+      within(exportPanel).queryByRole("checkbox", {
+        name: /apply active pitch & tempo adjustments/i,
+      })
+    ).toBeNull();
+
+    // Time-Stretch 1.00x -> 1.25x and Pitch-Shift +2 st in the Mix Tab.
+    const tempoUp = within(mixTab).getByRole("button", {
+      name: /increment tempo/i,
+    });
+    const pitchUp = within(mixTab).getByRole("button", {
+      name: /increment pitch/i,
+    });
+    for (let step = 0; step < 5; step += 1) {
+      fireEvent.click(tempoUp);
+    }
+    fireEvent.click(pitchUp);
+    fireEvent.click(pitchUp);
+
+    // The panel re-emits the adjustments row live, checked by default, with
+    // the readout chip mirroring both values.
+    const applyCheckbox = await waitFor(() =>
+      within(exportPanel).getByRole("checkbox", {
+        name: /apply active pitch & tempo adjustments/i,
+      })
+    );
+    expect(applyCheckbox).toBeChecked();
+    expect(within(exportPanel).getAllByText(/\+2 st/).length).toBeGreaterThan(
+      0
+    );
+    expect(within(exportPanel).getAllByText(/1\.25x/).length).toBeGreaterThan(
+      0
+    );
+
+    // Toggling Formant Preservation alone never fabricates the row: with
+    // tempo and pitch back to neutral it stays hidden.
+    fireEvent.click(
+      within(mixTab).getByRole("switch", {
+        name: /vocal formant preservation/i,
+      })
+    );
+    fireEvent.click(
+      within(mixTab).getByRole("button", { name: /reset time-stretch/i })
+    );
+    await waitFor(() => {
+      expect(
+        within(exportPanel).queryByRole("checkbox", {
+          name: /apply active pitch & tempo adjustments/i,
+        })
+      ).toBeNull();
+    });
+  });
+
+  it("cancels an in-flight Export Bundle from inside the inline panel", async () => {
+    vi.spyOn(webgpuModule, "detectWebGPUCapability").mockResolvedValue({
+      supported: true,
+      isFallback: false,
+    });
+    completeSeparationMocks();
+
+    render(<App />);
+    await loadAndSeparate();
+
+    const exportTab = screen.getByRole("region", { name: /export tab/i });
+    const exportPanel = await waitFor(() =>
+      within(exportTab).getByRole("region", { name: /export audio stems/i })
+    );
+
+    // The Cancel control sits inside the panel and is inert until an export
+    // is running.
+    const cancelButton = within(exportPanel).getByRole("button", {
+      name: /cancel encoding/i,
+    });
+    expect(cancelButton).toBeDisabled();
+
+    // Start a Full Export Bundle.
+    fireEvent.click(
+      within(exportPanel).getByRole("radio", {
+        name: /full export bundle/i,
+      })
+    );
+    fireEvent.click(
+      within(exportPanel).getByRole("button", { name: /export & download/i })
+    );
+
+    // Encoding in flight: Cancel is live, click aborts the bundle.
+    await waitFor(() => {
+      expect(cancelButton).not.toBeDisabled();
+    });
+    fireEvent.click(cancelButton);
+
+    // Nothing was written: the success banner never appears and the panel
+    // says the export was cancelled.
+    await waitFor(() => {
+      expect(
+        within(exportPanel).getAllByText(/cancelled/i).length
+      ).toBeGreaterThan(0);
+    });
+    expect(screen.queryByText(/export complete/i)).toBeNull();
+    expect(cancelButton).toBeDisabled();
   });
 
   it("keeps System Tab status and Diagnostics inline without any overlay", async () => {

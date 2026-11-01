@@ -372,6 +372,55 @@ describe("StemPlayer UI Component", () => {
     ).toHaveValue("0.75");
   });
 
+  it("keeps the hosted form action-free while the bridge still re-emits", async () => {
+    const emittedStates: any[] = [];
+    render(
+      <StemPlayer
+        stems={dummyStems}
+        sampleRate={sampleRate}
+        audioContext={mockCtx}
+        sourceMixTitle="audioslave_stone.mp3"
+        exportDialogHosted
+        onExportDialogState={(state) => {
+          emittedStates.push(state);
+        }}
+      />
+    );
+
+    // Ticket 03: the hosted form (Tab Shell Export Tab) renders neither the
+    // action button nor the standalone fallback panel.
+    expect(screen.queryByRole("button", { name: /export stems/i })).toBeNull();
+    expect(
+      screen.queryByRole("region", { name: /export audio stems/i })
+    ).toBeNull();
+
+    // Mixer, Master Volume, and Time-Stretch/Pitch-Shift/Formant tweaks still
+    // reach the Transport bridge.
+    fireEvent.change(screen.getByRole("slider", { name: /drums volume/i }), {
+      target: { value: "0.4" },
+    });
+    fireEvent.change(screen.getByRole("slider", { name: /master volume/i }), {
+      target: { value: "0.9" },
+    });
+    for (let step = 0; step < 2; step += 1) {
+      fireEvent.click(screen.getByRole("button", { name: /increment tempo/i }));
+    }
+    fireEvent.click(screen.getByRole("button", { name: /increment pitch/i }));
+    fireEvent.click(
+      screen.getByRole("switch", { name: /vocal formant preservation/i })
+    );
+
+    await waitFor(() => {
+      expect(emittedStates.length).toBeGreaterThanOrEqual(5);
+    });
+    const lastState = emittedStates[emittedStates.length - 1];
+    expect(lastState.mixerStates.drums.volume).toBeCloseTo(0.4);
+    expect(lastState.masterVolume).toBeCloseTo(0.9);
+    expect(lastState.timeStretch.tempo).toBeCloseTo(1.1);
+    expect(lastState.timeStretch.pitch).toBe(1);
+    expect(lastState.timeStretch.formantPreservation).toBe(false);
+  });
+
   it("synchronizes solo states into Custom Mixdown export dialog", async () => {
     const user = userEvent.setup();
     render(

@@ -35,7 +35,9 @@ import { cn } from "../lib/utils";
 
 export interface ExportDialogProps {
   isOpen: boolean;
-  onClose: () => void;
+  // Inline hosted form (Tab Shell Export Tab) omits this: the panel is always
+  // on screen, so it renders no Close controls and Escape does nothing.
+  onClose?: () => void;
   stems: Record<StemName, Float32Array[] | AudioBuffer>;
   sampleRate?: number;
   sourceMixTitle?: string;
@@ -185,6 +187,10 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
   const [successNotification, setSuccessNotification] = useState<string | null>(
     null
   );
+  // Ticket 03: the inline panel hosts its own Cancel; a cancelled Export
+  // Bundle writes nothing and reports the abort inside the panel.
+  const [hasCancelledExport, setHasCancelledExport] = useState(false);
+  const cancelExportRef = useRef(false);
 
   const isMixdownExportDisabled =
     mode === "mixdown" &&
@@ -231,7 +237,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
     if (!isOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape" && !isExporting) {
-        onClose();
+        onClose?.();
       }
     };
     window.addEventListener("keydown", handleKeyDown);
@@ -239,26 +245,63 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
   }, [isOpen, isExporting, onClose]);
 
   const prevOpenRef = useRef(false);
+  const prevMixerStatesRef = useRef<StemMixerStates | undefined>(undefined);
+  const prevMasterVolumeRef = useRef<number | undefined>(undefined);
+  const prevAdjustmentsRef = useRef<boolean | undefined>(undefined);
 
-  // Reset notifications & sync mixer settings on opening
+  // Opening resets notifications; while the panel is open, every re-emitted
+  // bridge state (mixer levels, Master Volume, Time-Stretch/Pitch-Shift/
+  // Formant Preservation) re-syncs the mixdown controls live (ticket 03:
+  // tweaks made while the panel is on screen appear in it).
   useEffect(() => {
-    if (isOpen && !prevOpenRef.current) {
+    const openedTransition = isOpen && !prevOpenRef.current;
+    const mixerChanged = initialMixerStates !== prevMixerStatesRef.current;
+    const masterVolumeChanged =
+      initialMasterVolume !== prevMasterVolumeRef.current;
+    const adjustmentsChanged =
+      hasActiveAdjustments !== prevAdjustmentsRef.current;
+    if (openedTransition) {
       setError(null);
       setSuccessNotification(null);
       setProgress(0);
       setStatusMessage("");
+    }
+    if (
+      isOpen &&
+      (openedTransition ||
+        mixerChanged ||
+        masterVolumeChanged ||
+        adjustmentsChanged)
+    ) {
       setStemControls(computeInitialStemControls(initialMixerStates));
       setMasterGain(initialMasterVolume ?? 1.0);
       setApplyAdjustments(hasActiveAdjustments);
     }
     prevOpenRef.current = isOpen;
+    prevMixerStatesRef.current = initialMixerStates;
+    prevMasterVolumeRef.current = initialMasterVolume;
+    prevAdjustmentsRef.current = hasActiveAdjustments;
   }, [isOpen, initialMixerStates, initialMasterVolume, hasActiveAdjustments]);
+
+  // In-panel Cancel (ticket 03): flags the running export; every await/loop
+  // boundary below checks the flag and bails before any file is written.
+  const handleCancelExport = useCallback(() => {
+    cancelExportRef.current = true;
+  }, []);
 
   const handleExport = useCallback(async () => {
     setIsExporting(true);
     setProgress(0);
     setError(null);
     setSuccessNotification(null);
+    cancelExportRef.current = false;
+    setHasCancelledExport(false);
+
+    const wasCancelled = () => {
+      setHasCancelledExport(true);
+      setStatusMessage("Export cancelled · nothing written");
+      toast.info("encoding cancelled · nothing written");
+    };
 
     try {
       let exportStems = stems;
@@ -284,6 +327,10 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
           formantPreservation: activeFormantPreservation ?? true,
         });
         exportStems = { ...stems, ...rendered };
+        if (cancelExportRef.current) {
+          wasCancelled();
+          return;
+        }
       }
 
       if (mode === "single") {
@@ -311,6 +358,10 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
           setProgress(100);
         }
 
+        if (cancelExportRef.current) {
+          wasCancelled();
+          return;
+        }
         setStatusMessage("Triggering download...");
         triggerDownload(blob, fileName);
         const successMsg = `Export complete! Downloaded ${fileName}`;
@@ -324,6 +375,10 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
 
         const stemCount = STEM_NAMES.length;
         for (let i = 0; i < stemCount; i++) {
+          if (cancelExportRef.current) {
+            wasCancelled();
+            return;
+          }
           const stemName = STEM_NAMES[i];
           const stemData = exportStems[stemName];
           if (!stemData) {
@@ -351,6 +406,10 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
           }
         }
 
+        if (cancelExportRef.current) {
+          wasCancelled();
+          return;
+        }
         setStatusMessage("Packaging ZIP bundle...");
         const zipBlob = await createStemBundleZip(encodedStems, {
           sourceMixTitle,
@@ -359,6 +418,10 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
             setProgress(Math.round(75 + zipPct * 0.25));
           },
         });
+        if (cancelExportRef.current) {
+          wasCancelled();
+          return;
+        }
 
         const zipFileName = `${sanitizeSourceMixTitle(sourceMixTitle)}_stems.zip`;
         setStatusMessage("Triggering download...");
@@ -402,6 +465,10 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
           setProgress(100);
         }
 
+        if (cancelExportRef.current) {
+          wasCancelled();
+          return;
+        }
         setStatusMessage("Triggering download...");
         triggerDownload(blob, fileName);
         const successMsg = `Export complete! Downloaded ${fileName}`;
@@ -462,15 +529,17 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
             </p>
           </div>
         </div>
-        <button
-          type="button"
-          aria-label="Close dialog"
-          onClick={onClose}
-          disabled={isExporting}
-          className="rounded-none p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground transition-all disabled:opacity-50"
-        >
-          <X className="h-5 w-5" />
-        </button>
+        {onClose && (
+          <button
+            type="button"
+            aria-label="Close dialog"
+            onClick={onClose}
+            disabled={isExporting}
+            className="rounded-none p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground transition-all disabled:opacity-50"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        )}
       </div>
 
       {/* Form Body */}
@@ -932,6 +1001,16 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
           </div>
         )}
 
+        {hasCancelledExport && (
+          <div
+            role="status"
+            className="flex items-center gap-2.5 rounded-none border border-secondary/60 bg-secondary/40 p-3.5 text-xs text-muted-foreground"
+          >
+            <X className="h-4 w-4 shrink-0" />
+            <span>Export cancelled · nothing written</span>
+          </div>
+        )}
+
         {/* Error Notification */}
         {error && (
           <div
@@ -944,16 +1023,18 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
         )}
       </div>
 
-      {/* Dialog Actions */}
+      {/* Panel Actions */}
       <div className="flex items-center justify-end gap-3 border-t border-border/60 pt-4">
-        <button
-          type="button"
-          onClick={onClose}
-          disabled={isExporting}
-          className="px-4 py-2 text-sm font-medium rounded-none border border-border bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground transition-all disabled:opacity-50"
-        >
-          Close
-        </button>
+        {onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isExporting}
+            className="px-4 py-2 text-sm font-medium rounded-none border border-border bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground transition-all disabled:opacity-50"
+          >
+            Close
+          </button>
+        )}
         <button
           type="button"
           onClick={handleExport}
@@ -971,6 +1052,16 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
               <span>Export &amp; Download</span>
             </>
           )}
+        </button>
+        <button
+          type="button"
+          aria-label="Cancel encoding"
+          onClick={handleCancelExport}
+          disabled={!isExporting}
+          className="flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-none border border-destructive/40 bg-secondary/60 text-destructive hover:bg-destructive/10 transition-all disabled:opacity-50"
+        >
+          <X className="h-4 w-4" />
+          <span>Cancel encoding</span>
         </button>
       </div>
     </section>

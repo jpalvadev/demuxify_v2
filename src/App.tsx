@@ -155,9 +155,9 @@ export const App: React.FC = () => {
     useState<SessionMixerState | null>(null);
 
   // Export Tab panel state (Tab Shell): fed live from the Stem Player bridge.
+  // Ticket 03: the panel is inline, so there is no open/closed state anymore.
   const [exportDialogState, setExportDialogState] =
     useState<ExportDialogState | null>(null);
-  const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
 
   // Transport bridge: the Mix Tab's spine scrubbing drives the Stem Player
   // engine (registered by StemPlayer on init, ADR-0008 Tab Shell bridge).
@@ -397,11 +397,6 @@ export const App: React.FC = () => {
 
   const handleChangeFile = () => {
     fileInputRef.current?.click();
-  };
-
-  const handleExportDialogOpen = (state: ExportDialogState) => {
-    setExportDialogState(state);
-    setIsExportDialogOpen(true);
   };
 
   const handleExportDialogStateChange = (state: ExportDialogState) => {
@@ -813,7 +808,7 @@ export const App: React.FC = () => {
                   onMixerChange={handleMixerChange}
                   onPurgeSession={handlePurgeSession}
                   sourceMixTitle={decodedSourceMix.metadata.fileName}
-                  onExportDialogOpen={handleExportDialogOpen}
+                  exportDialogHosted
                   onExportDialogState={handleExportDialogStateChange}
                   onTransportControls={(controls) => {
                     transportActionsRef.current = controls;
@@ -848,13 +843,12 @@ export const App: React.FC = () => {
                     Export
                   </h3>
                   <p className="text-sm text-muted-foreground">
-                    Use the Export Stems action to open the Export panel.
+                    The Export panel is always here — no action to click.
                   </p>
                 </div>
                 <div className="pt-1">
                   <ExportDialog
-                    isOpen={isExportDialogOpen}
-                    onClose={() => setIsExportDialogOpen(false)}
+                    isOpen
                     stems={separatedStems}
                     sampleRate={decodedSourceMix.metadata.sampleRate}
                     sourceMixTitle={decodedSourceMix.metadata.fileName}

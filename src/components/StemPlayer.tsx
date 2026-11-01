@@ -25,10 +25,11 @@ import { WaveformPeaks } from "../lib/waveformPeaks";
 import { cn } from "../lib/utils";
 import { DISPLAY_FONT_STACK, MONO_FONT_STACK } from "../lib/typography";
 
-// Tab Shell (ADR-0007): live mixer + time-stretch state bridge so the Export Tab
-// panel can be mounted at the app level instead of inside the player. When
-// App hosts the Export panel it passes these callbacks; without them the
-// component keeps its legacy internal ExportDialog (per-component seam).
+// Tab Shell (ADR-0007/0008): live mixer + time-stretch state bridge so the
+// Export panel can be mounted at the app level instead of inside the player.
+// App hosts the panel inline in the Export Tab and flags exportDialogHosted;
+// without that flag the component keeps its legacy internal Export panel
+// (per-component seam).
 export interface ExportDialogState {
   mixerStates: StemMixerStates;
   masterVolume: number;
@@ -63,7 +64,10 @@ export interface StemPlayerProps {
     currentTime: number;
   }) => void;
   onPurgeSession?: () => void;
-  onExportDialogOpen?: (state: ExportDialogState) => void;
+  // Tab Shell (ADR-0008): the app hosts the Export panel inline in the Export
+  // Tab, so the Mix Tab carries no Export Stems action and the player renders
+  // no fallback panel of its own.
+  exportDialogHosted?: boolean;
   onExportDialogState?: (state: ExportDialogState) => void;
   onTransportControls?: (controls: TransportControls) => void;
   // Tab Shell (ADR-0007): the shell hosts the shared Master Waveform spine in
@@ -92,7 +96,7 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
   initialCurrentTime,
   onMixerChange,
   onPurgeSession,
-  onExportDialogOpen,
+  exportDialogHosted,
   onExportDialogState,
   onTransportControls,
   masterWaveformHosted,
@@ -338,20 +342,22 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
   }, []);
 
   const handleIncrementTempo = useCallback(() => {
-    setTempo((prev) => {
-      const next = Math.min(2.0, Math.round((prev + 0.05) * 20) / 20);
-      engineRef.current?.setTempo(next);
-      return next;
-    });
+    // Engine-first: the fork defers state-updater callbacks, so side effects
+    // must run synchronously here (see handleTempoChange).
+    const engine = engineRef.current;
+    const current = engine ? engine.getTempo() : tempo;
+    const next = Math.min(2.0, Math.round((current + 0.05) * 20) / 20);
+    engine?.setTempo(next);
+    setTempo(next);
     emitExportDialogState();
   }, []);
 
   const handleDecrementTempo = useCallback(() => {
-    setTempo((prev) => {
-      const next = Math.max(0.5, Math.round((prev - 0.05) * 20) / 20);
-      engineRef.current?.setTempo(next);
-      return next;
-    });
+    const engine = engineRef.current;
+    const current = engine ? engine.getTempo() : tempo;
+    const next = Math.max(0.5, Math.round((current - 0.05) * 20) / 20);
+    engine?.setTempo(next);
+    setTempo(next);
     emitExportDialogState();
   }, []);
 
@@ -363,29 +369,30 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
   }, []);
 
   const handleIncrementPitch = useCallback(() => {
-    setPitch((prev) => {
-      const next = Math.min(12, prev + 1);
-      engineRef.current?.setPitch(next);
-      return next;
-    });
+    const engine = engineRef.current;
+    const current = engine ? engine.getPitch() : pitch;
+    const next = Math.min(12, current + 1);
+    engine?.setPitch(next);
+    setPitch(next);
     emitExportDialogState();
   }, []);
 
   const handleDecrementPitch = useCallback(() => {
-    setPitch((prev) => {
-      const next = Math.max(-12, prev - 1);
-      engineRef.current?.setPitch(next);
-      return next;
-    });
+    const engine = engineRef.current;
+    const current = engine ? engine.getPitch() : pitch;
+    const next = Math.max(-12, current - 1);
+    engine?.setPitch(next);
+    setPitch(next);
     emitExportDialogState();
   }, []);
 
   const handleToggleFormant = useCallback(() => {
-    setFormantPreservation((prev) => {
-      const next = !prev;
-      engineRef.current?.setFormantPreservation(next);
-      return next;
-    });
+    const engine = engineRef.current;
+    const next = !(engine
+      ? engine.isFormantPreservationEnabled()
+      : formantPreservation);
+    engine?.setFormantPreservation(next);
+    setFormantPreservation(next);
     emitExportDialogState();
   }, []);
 
@@ -485,32 +492,21 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
               </button>
             )}
 
-            {/* Export Stems Action */}
-            <button
-              type="button"
-              aria-label="Export Stems"
-              title="Export isolated stems (WAV/MP3/ZIP)"
-              onClick={() => {
-                if (onExportDialogOpen) {
-                  const engine = engineRef.current;
-                  onExportDialogOpen({
-                    mixerStates: engine?.getAllStemStates() ?? mixerStates,
-                    masterVolume: engine?.getMasterVolume() ?? masterVolume,
-                    timeStretch: {
-                      tempo,
-                      pitch,
-                      formantPreservation,
-                    },
-                  });
-                } else {
-                  setIsExportDialogOpen(true);
-                }
-              }}
-              className="flex h-10 px-3.5 items-center justify-center gap-2 rounded-none border border-border bg-secondary/60 text-foreground font-medium shadow-xs hover:bg-secondary hover:border-primary/40 active:scale-95 transition-all text-xs sm:text-sm"
-            >
-              <Download className="h-4 w-4 text-primary" />
-              <span>Export Stems</span>
-            </button>
+            {/* Export Stems Action — standalone form only. The hosted app
+                form (exportDialogHosted) keeps the Export panel inline in the
+                Export Tab, so the Mix Tab never carries this action. */}
+            {!exportDialogHosted && (
+              <button
+                type="button"
+                aria-label="Export Stems"
+                title="Export isolated stems (WAV/MP3/ZIP)"
+                onClick={() => setIsExportDialogOpen(true)}
+                className="flex h-10 px-3.5 items-center justify-center gap-2 rounded-none border border-border bg-secondary/60 text-foreground font-medium shadow-xs hover:bg-secondary hover:border-primary/40 active:scale-95 transition-all text-xs sm:text-sm"
+              >
+                <Download className="h-4 w-4 text-primary" />
+                <span>Export Stems</span>
+              </button>
+            )}
           </div>
 
           {/* Master Volume Slider */}
@@ -810,9 +806,9 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
         })}
       </div>
 
-      {/* Export Dialog Modal — legacy internal form; with Tab Shell wiring the
-          app mounts the panel in the Export Tab instead (see onExportDialogOpen). */}
-      {!onExportDialogOpen && (
+      {/* Export panel fallback — standalone form only; the hosted app form
+          (exportDialogHosted) keeps the panel inline in the Export Tab. */}
+      {!exportDialogHosted && (
         <ExportDialog
           isOpen={isExportDialogOpen}
           onClose={() => setIsExportDialogOpen(false)}
