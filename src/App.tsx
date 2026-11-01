@@ -1,11 +1,23 @@
 import React, { useEffect, useState, useRef, ChangeEvent } from "react";
-import { AlertCircle, Loader2, CheckCircle2, Music } from "lucide-react";
+import {
+  AlertCircle,
+  Loader2,
+  CheckCircle2,
+  Music,
+  SkipBack,
+  Play,
+  Pause,
+} from "lucide-react";
 import { Header } from "./components/Header";
 import { SourceMixDropzone } from "./components/SourceMixDropzone";
 import { FallbackAdvisory } from "./components/FallbackAdvisory";
 import { SourceMixCard } from "./components/SourceMixCard";
 import { MasterWaveform } from "./components/MasterWaveform";
-import { StemPlayer, ExportDialogState } from "./components/StemPlayer";
+import {
+  StemPlayer,
+  ExportDialogState,
+  TransportControls,
+} from "./components/StemPlayer";
 import { ExportDialog } from "./components/ExportDialog";
 import { SessionRecovery } from "./components/SessionRecovery";
 import { WebGPUStatusBadge } from "./components/WebGPUStatusBadge";
@@ -59,6 +71,13 @@ const SUPPORTED_MIME_TYPES = [
 
 // Tab Shell registry (ADR-0007): one registry drives the desktop left rail,
 // the mobile top strip, and the five pinned Tab panels.
+function formatTransportTime(totalSeconds: number): string {
+  if (isNaN(totalSeconds) || totalSeconds < 0) return "00:00";
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = Math.floor(totalSeconds % 60);
+  return `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
+}
+
 interface TabEntry {
   id: string;
   title: string;
@@ -130,6 +149,14 @@ export const App: React.FC = () => {
   const [exportDialogState, setExportDialogState] =
     useState<ExportDialogState | null>(null);
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
+
+  // Transport bridge: the Listen Tab's Transport row drives the Stem Player
+  // engine (registered by StemPlayer on init, ADR-0007 Tab Shell bridge).
+  const transportActionsRef = useRef<TransportControls>({
+    play: () => {},
+    pause: () => {},
+    seekToStart: () => {},
+  });
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const inferenceClientRef = useRef<InferenceClient | null>(null);
@@ -709,7 +736,7 @@ export const App: React.FC = () => {
               </p>
             </div>
             {waveformPeaks && decodedSourceMix && (
-              <div className="pt-1">
+              <div className="pt-1 space-y-3">
                 <MasterWaveform
                   peaks={waveformPeaks}
                   audioBuffer={decodedSourceMix.buffer}
@@ -717,6 +744,60 @@ export const App: React.FC = () => {
                   currentTime={currentTime}
                   onSeek={handleSeek}
                 />
+
+                {/* Transport row (Tab Shell port): dedicated Seek/Play/Pause + mono readout */}
+                <div
+                  role="group"
+                  aria-label="Transport"
+                  className="flex flex-wrap items-center gap-2"
+                >
+                  <button
+                    type="button"
+                    aria-label="Seek to Start"
+                    title="Seek to start"
+                    onClick={() => {
+                      transportActionsRef.current.seekToStart();
+                      handleSeek(0);
+                    }}
+                    className="flex h-11 w-11 items-center justify-center rounded-xl border border-border bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground transition-all"
+                  >
+                    <SkipBack className="h-4 w-4" />
+                    <span className="font-mono uppercase text-[9px] font-bold tracking-wider">
+                      Seek
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="Play"
+                    title="Play (Space)"
+                    onClick={() => transportActionsRef.current.play()}
+                    className="flex h-11 px-4 items-center justify-center gap-2 rounded-xl bg-primary text-primary-foreground font-semibold shadow-sm hover:bg-primary/90 active:scale-95 transition-all"
+                  >
+                    <Play className="h-4 w-4 fill-current" />
+                    <span className="font-mono text-[10px] font-bold uppercase">
+                      Play
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="Pause"
+                    title="Pause (Space)"
+                    onClick={() => transportActionsRef.current.pause()}
+                    className="flex h-11 px-4 items-center justify-center gap-2 rounded-xl border border-border bg-secondary/60 text-foreground hover:bg-secondary transition-all"
+                  >
+                    <Pause className="h-4 w-4 fill-current" />
+                    <span className="font-mono text-[10px] font-bold uppercase">
+                      Pause
+                    </span>
+                  </button>
+                </div>
+                <p className="font-mono font-extrabold tracking-tight text-lg text-foreground">
+                  <span>{formatTransportTime(currentTime)}</span>
+                  <span className="text-muted-foreground"> / </span>
+                  <span>
+                    {formatTransportTime(decodedSourceMix.metadata.duration)}
+                  </span>
+                </p>
               </div>
             )}
           </section>
@@ -744,6 +825,9 @@ export const App: React.FC = () => {
                 sourceMixTitle={decodedSourceMix.metadata.fileName}
                 onExportDialogOpen={handleExportDialogOpen}
                 onExportDialogState={handleExportDialogStateChange}
+                onTransportControls={(controls) => {
+                  transportActionsRef.current = controls;
+                }}
               />
             ) : (
               <div className="flex items-center justify-between gap-2">

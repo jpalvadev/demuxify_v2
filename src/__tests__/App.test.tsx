@@ -1171,4 +1171,50 @@ describe("App UI Shell", () => {
     expect(screen.queryByRole("button", { name: /^diagnostics$/i })).toBeNull();
     expect(screen.queryByRole("dialog")).toBeNull();
   });
+
+  it("renders dedicated Play/Pause transport buttons with seek-to-start and mono readout in Listen", async () => {
+    vi.spyOn(webgpuModule, "detectWebGPUCapability").mockResolvedValue({
+      supported: true,
+      isFallback: false,
+    });
+    completeSeparationMocks();
+
+    render(<App />);
+    await loadAndSeparate();
+
+    const listenTab = screen.getByRole("region", { name: /listen tab/i });
+    expect(
+      within(listenTab).getByRole("button", { name: /^play$/i })
+    ).toBeInTheDocument();
+    expect(
+      within(listenTab).getByRole("button", { name: /^pause$/i })
+    ).toBeInTheDocument();
+    expect(
+      within(listenTab).getByRole("button", { name: /seek to start/i })
+    ).toBeInTheDocument();
+    expect(
+      within(listenTab).getAllByText(/\d{2}:\d{2}/).length
+    ).toBeGreaterThanOrEqual(2);
+
+    // Pressing the Listen Tab Play button drives the shared Stem Player engine
+    const listenPlayBtn = within(listenTab).getByRole("button", {
+      name: /^play$/i,
+    });
+    fireEvent.click(listenPlayBtn);
+
+    const mixTab = screen.getByRole("region", { name: /mix tab/i });
+    const mixPlayBtn = within(mixTab).getByRole("button", {
+      name: /^play$/i,
+    });
+    await waitFor(() => {
+      expect(mixPlayBtn).toHaveAttribute("aria-pressed", "true");
+    });
+
+    fireEvent.click(
+      within(listenTab).getByRole("button", { name: /^pause$/i })
+    );
+    await waitFor(() => {
+      expect(mixPlayBtn).toHaveAttribute("aria-pressed", "false");
+    });
+  });
 });

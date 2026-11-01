@@ -91,8 +91,14 @@ describe("StemPlayer UI Component", () => {
       screen.getByRole("region", { name: /stem player/i })
     ).toBeInTheDocument();
 
-    // Transport controls
-    expect(screen.getByRole("button", { name: /play/i })).toBeInTheDocument();
+    // Transport controls: dedicated Play and Pause buttons plus seek-to-start
+    expect(screen.getByRole("button", { name: /^play$/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /^pause$/i })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /seek to start/i })
+    ).toBeInTheDocument();
     expect(screen.getByText(/00:00/)).toBeInTheDocument();
 
     // 4 Stem tracks
@@ -107,7 +113,7 @@ describe("StemPlayer UI Component", () => {
     ).toBeInTheDocument();
   });
 
-  it("toggles playback via the Play/Pause transport button", async () => {
+  it("toggles playback via the dedicated Play and Pause buttons", async () => {
     render(
       <StemPlayer
         stems={dummyStems}
@@ -116,20 +122,24 @@ describe("StemPlayer UI Component", () => {
       />
     );
 
-    const playBtn = screen.getByRole("button", { name: /play/i });
+    const playBtn = screen.getByRole("button", { name: /^play$/i });
+    const pauseBtn = screen.getByRole("button", { name: /^pause$/i });
+
+    // Initially paused: Play unpressed, Pause pressed
+    expect(playBtn).toHaveAttribute("aria-pressed", "false");
+    expect(pauseBtn).toHaveAttribute("aria-pressed", "true");
+
+    // Pressing Play starts playback
     fireEvent.click(playBtn);
+    await waitFor(() => {
+      expect(playBtn).toHaveAttribute("aria-pressed", "true");
+    });
 
-    // Button should now show Pause
-    expect(
-      await screen.findByRole("button", { name: /pause/i })
-    ).toBeInTheDocument();
-
-    // Clicking pause returns to play
-    const pauseBtn = screen.getByRole("button", { name: /pause/i });
+    // Pressing Pause stops playback
     fireEvent.click(pauseBtn);
-    expect(
-      await screen.findByRole("button", { name: /play/i })
-    ).toBeInTheDocument();
+    await waitFor(() => {
+      expect(playBtn).toHaveAttribute("aria-pressed", "false");
+    });
   });
 
   it("toggles playback using Spacebar hotkey listener", async () => {
@@ -141,19 +151,24 @@ describe("StemPlayer UI Component", () => {
       />
     );
 
-    expect(screen.getByRole("button", { name: /play/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^play$/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /^pause$/i })
+    ).toBeInTheDocument();
+
+    const playBtn = screen.getByRole("button", { name: /^play$/i });
 
     // Press Spacebar
     fireEvent.keyDown(window, { code: "Space", key: " " });
-    expect(
-      await screen.findByRole("button", { name: /pause/i })
-    ).toBeInTheDocument();
+    await waitFor(() => {
+      expect(playBtn).toHaveAttribute("aria-pressed", "true");
+    });
 
     // Press Spacebar again
     fireEvent.keyDown(window, { code: "Space", key: " " });
-    expect(
-      await screen.findByRole("button", { name: /play/i })
-    ).toBeInTheDocument();
+    await waitFor(() => {
+      expect(playBtn).toHaveAttribute("aria-pressed", "false");
+    });
   });
 
   it("adjusts stem volume using individual volume faders", () => {
@@ -253,9 +268,9 @@ describe("StemPlayer UI Component", () => {
     fireEvent.keyDown(slider, { key: "ArrowRight" });
     expect(screen.getByText(/00:05/)).toBeInTheDocument();
 
-    // Click Reset
+    // Click Seek to Start
     const resetBtn = screen.getByRole("button", {
-      name: /reset to beginning/i,
+      name: /seek to start/i,
     });
     fireEvent.click(resetBtn);
 

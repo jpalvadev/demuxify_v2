@@ -3,6 +3,7 @@ import {
   Play,
   Pause,
   RotateCcw,
+  SkipBack,
   Volume2,
   Layers,
   Trash2,
@@ -34,6 +35,15 @@ export interface ExportDialogState {
   timeStretch: TimeStretchState;
 }
 
+// Tab Shell (ADR-0007): transport actions bridge so the Listen Tab can host
+// the shared Transport row (Play / Pause / Seek to start) driving the same
+// StemPlayerEngine instance. Engine interface unchanged.
+export interface TransportControls {
+  play: () => void;
+  pause: () => void;
+  seekToStart: () => void;
+}
+
 export interface StemPlayerProps {
   stems: Record<StemName, Float32Array[] | AudioBuffer>;
   sampleRate?: number;
@@ -54,6 +64,7 @@ export interface StemPlayerProps {
   onPurgeSession?: () => void;
   onExportDialogOpen?: (state: ExportDialogState) => void;
   onExportDialogState?: (state: ExportDialogState) => void;
+  onTransportControls?: (controls: TransportControls) => void;
 }
 
 function formatTime(totalSeconds: number): string {
@@ -79,6 +90,7 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
   onPurgeSession,
   onExportDialogOpen,
   onExportDialogState,
+  onTransportControls,
 }) => {
   const engineRef = useRef<StemPlayerEngine | null>(null);
 
@@ -110,6 +122,14 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
       initialCurrentTime,
     });
     engineRef.current = engine;
+
+    // Hand transport actions to the shell so the Listen Tab's Transport row
+    // drives this same engine (ADR-0007 Tab Shell bridge).
+    onTransportControls?.({
+      play: () => void handlePlay(),
+      pause: handlePause,
+      seekToStart: handleReset,
+    });
 
     setDuration(engine.getDuration());
     setMixerStates(engine.getAllStemStates());
@@ -186,6 +206,21 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
       await engine.play();
       setIsPlaying(true);
     }
+  }, []);
+
+  // Dedicated transport actions (Tab Shell): Play only starts, Pause only stops.
+  const handlePlay = useCallback(async () => {
+    const engine = engineRef.current;
+    if (!engine || engine.isPlaying()) return;
+    await engine.play();
+    setIsPlaying(true);
+  }, []);
+
+  const handlePause = useCallback(() => {
+    const engine = engineRef.current;
+    if (!engine || !engine.isPlaying()) return;
+    engine.pause();
+    setIsPlaying(false);
   }, []);
 
   const handleSeek = useCallback(
@@ -385,8 +420,8 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
 
         {/* Global Transport Bar */}
         <div className="flex flex-wrap items-center justify-between md:justify-end gap-3 sm:gap-4">
-          {/* Time Display */}
-          <div className="flex items-center gap-1 font-mono text-sm bg-secondary/60 px-3 py-1.5 rounded-xl border border-border/60">
+          {/* Time Display: strong mono readout (Bold port of the .tread row) */}
+          <div className="flex items-center gap-1 font-mono text-lg font-extrabold tracking-tight bg-secondary/60 px-3 py-1.5 rounded-xl border border-border/60">
             <span className="text-primary font-bold">
               {formatTime(currentTime)}
             </span>
@@ -396,36 +431,43 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
             </span>
           </div>
 
-          {/* Transport Controls */}
+          {/* Transport Controls: dedicated Seek-to-start / Play / Pause buttons (Bold port) */}
           <div className="flex items-center gap-2">
             <button
               type="button"
-              aria-label="Reset to Beginning"
-              title="Reset to beginning"
+              aria-label="Seek to Start"
+              title="Seek to start"
               onClick={handleReset}
-              className="flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground transition-all"
+              className="flex h-11 w-11 items-center justify-center rounded-xl border border-border bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground transition-all"
             >
-              <RotateCcw className="h-4 w-4" />
+              <SkipBack className="h-4 w-4" />
+              <span className="hidden sm:inline font-mono uppercase text-[10px] font-bold">
+                Seek
+              </span>
             </button>
 
             <button
               type="button"
-              aria-label={isPlaying ? "Pause" : "Play"}
-              title={isPlaying ? "Pause (Space)" : "Play (Space)"}
-              onClick={togglePlayPause}
-              className="flex h-10 px-5 items-center justify-center gap-2 rounded-xl bg-primary text-primary-foreground font-semibold shadow-sm hover:bg-primary/90 active:scale-95 transition-all"
+              aria-label="Play"
+              aria-pressed={isPlaying}
+              title="Play (Space)"
+              onClick={handlePlay}
+              className="flex h-11 px-5 items-center justify-center gap-2 rounded-xl bg-primary text-primary-foreground font-semibold shadow-sm hover:bg-primary/90 active:scale-95 transition-all"
             >
-              {isPlaying ? (
-                <>
-                  <Pause className="h-4 w-4 fill-current" />
-                  <span>Pause</span>
-                </>
-              ) : (
-                <>
-                  <Play className="h-4 w-4 fill-current ml-0.5" />
-                  <span>Play</span>
-                </>
-              )}
+              <Play className="h-4 w-4 fill-current" />
+              <span>Play</span>
+            </button>
+
+            <button
+              type="button"
+              aria-label="Pause"
+              aria-pressed={!isPlaying}
+              title="Pause (Space)"
+              onClick={handlePause}
+              className="flex h-11 px-5 items-center justify-center gap-2 rounded-xl border border-border bg-secondary/60 text-foreground hover:bg-secondary transition-all"
+            >
+              <Pause className="h-4 w-4 fill-current" />
+              <span>Pause</span>
             </button>
 
             {onPurgeSession && (
