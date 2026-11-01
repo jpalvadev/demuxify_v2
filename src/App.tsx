@@ -558,11 +558,13 @@ export const App: React.FC = () => {
     <div className="min-h-screen bg-background text-foreground flex flex-col font-sans transition-colors duration-200">
       <Header />
 
-      <main className="flex-1 mx-auto w-full max-w-4xl px-4 py-8 sm:px-6 sm:py-12 flex flex-col md:flex-row gap-6 md:gap-8">
+      {/* Full-bleed shell (artifact `.app`: no max-width; rail + stage fill the
+          viewport; at md+ the rail is a fixed column beside the fluid stage). */}
+      <main className="flex-1 w-full px-4 sm:px-6 flex flex-col gap-4 md:flex-row md:gap-5">
         {/* Tab rail: horizontal top strip on mobile portrait, vertical left rail at md+ */}
         <nav
           aria-label="Tab rail"
-          className="flex items-center justify-center flex-wrap gap-2 w-full md:w-56 md:flex-col md:no-wrap md:justify-start md:items-stretch pb-3"
+          className="grid grid-cols-[112px_112px_112px] sm:grid-cols-[112px_112px_112px_112px_112px] gap-2 items-center overflow-hidden w-full bg-card/50 pb-4 md:w-[250px] lg:w-[280px] md:flex md:flex-col md:no-wrap md:justify-start md:items-stretch md:gap-2.5 md:border-r md:border-border/60"
         >
           {TAB_REGISTRY.map((tab) => {
             const gated = tab.gatedUntilStems && !stemsReady;
@@ -574,11 +576,11 @@ export const App: React.FC = () => {
                 aria-label={tab.title}
                 aria-current={active ? "true" : undefined}
                 onClick={() => handleSelectTab(tab.id)}
-                className={`inline-flex flex-col items-center justify-center gap-1.5 rounded-lg px-4 py-3.5 min-h-[44px] min-w-[44px] md:w-full text-sm font-semibold tracking-wide text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${gated ? "opacity-50 text-muted-foreground" : ""} ${active ? "bg-primary/10 border-primary/60 shadow-sm" : ""}`.trim()}
+                className={`flex flex-col items-center justify-center gap-1 rounded-lg px-1 py-2 min-h-[44px] min-w-[44px] text-[10px] font-bold tracking-wide text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:flex-1 md:px-3 md:py-2.5 md:text-sm md:flex-row md:justify-start md:items-center md:gap-3 ${gated ? "opacity-50 text-muted-foreground" : ""} ${active ? "bg-primary/10 border-primary/60 shadow-sm" : ""}`.trim()}
               >
-                {tab.title}
+                <span className="whitespace-nowrap">{tab.title}</span>
                 {gated && (
-                  <span className="text-xs text-muted-foreground">
+                  <span className="font-mono text-[9px] font-medium tracking-wide text-muted-foreground">
                     {TAB_GATING_REASON}
                   </span>
                 )}
@@ -594,7 +596,7 @@ export const App: React.FC = () => {
 
         {/* Tab stage: five pinned Tab panels, always present in the DOM; the
             stage shows only the ACTIVE Tab panel (artifact `.stage` + `.panel`). */}
-        <div className="relative flex-1 min-h-[340px]">
+        <div className="relative flex-1 min-h-[340px] overflow-hidden">
           {/* Separate Tab: Session Recovery, Model Selector, Source Mix ingestion, Inference Engine */}
           <section
             role="region"

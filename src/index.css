@@ -78,3 +78,35 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Dark-only chrome (ADR-0007 / ticket 09): the near-black canvas must not
+   float bright white UA scrollbars or light form controls. `color-scheme:
+   dark` themes the UA widgets; the rules below give the stage panels a
+   slim border-tinted scrollbar instead of the default chunky light one. */
+:root {
+  color-scheme: dark;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--border)) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--border));
+  border: 2px solid transparent;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted));
+}
