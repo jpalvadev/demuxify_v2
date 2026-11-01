@@ -62,6 +62,11 @@
     --stem-drums: 264 84% 70%;
     --stem-bass: 34 95% 60%;
     --stem-other: 196 86% 62%;
+
+    /* Status hues (ticket 01 --ok/--warn tokens): the declared set behind every
+       ok / caution surface, so no surface reads the default Tailwind palette. */
+    --status-ok: 140 72% 52%;
+    --status-warn: 48 95% 58%;
   }
 }
 

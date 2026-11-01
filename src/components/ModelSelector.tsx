@@ -68,7 +68,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
                 <span className="text-xs font-semibold uppercase tracking-wider text-primary">
                   Mobile-Optimized Model Active
                 </span>
-                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
+                <span className="inline-flex items-center gap-1 rounded-full bg-status-ok/10 px-2 py-0.5 text-[10px] font-medium text-status-ok">
                   <ShieldCheck className="h-3 w-3" />
                   Memory Protected
                 </span>
@@ -87,9 +87,9 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
       {isMobile && isStudioSelected && (
         <div
           role="alert"
-          className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-800 dark:text-amber-200 flex items-start gap-2.5"
+          className="rounded-xl border border-status-warn/30 bg-status-warn/10 p-3 text-xs text-status-warn flex items-start gap-2.5"
         >
-          <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
+          <AlertTriangle className="h-4 w-4 shrink-0 text-status-warn mt-0.5" />
           <div className="space-y-0.5">
             <div className="font-semibold">
               Studio Profile on Mobile Warning

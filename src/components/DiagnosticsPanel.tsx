@@ -144,7 +144,7 @@ export const DiagnosticsPanel: React.FC = () => {
                     log.level === "error"
                       ? "border-destructive/40 bg-destructive/10 text-destructive-foreground"
                       : log.level === "warn"
-                        ? "border-amber-500/40 bg-amber-500/10 text-foreground"
+                        ? "border-status-warn/40 bg-status-warn/10 text-foreground"
                         : "border-border bg-muted/20 text-foreground"
                   }`}
                 >
@@ -154,7 +154,7 @@ export const DiagnosticsPanel: React.FC = () => {
                         <AlertCircle className="h-3 w-3 text-destructive" />
                       )}
                       {log.level === "warn" && (
-                        <AlertTriangle className="h-3 w-3 text-amber-500" />
+                        <AlertTriangle className="h-3 w-3 text-status-warn" />
                       )}
                       {log.level === "info" && (
                         <Info className="h-3 w-3 text-primary" />

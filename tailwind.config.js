@@ -44,6 +44,9 @@ export default {
         "stem-drums": "hsl(var(--stem-drums) / <alpha-value>)",
         "stem-bass": "hsl(var(--stem-bass) / <alpha-value>)",
         "stem-other": "hsl(var(--stem-other) / <alpha-value>)",
+        // Status hues (ticket 09 follow-up): sheet's --ok / --warn tokens.
+        "status-ok": "hsl(var(--status-ok) / <alpha-value>)",
+        "status-warn": "hsl(var(--status-warn) / <alpha-value>)",
       },
       fontFamily: {
         // Bold pairing (ticket 01 sheet): Archivo Black display for

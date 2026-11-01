@@ -39,9 +39,9 @@ const TOAST_STYLES: Record<
 > = {
   success: {
     border:
-      "border-emerald-500/40 bg-card/95 text-foreground shadow-emerald-500/10",
-    iconColor: "text-emerald-400",
-    badgeBg: "bg-emerald-500/10 text-emerald-400",
+      "border-status-ok/40 bg-card/95 text-foreground shadow-status-ok/10",
+    iconColor: "text-status-ok",
+    badgeBg: "bg-status-ok/10 text-status-ok",
     role: "status",
     ariaLive: "polite",
   },

@@ -759,7 +759,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
                   />
                   <div>
                     <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
-                      <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
+                      <ShieldCheck className="h-3.5 w-3.5 text-status-ok" />
                       <span>Anti-Clipping Protection</span>
                     </div>
                     <p className="text-[10px] text-muted-foreground leading-tight mt-0.5">
@@ -898,7 +898,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
                 {isExporting ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 ) : (
-                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+                  <CheckCircle2 className="h-3.5 w-3.5 text-status-ok" />
                 )}
                 {statusMessage || "Encoding..."}
               </span>
@@ -925,7 +925,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
         {successNotification && (
           <div
             role="status"
-            className="flex items-center gap-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3.5 text-xs text-emerald-600 dark:text-emerald-400"
+            className="flex items-center gap-2.5 rounded-xl border border-status-ok/30 bg-status-ok/10 p-3.5 text-xs text-status-ok"
           >
             <CheckCircle2 className="h-4 w-4 shrink-0" />
             <span>{successNotification}</span>

@@ -127,7 +127,7 @@ export const SourceMixCard: React.FC<SourceMixCardProps> = ({
         </div>
 
         <div className="flex items-center gap-2.5">
-          <Activity className="h-4 w-4 text-emerald-400 shrink-0" />
+          <Activity className="h-4 w-4 text-status-ok shrink-0" />
           <div>
             <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
               Sample Rate

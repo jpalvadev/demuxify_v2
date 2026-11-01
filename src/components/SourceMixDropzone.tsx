@@ -159,7 +159,7 @@ export const SourceMixDropzone: React.FC<SourceMixDropzoneProps> = ({
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-wider text-emerald-400">
+                  <span className="inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-wider text-status-ok">
                     <CheckCircle2 className="h-3.5 w-3.5" />
                     Loaded Source Mix
                   </span>

@@ -62,7 +62,7 @@ export const ModelCacheStatus: React.FC = () => {
                   Checking...
                 </span>
               ) : cached ? (
-                <span className="flex items-center gap-1 text-[10px] font-semibold text-emerald-400">
+                <span className="flex items-center gap-1 text-[10px] font-semibold text-status-ok">
                   <Check className="h-3 w-3" />
                   Cached
                 </span>

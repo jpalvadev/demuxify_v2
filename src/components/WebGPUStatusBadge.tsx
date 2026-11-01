@@ -1,13 +1,16 @@
-import React from 'react';
-import { Cpu, Zap, AlertTriangle, Loader2 } from 'lucide-react';
-import { WebGPUCapability } from '../lib/webgpu';
+import React from "react";
+import { Cpu, Zap, AlertTriangle, Loader2 } from "lucide-react";
+import { WebGPUCapability } from "../lib/webgpu";
 
 interface WebGPUStatusBadgeProps {
   capability: WebGPUCapability | null;
   isLoading?: boolean;
 }
 
-export const WebGPUStatusBadge: React.FC<WebGPUStatusBadgeProps> = ({ capability, isLoading }) => {
+export const WebGPUStatusBadge: React.FC<WebGPUStatusBadgeProps> = ({
+  capability,
+  isLoading,
+}) => {
   if (isLoading || !capability) {
     return (
       <div
@@ -21,20 +24,23 @@ export const WebGPUStatusBadge: React.FC<WebGPUStatusBadgeProps> = ({ capability
   }
 
   if (capability.supported) {
-    const deviceName = capability.adapterInfo?.device || capability.adapterInfo?.vendor || 'Hardware Acceleration';
+    const deviceName =
+      capability.adapterInfo?.device ||
+      capability.adapterInfo?.vendor ||
+      "Hardware Acceleration";
     return (
       <div
-        className="inline-flex items-center gap-2 px-3 py-1 text-xs font-semibold rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
+        className="inline-flex items-center gap-2 px-3 py-1 text-xs font-semibold rounded-full bg-status-ok/15 text-status-ok border border-status-ok/30"
         title={`WebGPU Active: ${deviceName}`}
       >
         <span className="relative flex h-2 w-2">
-          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-          <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-status-ok opacity-75"></span>
+          <span className="relative inline-flex rounded-full h-2 w-2 bg-status-ok"></span>
         </span>
-        <Zap className="w-3.5 h-3.5 text-emerald-400" />
+        <Zap className="w-3.5 h-3.5 text-status-ok" />
         <span>WebGPU Active</span>
         {capability.adapterInfo?.device && (
-          <span className="hidden sm:inline text-emerald-500/80 font-normal">
+          <span className="hidden sm:inline text-status-ok/80 font-normal">
             ({capability.adapterInfo.device})
           </span>
         )}
@@ -44,10 +50,10 @@ export const WebGPUStatusBadge: React.FC<WebGPUStatusBadgeProps> = ({ capability
 
   return (
     <div
-      className="inline-flex items-center gap-2 px-3 py-1 text-xs font-semibold rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/30"
-      title={capability.errorReason || 'Running in CPU/WASM fallback mode'}
+      className="inline-flex items-center gap-2 px-3 py-1 text-xs font-semibold rounded-full bg-status-warn/15 text-status-warn border border-status-warn/30"
+      title={capability.errorReason || "Running in CPU/WASM fallback mode"}
     >
-      <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
+      <AlertTriangle className="w-3.5 h-3.5 text-status-warn" />
       <Cpu className="w-3.5 h-3.5" />
       <span>Fallback Mode (CPU)</span>
     </div>

@@ -698,9 +698,9 @@ export const App: React.FC = () => {
                     <div
                       role="region"
                       aria-label="Separation Complete"
-                      className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-5 shadow-sm space-y-3"
+                      className="rounded-2xl border border-status-ok/30 bg-status-ok/10 p-5 shadow-sm space-y-3"
                     >
-                      <div className="flex items-center gap-2.5 text-emerald-600 dark:text-emerald-400">
+                      <div className="flex items-center gap-2.5 text-status-ok">
                         <CheckCircle2 className="h-5 w-5 shrink-0" />
                         <h3 className="font-display text-base font-semibold">
                           Separation Complete: 4 Discrete Stems Generated
