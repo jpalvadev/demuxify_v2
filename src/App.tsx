@@ -23,8 +23,6 @@ import {
   SeparationProgress,
   SeparationPhase,
 } from "./components/SeparationProgress";
-import { ToastContainer } from "./components/Toast";
-import { toast } from "./lib/toast";
 import { DiagnosticsPanel } from "./components/DiagnosticsPanel";
 import { grz01, grz02, grzNames, faceElements } from "./lib/grizzly";
 import { ModelCacheStatus } from "./components/ModelCacheStatus";
@@ -542,7 +540,9 @@ export const App: React.FC = () => {
 
   const handleSelectTab = (tabId: string) => {
     if (tabIsGated(tabId)) {
-      toast.error(`Tab blocked — ${TAB_GATING_REASON}`);
+      // Silent no-op (ADR-0009): the rail chip's bare reason line is already
+      // the whole refusal answer, and the toast DOM surface is dead — no
+      // notice is emitted at all. The stage never moves.
       return;
     }
     setSelectedTab(tabId);
@@ -592,11 +592,6 @@ export const App: React.FC = () => {
               </button>
             );
           })}
-
-          {/* Toast stack (Tab Shell port, data-od-id="toast-stack"): notices
-              stack at the rail bottom (left column on desktop, below the top
-              strip on mobile portrait) instead of floating over content. */}
-          <ToastContainer />
         </nav>
 
         {/* Tab stage: four pinned Tab panels, always present in the DOM; the

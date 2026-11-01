@@ -990,25 +990,29 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
           </div>
         )}
 
-        {/* Success Notification */}
+        {/* Export success (ADR-0009): the toast DOM surface is dead, so the
+            result announces itself inline in the Export Tab — one mono micro
+            line at the surface the user acted on, keeping the toast copy. */}
         {successNotification && (
-          <div
+          <p
             role="status"
-            className="flex items-center gap-2.5 rounded-none border border-status-ok/30 bg-status-ok/10 p-3.5 text-xs text-status-ok"
+            className="mt-2 font-mono text-[10px] leading-[12px] uppercase tracking-[0.12em] text-status-ok inline-flex items-center gap-1.5"
           >
-            <CheckCircle2 className="h-4 w-4 shrink-0" />
+            <span
+              aria-hidden="true"
+              className="inline-block w-1.5 h-1.5 rounded-full bg-status-ok"
+            />{" "}
             <span>{successNotification}</span>
-          </div>
+          </p>
         )}
 
         {hasCancelledExport && (
-          <div
+          <p
             role="status"
-            className="flex items-center gap-2.5 rounded-none border border-secondary/60 bg-secondary/40 p-3.5 text-xs text-muted-foreground"
+            className="mt-2 font-mono text-[10px] leading-[12px] uppercase tracking-[0.12em] text-grz-600"
           >
-            <X className="h-4 w-4 shrink-0" />
-            <span>Export cancelled · nothing written</span>
-          </div>
+            Export cancelled · nothing written
+          </p>
         )}
 
         {/* Error Notification */}

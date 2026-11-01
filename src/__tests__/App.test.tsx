@@ -1169,7 +1169,7 @@ describe("App UI Shell", () => {
     ).toHaveLength(1);
   });
 
-  it("keeps gated Tabs locked: clicking the Mix rail Tab before separation is blocked with a notice", async () => {
+  it("keeps gated Tabs locked: clicking the Mix rail Tab before separation is a silent no-op", async () => {
     vi.spyOn(webgpuModule, "detectWebGPUCapability").mockResolvedValue({
       supported: true,
       isFallback: false,
@@ -1181,15 +1181,19 @@ describe("App UI Shell", () => {
     const mixRailBtn = within(rail).getByRole("button", { name: /^Mix$/i });
     fireEvent.click(mixRailBtn);
 
-    // Blocked: the stage stays on Separate and a rail notice explains why
+    // Silent no-op (ADR-0009): the stage stays on Separate, the mix Tab never
+    // reaches the stage, and the click emits no notice of any kind — the
+    // chip's bare reason line is the whole refusal answer.
     const separateRailBtn = within(rail).getByRole("button", {
       name: /^Separate$/i,
     });
     expect(separateRailBtn.getAttribute("aria-current")).toBe("true");
     expect(mixRailBtn.getAttribute("aria-current")).toBeNull();
-    expect(
-      within(rail).getAllByText(/blocked.*no Stems yet/i).length
-    ).toBeGreaterThanOrEqual(1);
+    expect(within(rail).queryAllByText(/blocked/i)).toHaveLength(0);
+    expect(within(rail).getAllByText(/no Stems yet/i).length).toBeGreaterThan(
+      0
+    );
+    expect(screen.queryByTestId(/^toast-/)).not.toBeInTheDocument();
   });
 
   it("places each tool in its Tab home once separation completes", async () => {
@@ -1649,7 +1653,7 @@ describe("App UI Shell", () => {
     }
   });
 
-  it("stacks toast notices at the rail bottom instead of floating over content", async () => {
+  it("keeps the toast DOM surface dead: no notice container anywhere, notices only in the manager", async () => {
     vi.spyOn(webgpuModule, "detectWebGPUCapability").mockResolvedValue({
       supported: true,
       isFallback: false,
@@ -1659,14 +1663,19 @@ describe("App UI Shell", () => {
 
     render(<App />);
 
+    // A live manager emission must reach no DOM surface at all: the toast
+    // container is dead at every breakpoint and every rail placement.
     const railNav = screen.getByRole("navigation", { name: /tab rail/i });
-    const stack = within(railNav).getByTestId("toast-stack");
-    expect(stack).toBeInTheDocument();
-    expect(within(railNav).getByText(/source mix queued/)).toBeInTheDocument();
-
-    // The stack is an in-flow notice area at the rail end, not a floating
-    // bottom-right container
-    expect(stack.className.includes("fixed")).toBe(false);
+    expect(
+      within(railNav).queryByTestId("toast-stack")
+    ).not.toBeInTheDocument();
+    expect(within(railNav).queryAllByText(/source mix queued/i)).toHaveLength(
+      0
+    );
+    expect(screen.queryByTestId("toast-stack")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("source mix queued · demo notice")
+    ).not.toBeInTheDocument();
 
     toastModule.toastManager.clear();
   });
