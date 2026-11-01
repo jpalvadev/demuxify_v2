@@ -14,7 +14,8 @@ import {
   SeparationPhase,
 } from "./components/SeparationProgress";
 import { ToastContainer } from "./components/Toast";
-import { DiagnosticsOverlay } from "./components/DiagnosticsOverlay";
+import { DiagnosticsPanel } from "./components/DiagnosticsPanel";
+import { ModelCacheStatus } from "./components/ModelCacheStatus";
 import { ModelSelector } from "./components/ModelSelector";
 import {
   isMobileDevice,
@@ -799,7 +800,7 @@ export const App: React.FC = () => {
             )}
           </section>
 
-          {/* System Tab: WebGPU status, Fallback Advisory, diagnostics entry point */}
+          {/* System Tab: WebGPU status, Fallback Advisory, Model Cache status, session info, inline diagnostics */}
           <section
             role="region"
             aria-label="System Tab"
@@ -810,7 +811,7 @@ export const App: React.FC = () => {
                 System
               </h3>
               <p className="text-sm text-muted-foreground">
-                Hardware acceleration status and on-device diagnostics.
+                Hardware acceleration, Model Cache and on-device diagnostics.
               </p>
             </div>
             <div className="pt-1 space-y-3">
@@ -821,8 +822,16 @@ export const App: React.FC = () => {
               {capability?.isFallback && (
                 <FallbackAdvisory capability={capability} />
               )}
+              <ModelCacheStatus />
+              {detectedSession && !decodedSourceMix && (
+                <p className="text-xs text-muted-foreground">
+                  Saved session: {detectedSession.title} (
+                  {detectedSession.duration.toFixed(1)}s) — resume it from the
+                  Separate Tab.
+                </p>
+              )}
             </div>
-            <DiagnosticsOverlay />
+            <DiagnosticsPanel />
           </section>
         </div>
       </main>

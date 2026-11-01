@@ -1147,4 +1147,28 @@ describe("App UI Shell", () => {
       })
     ).toHaveValue("1");
   });
+
+  it("keeps System Tab status and Diagnostics inline without any overlay", async () => {
+    vi.spyOn(webgpuModule, "detectWebGPUCapability").mockResolvedValue({
+      supported: true,
+      isFallback: false,
+      adapterInfo: { vendor: "NVIDIA", device: "RTX 3080" },
+    });
+
+    render(<App />);
+
+    const systemTab = screen.getByRole("region", { name: /system tab/i });
+    expect(
+      within(systemTab).getByText(/system diagnostics/i)
+    ).toBeInTheDocument();
+    await waitFor(() => {
+      expect(
+        within(systemTab).queryAllByText(/not cached/i).length
+      ).toBeGreaterThan(0);
+    });
+
+    // No floating diagnostics pill and no modal overlay anywhere
+    expect(screen.queryByRole("button", { name: /^diagnostics$/i })).toBeNull();
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
 });

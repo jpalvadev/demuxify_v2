@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import { DiagnosticsOverlay } from "../components/DiagnosticsOverlay";
+import { DiagnosticsPanel } from "../components/DiagnosticsPanel";
 import { diagnostics } from "../lib/diagnostics";
 
-describe("DiagnosticsOverlay", () => {
+describe("DiagnosticsPanel", () => {
   beforeEach(() => {
     diagnostics.clear();
   });
@@ -12,30 +12,30 @@ describe("DiagnosticsOverlay", () => {
     diagnostics.clear();
   });
 
-  it("renders floating toggle button with error count badge", async () => {
+  it("renders inline System Diagnostics panel with error count badge", async () => {
     diagnostics.info("general", "App started");
     diagnostics.error("inference", "Test failure");
 
-    render(<DiagnosticsOverlay />);
+    render(<DiagnosticsPanel />);
 
-    const toggleButton = screen.getByRole("button", { name: /diagnostics/i });
-    expect(toggleButton).toBeInTheDocument();
+    const panel = screen.getByRole("region", { name: /system diagnostics/i });
+    expect(panel).toBeInTheDocument();
+    expect(screen.getByText("System Diagnostics")).toBeInTheDocument();
     await waitFor(() => {
-      expect(screen.getByText("1")).toBeInTheDocument(); // 1 error badge
+      expect(screen.getByText(/1 error/)).toBeInTheDocument(); // 1 error badge
     });
   });
 
-  it("opens drawer when toggle button is clicked and displays log entries", async () => {
+  it("displays log entries inline without opening anything", async () => {
     diagnostics.info("inference", "Loading model weights");
     diagnostics.error("system", "WebGPU fallback active");
 
-    render(<DiagnosticsOverlay />);
-
-    const toggleButton = screen.getByRole("button", { name: /diagnostics/i });
-    fireEvent.click(toggleButton);
+    render(<DiagnosticsPanel />);
 
     await waitFor(() => {
-      expect(screen.getByText("System Diagnostics")).toBeInTheDocument();
+      expect(
+        screen.getByRole("region", { name: /system diagnostics/i })
+      ).toBeInTheDocument();
       expect(screen.getByText("Loading model weights")).toBeInTheDocument();
       expect(screen.getByText("WebGPU fallback active")).toBeInTheDocument();
     });
@@ -51,12 +51,11 @@ describe("DiagnosticsOverlay", () => {
 
     diagnostics.info("network", "Fetched 100 bytes");
 
-    render(<DiagnosticsOverlay />);
+    render(<DiagnosticsPanel />);
 
-    // Open drawer
-    fireEvent.click(screen.getByRole("button", { name: /diagnostics/i }));
-
-    const copyBtn = await screen.findByRole("button", { name: /copy report/i });
+    const copyBtn = await screen.findByRole("button", {
+      name: /copy report/i,
+    });
     fireEvent.click(copyBtn);
 
     await waitFor(() => {
@@ -71,8 +70,7 @@ describe("DiagnosticsOverlay", () => {
   it("clears logs when clear button is clicked", async () => {
     diagnostics.info("general", "Log to clear");
 
-    render(<DiagnosticsOverlay />);
-    fireEvent.click(screen.getByRole("button", { name: /diagnostics/i }));
+    render(<DiagnosticsPanel />);
 
     expect(await screen.findByText("Log to clear")).toBeInTheDocument();
 
