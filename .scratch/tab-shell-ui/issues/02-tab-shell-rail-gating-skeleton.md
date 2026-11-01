@@ -28,3 +28,4 @@ Commit `299ca69` (`src/App.tsx`, `src/__tests__/App.test.tsx`):
 ## Comments
 
 - Design mandate satisfied: shell structure follows the ticket 01 OpenDesign run brief (five pinned Tabs, rail/strip responsive behavior, gating reason); the Bold skin (palette, type, radius) is ported in ticket 09 from that run's artifact — structure first per this ticket ("current neutral tokens are fine").
+- Post-resolve fix (commit `bc567da`): the rail is now interactive as the artifact requires — rail Tab buttons carry `onClick` → `handleSelectTab`, `selectedTab` state drives `aria-current`, gated Tab clicks are blocked with a rail toast notice (`Tab blocked — no Stems yet`), and separation completion auto-activates Listen. Two new seams added (rail click moves the active Tab; gated click stays locked with the notice); suite 289 green.
