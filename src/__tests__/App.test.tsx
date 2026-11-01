@@ -1020,6 +1020,67 @@ describe("App UI Shell", () => {
     });
   };
 
+  it("activates the Tab rail: clicking a rail Tab button moves the stage panel", async () => {
+    vi.spyOn(webgpuModule, "detectWebGPUCapability").mockResolvedValue({
+      supported: true,
+      isFallback: false,
+    });
+    completeSeparationMocks();
+
+    render(<App />);
+    await loadAndSeparate();
+
+    // Separation completion auto-activates the Listen Tab
+    const rail = screen.getByRole("navigation", { name: /tab rail/i });
+    const listenRailBtn = within(rail).getByRole("button", {
+      name: /^Listen$/i,
+    });
+    const mixRailBtn = within(rail).getByRole("button", { name: /^Mix$/i });
+    expect(listenRailBtn.getAttribute("aria-current")).toBe("true");
+
+    fireEvent.click(mixRailBtn);
+
+    expect(mixRailBtn.getAttribute("aria-current")).toBe("true");
+    expect(listenRailBtn.getAttribute("aria-current")).toBeNull();
+
+    // Stage invariant: only the ACTIVE Tab panel paints; the rest are hidden
+    const listenPanel = screen.getByRole("region", { name: /^Listen Tab$/ });
+    const mixPanel = screen.getByRole("region", { name: /^Mix Tab$/ });
+    const listenClasses = (listenPanel.getAttribute("class") ?? "").split(" ");
+    const mixClasses = (mixPanel.getAttribute("class") ?? "").split(" ");
+    expect(listenClasses).toContain("hidden");
+    expect(mixClasses).not.toContain("hidden");
+    const panels = screen.getAllByRole("region", {
+      name: /^(Separate|Listen|Mix|Export|System) Tab$/,
+    });
+    expect(
+      panels.filter((p) => (p.getAttribute("class") ?? "").includes("absolute"))
+    ).toHaveLength(1);
+  });
+
+  it("keeps gated Tabs locked: clicking the Mix rail Tab before separation is blocked with a notice", async () => {
+    vi.spyOn(webgpuModule, "detectWebGPUCapability").mockResolvedValue({
+      supported: true,
+      isFallback: false,
+    });
+
+    render(<App />);
+
+    const rail = screen.getByRole("navigation", { name: /tab rail/i });
+    const mixRailBtn = within(rail).getByRole("button", { name: /^Mix$/i });
+    fireEvent.click(mixRailBtn);
+
+    // Blocked: the stage stays on Separate and a rail notice explains why
+    const separateRailBtn = within(rail).getByRole("button", {
+      name: /^Separate$/i,
+    });
+    expect(separateRailBtn.getAttribute("aria-current")).toBe("true");
+    expect(mixRailBtn.getAttribute("aria-current")).toBeNull();
+    expect(
+      within(rail).getAllByText(/blocked.*no Stems yet/i).length
+    ).toBeGreaterThanOrEqual(1);
+  });
+
   it("places each tool in its Tab home once separation completes", async () => {
     vi.spyOn(webgpuModule, "detectWebGPUCapability").mockResolvedValue({
       supported: true,

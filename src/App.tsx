@@ -26,6 +26,7 @@ import {
   SeparationPhase,
 } from "./components/SeparationProgress";
 import { ToastContainer } from "./components/Toast";
+import { toast } from "./lib/toast";
 import { DiagnosticsPanel } from "./components/DiagnosticsPanel";
 import { ModelCacheStatus } from "./components/ModelCacheStatus";
 import { ModelSelector } from "./components/ModelSelector";
@@ -103,15 +104,23 @@ const TAB_REGISTRY: TabEntry[] = [
 const TAB_GATING_REASON = "no Stems yet";
 
 const tabPanelClass = (gated: boolean, active: boolean) =>
-  `rounded-2xl border border-border/60 bg-card/40 p-4 transition-colors ${
-    active ? "border-primary/70 bg-card/80" : ""
-  } ${gated ? "opacity-50" : ""}`.trim();
+  // Tab Shell stage invariant (artifact `.panel` + `.panel.act`): every Tab panel
+  // stays in the DOM, but only the ACTIVE Tab's panel paints — the rest are
+  // display-hidden inside the stage.
+  gated || !active
+    ? "hidden"
+    : "absolute inset-0 overflow-y-auto overflow-x-hidden rounded-2xl border border-primary/70 bg-card/80 p-4 sm:px-6 sm:py-6 transition-colors";
 
 export const App: React.FC = () => {
   // Dark-only contract (ticket 09): no theme state — html keeps `dark` forever
   // and there is no light-token override block to switch into.
   const [capability, setCapability] = useState<WebGPUCapability | null>(null);
   const [isDetectingWebGPU, setIsDetectingWebGPU] = useState(true);
+
+  // Tab Shell (ADR-0007): the rail is interactive — clicking a Tab button moves
+  // the stage's active Tab. Gated Tabs stay locked (with the reason line) until
+  // Stems exist, so they can never become the active Tab.
+  const [selectedTab, setSelectedTab] = useState("separate");
 
   // Model Profile State
   const [isMobile] = useState(() => isMobileDevice());
@@ -350,6 +359,7 @@ export const App: React.FC = () => {
       setCurrentTime(session.mixer.currentTime ?? 0);
       setSeparationPhase("completed");
       setDetectedSession(null);
+      setSelectedTab("listen");
     } catch (err) {
       setDecodeError("Failed to resume previous session.");
     } finally {
@@ -471,6 +481,7 @@ export const App: React.FC = () => {
 
       setSeparatedStems(result.stems);
       setSeparationPhase("completed");
+      setSelectedTab("listen");
 
       const initialMixerState: SessionMixerState = {
         stems: {
@@ -529,7 +540,19 @@ export const App: React.FC = () => {
   };
 
   const stemsReady = separationPhase === "completed" && separatedStems !== null;
-  const activeTab: string = stemsReady ? "listen" : "separate";
+  const tabIsGated = (tabId: string) =>
+    TAB_REGISTRY.some((tab) => tab.id === tabId && tab.gatedUntilStems) &&
+    !stemsReady;
+  // A gated Tab can never hold the stage; the shell falls back to Separate.
+  const activeTab: string = tabIsGated(selectedTab) ? "separate" : selectedTab;
+
+  const handleSelectTab = (tabId: string) => {
+    if (tabIsGated(tabId)) {
+      toast.error(`Tab blocked — ${TAB_GATING_REASON}`);
+      return;
+    }
+    setSelectedTab(tabId);
+  };
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col font-sans transition-colors duration-200">
@@ -550,6 +573,7 @@ export const App: React.FC = () => {
                 type="button"
                 aria-label={tab.title}
                 aria-current={active ? "true" : undefined}
+                onClick={() => handleSelectTab(tab.id)}
                 className={`inline-flex flex-col items-center justify-center gap-1.5 rounded-lg px-4 py-3.5 min-h-[44px] min-w-[44px] md:w-full text-sm font-semibold tracking-wide text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${gated ? "opacity-50 text-muted-foreground" : ""} ${active ? "bg-primary/10 border-primary/60 shadow-sm" : ""}`.trim()}
               >
                 {tab.title}
@@ -568,8 +592,9 @@ export const App: React.FC = () => {
           <ToastContainer />
         </nav>
 
-        {/* Tab stage: five pinned Tab panels, always present in the DOM */}
-        <div className="flex-1 flex flex-col gap-4">
+        {/* Tab stage: five pinned Tab panels, always present in the DOM; the
+            stage shows only the ACTIVE Tab panel (artifact `.stage` + `.panel`). */}
+        <div className="relative flex-1 min-h-[340px]">
           {/* Separate Tab: Session Recovery, Model Selector, Source Mix ingestion, Inference Engine */}
           <section
             role="region"
