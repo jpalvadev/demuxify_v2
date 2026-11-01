@@ -13,12 +13,26 @@ import {
   Minus,
 } from "lucide-react";
 import { StemName, STEM_NAMES } from "../lib/chunkOverlapAdd";
-import { StemPlayerEngine, StemMixerStates } from "../lib/stemPlayerEngine";
+import {
+  StemPlayerEngine,
+  StemMixerStates,
+  TimeStretchState,
+} from "../lib/stemPlayerEngine";
 import { StemStrip } from "./StemStrip";
 import { MasterWaveform } from "./MasterWaveform";
 import { ExportDialog } from "./ExportDialog";
 import { WaveformPeaks } from "../lib/waveformPeaks";
 import { cn } from "../lib/utils";
+
+// Tab Shell (ADR-0007): live mixer + time-stretch state bridge so the Export Tab
+// panel can be mounted at the app level instead of inside the player. When
+// App hosts the Export panel it passes these callbacks; without them the
+// component keeps its legacy internal ExportDialog (per-component seam).
+export interface ExportDialogState {
+  mixerStates: StemMixerStates;
+  masterVolume: number;
+  timeStretch: TimeStretchState;
+}
 
 export interface StemPlayerProps {
   stems: Record<StemName, Float32Array[] | AudioBuffer>;
@@ -38,6 +52,8 @@ export interface StemPlayerProps {
     currentTime: number;
   }) => void;
   onPurgeSession?: () => void;
+  onExportDialogOpen?: (state: ExportDialogState) => void;
+  onExportDialogState?: (state: ExportDialogState) => void;
 }
 
 function formatTime(totalSeconds: number): string {
@@ -61,6 +77,8 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
   initialCurrentTime,
   onMixerChange,
   onPurgeSession,
+  onExportDialogOpen,
+  onExportDialogState,
 }) => {
   const engineRef = useRef<StemPlayerEngine | null>(null);
 
@@ -185,6 +203,22 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
     [onMixerChange]
   );
 
+  // Re-export the live state for an app-level Export panel (Tab Shell).
+  const emitExportDialogState = () => {
+    if (!onExportDialogState) return;
+    const engine = engineRef.current;
+    if (!engine) return;
+    onExportDialogState({
+      mixerStates: engine.getAllStemStates(),
+      masterVolume: engine.getMasterVolume(),
+      timeStretch: {
+        tempo: engine.getTempo(),
+        pitch: engine.getPitch(),
+        formantPreservation: engine.isFormantPreservationEnabled(),
+      },
+    });
+  };
+
   const handleReset = useCallback(() => {
     handleSeek(0);
   }, [handleSeek]);
@@ -199,6 +233,7 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
         masterVolume: engine.getMasterVolume(),
         currentTime: engine.getCurrentTime(),
       });
+      emitExportDialogState();
     },
     [onMixerChange]
   );
@@ -213,6 +248,7 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
         masterVolume: engine.getMasterVolume(),
         currentTime: engine.getCurrentTime(),
       });
+      emitExportDialogState();
     },
     [onMixerChange]
   );
@@ -227,6 +263,7 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
         masterVolume: engine.getMasterVolume(),
         currentTime: engine.getCurrentTime(),
       });
+      emitExportDialogState();
     },
     [onMixerChange]
   );
@@ -242,6 +279,7 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
         masterVolume: volume,
         currentTime: engine.getCurrentTime(),
       });
+      emitExportDialogState();
     },
     [onMixerChange]
   );
@@ -255,6 +293,7 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
     );
     engineRef.current?.setTempo(quantized);
     setTempo(quantized);
+    emitExportDialogState();
   }, []);
 
   const handleIncrementTempo = useCallback(() => {
@@ -263,6 +302,7 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
       engineRef.current?.setTempo(next);
       return next;
     });
+    emitExportDialogState();
   }, []);
 
   const handleDecrementTempo = useCallback(() => {
@@ -271,12 +311,14 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
       engineRef.current?.setTempo(next);
       return next;
     });
+    emitExportDialogState();
   }, []);
 
   const handlePitchChange = useCallback((newPitch: number) => {
     const quantized = Math.max(-12, Math.min(12, Math.round(newPitch)));
     engineRef.current?.setPitch(quantized);
     setPitch(quantized);
+    emitExportDialogState();
   }, []);
 
   const handleIncrementPitch = useCallback(() => {
@@ -285,6 +327,7 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
       engineRef.current?.setPitch(next);
       return next;
     });
+    emitExportDialogState();
   }, []);
 
   const handleDecrementPitch = useCallback(() => {
@@ -293,6 +336,7 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
       engineRef.current?.setPitch(next);
       return next;
     });
+    emitExportDialogState();
   }, []);
 
   const handleToggleFormant = useCallback(() => {
@@ -301,12 +345,14 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
       engineRef.current?.setFormantPreservation(next);
       return next;
     });
+    emitExportDialogState();
   }, []);
 
   const handleResetTimeStretch = useCallback(() => {
     engineRef.current?.resetTimeStretch();
     setTempo(1.0);
     setPitch(0);
+    emitExportDialogState();
   }, []);
 
   // Determine silencing for visual feedback
@@ -400,7 +446,22 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
               type="button"
               aria-label="Export Stems"
               title="Export isolated stems (WAV/MP3/ZIP)"
-              onClick={() => setIsExportDialogOpen(true)}
+              onClick={() => {
+                if (onExportDialogOpen) {
+                  const engine = engineRef.current;
+                  onExportDialogOpen({
+                    mixerStates: engine?.getAllStemStates() ?? mixerStates,
+                    masterVolume: engine?.getMasterVolume() ?? masterVolume,
+                    timeStretch: {
+                      tempo,
+                      pitch,
+                      formantPreservation,
+                    },
+                  });
+                } else {
+                  setIsExportDialogOpen(true);
+                }
+              }}
               className="flex h-10 px-3.5 items-center justify-center gap-2 rounded-xl border border-border bg-secondary/60 text-foreground font-medium shadow-xs hover:bg-secondary hover:border-primary/40 active:scale-95 transition-all text-xs sm:text-sm"
             >
               <Download className="h-4 w-4 text-primary" />
@@ -703,17 +764,20 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
         })}
       </div>
 
-      {/* Export Dialog Modal */}
-      <ExportDialog
-        isOpen={isExportDialogOpen}
-        onClose={() => setIsExportDialogOpen(false)}
-        stems={stems}
-        sampleRate={sampleRate}
-        sourceMixTitle={sourceMixTitle}
-        initialMixerStates={mixerStates}
-        initialMasterVolume={masterVolume}
-        activeTimeStretch={{ tempo, pitch, formantPreservation }}
-      />
+      {/* Export Dialog Modal — legacy internal form; with Tab Shell wiring the
+          app mounts the panel in the Export Tab instead (see onExportDialogOpen). */}
+      {!onExportDialogOpen && (
+        <ExportDialog
+          isOpen={isExportDialogOpen}
+          onClose={() => setIsExportDialogOpen(false)}
+          stems={stems}
+          sampleRate={sampleRate}
+          sourceMixTitle={sourceMixTitle}
+          initialMixerStates={mixerStates}
+          initialMasterVolume={masterVolume}
+          activeTimeStretch={{ tempo, pitch, formantPreservation }}
+        />
+      )}
     </section>
   );
 };

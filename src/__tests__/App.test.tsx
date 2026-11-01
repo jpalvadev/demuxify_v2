@@ -982,4 +982,169 @@ describe("App UI Shell", () => {
     expect(focusedOnComplete).toHaveLength(1);
     expect(focusedOnComplete[0].getAttribute("aria-label")).toBe("Listen");
   });
+
+  const completeSeparationMocks = () => {
+    vi.spyOn(InferenceClient.prototype, "init").mockResolvedValue({
+      backend: "webgpu",
+    });
+    vi.spyOn(InferenceClient.prototype, "separate").mockResolvedValue({
+      stems: {
+        vocals: [new Float32Array(500), new Float32Array(500)],
+        drums: [new Float32Array(500), new Float32Array(500)],
+        bass: [new Float32Array(500), new Float32Array(500)],
+        other: [new Float32Array(500), new Float32Array(500)],
+      },
+      duration: 180,
+    });
+  };
+
+  const loadAndSeparate = async () => {
+    const file = new File(["audio"], "song_master.mp3", { type: "audio/mp3" });
+    const fileInput = screen.getByLabelText(/select source mix file/i, {
+      selector: "input",
+    });
+    fireEvent.change(fileInput, { target: { files: [file] } });
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: /separate stems|start separation/i })
+      ).toBeInTheDocument();
+    });
+
+    const separateBtn = screen.getByRole("button", {
+      name: /separate stems|start separation/i,
+    });
+    fireEvent.click(separateBtn);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("region", { name: /stem player/i })
+      ).toBeInTheDocument();
+    });
+  };
+
+  it("places each tool in its Tab home once separation completes", async () => {
+    vi.spyOn(webgpuModule, "detectWebGPUCapability").mockResolvedValue({
+      supported: true,
+      isFallback: false,
+    });
+    completeSeparationMocks();
+
+    render(<App />);
+    await loadAndSeparate();
+
+    // Separate Tab keeps ingestion: the Source Mix dropzone lives there
+    const separateTab = screen.getByRole("region", { name: /separate tab/i });
+    expect(
+      within(separateTab).getByRole("button", { name: /remove source mix/i })
+    ).toBeInTheDocument();
+
+    // Listen Tab hosts the shared Master Waveform spine
+    const listenTab = screen.getByRole("region", { name: /listen tab/i });
+    expect(
+      within(listenTab).getByRole("slider", {
+        name: /master waveform timeline/i,
+      })
+    ).toBeInTheDocument();
+
+    // Mix Tab hosts the Stem Player
+    const mixTab = screen.getByRole("region", { name: /mix tab/i });
+    expect(
+      within(mixTab).getByRole("region", { name: /stem player/i })
+    ).toBeInTheDocument();
+
+    // System Tab hosts the WebGPU status badge
+    const systemTab = screen.getByRole("region", { name: /system tab/i });
+    expect(within(systemTab).getByText(/webgpu active/i)).toBeInTheDocument();
+  });
+
+  it("opens the Export panel inside the Export Tab when the Export Stems action is clicked", async () => {
+    vi.spyOn(webgpuModule, "detectWebGPUCapability").mockResolvedValue({
+      supported: true,
+      isFallback: false,
+    });
+    completeSeparationMocks();
+
+    render(<App />);
+    await loadAndSeparate();
+
+    const exportTab = screen.getByRole("region", { name: /export tab/i });
+    expect(
+      within(exportTab).queryByRole("dialog", { name: /export/i })
+    ).not.toBeInTheDocument();
+
+    const exportBtn = screen.getByRole("button", { name: /export stems/i });
+    fireEvent.click(exportBtn);
+
+    const exportPanel = await waitFor(() =>
+      within(exportTab).getByRole("dialog", { name: /export/i })
+    );
+    expect(exportPanel).toBeInTheDocument();
+
+    const closeBtn = within(exportPanel).getByRole("button", {
+      name: /close dialog/i,
+    });
+    fireEvent.click(closeBtn);
+    await waitFor(() => {
+      expect(
+        within(exportTab).queryByRole("dialog", { name: /export/i })
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  it("mirrors live Stem Player mixer state into the Export Tab panel", async () => {
+    vi.spyOn(webgpuModule, "detectWebGPUCapability").mockResolvedValue({
+      supported: true,
+      isFallback: false,
+    });
+    completeSeparationMocks();
+
+    render(<App />);
+    await loadAndSeparate();
+
+    const mixTab = screen.getByRole("region", { name: /mix tab/i });
+
+    // Adjust Drums volume to 0.4 in the Mix Tab
+    const drumsSlider = within(mixTab).getByRole("slider", {
+      name: /drums volume/i,
+    });
+    fireEvent.change(drumsSlider, { target: { value: "0.4" } });
+
+    // Mute Vocals
+    fireEvent.click(
+      within(mixTab).getByRole("button", {
+        name: /mute vocals/i,
+      })
+    );
+
+    // Open the Export panel from the Stem Player action
+    fireEvent.click(screen.getByRole("button", { name: /export stems/i }));
+
+    const exportTab = screen.getByRole("region", { name: /export tab/i });
+    const exportPanel = await waitFor(() =>
+      within(exportTab).getByRole("dialog", { name: /export/i })
+    );
+
+    // Switch to Custom Mixdown and verify synchronized stem state
+    fireEvent.click(
+      within(exportPanel).getByRole("radio", {
+        name: /custom mixdown/i,
+      })
+    );
+
+    expect(
+      within(exportPanel).getByRole("checkbox", { name: /vocals stem/i })
+    ).not.toBeChecked();
+    expect(
+      within(exportPanel).getByRole("checkbox", { name: /drums stem/i })
+    ).toBeChecked();
+    expect(
+      within(exportPanel).getByRole("slider", { name: /drums volume/i })
+    ).toHaveValue("0.4");
+    expect(
+      within(exportPanel).getByRole("slider", {
+        name: /master mixdown volume/i,
+      })
+    ).toHaveValue("1");
+  });
 });
