@@ -278,7 +278,7 @@ export const MasterWaveform: React.FC<MasterWaveformProps> = ({
   return (
     <div
       className={cn(
-        "group relative w-full overflow-hidden rounded-2xl border border-border bg-card/60 p-4 shadow-sm backdrop-blur-sm transition-all select-none",
+        "group relative w-full overflow-hidden rounded-none border border-border bg-card/60 p-4 shadow-sm backdrop-blur-sm transition-all select-none",
         disabled && "opacity-60 pointer-events-none",
         className
       )}
@@ -320,7 +320,7 @@ export const MasterWaveform: React.FC<MasterWaveformProps> = ({
         onPointerCancel={handlePointerUp}
         onKeyDown={handleKeyDown}
         className={cn(
-          "relative w-full rounded-xl overflow-hidden cursor-pointer touch-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
+          "relative w-full rounded-none overflow-hidden cursor-pointer touch-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
           isScrubbing && "cursor-ew-resize"
         )}
         style={{ height }}

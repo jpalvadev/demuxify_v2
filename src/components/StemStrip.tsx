@@ -238,7 +238,7 @@ export const StemStrip: React.FC<StemStripProps> = ({
       role="group"
       aria-label={`${config.label} Stem`}
       className={cn(
-        "group flex flex-col sm:flex-row items-stretch sm:items-center gap-3 rounded-xl border border-border bg-card/60 p-3 transition-colors shadow-xs",
+        "group flex flex-col sm:flex-row items-stretch sm:items-center gap-3 rounded-none border border-border bg-card/60 p-3 transition-colors shadow-xs",
         isSilenced && "opacity-65 bg-card/30",
         className
       )}
@@ -247,7 +247,7 @@ export const StemStrip: React.FC<StemStripProps> = ({
       <div className="flex items-center gap-2 sm:w-32 shrink-0">
         <div
           className={cn(
-            "flex items-center gap-2 rounded-lg border px-2.5 py-1 text-xs font-semibold shadow-xs",
+            "flex items-center gap-2 rounded-none border px-2.5 py-1 text-xs font-semibold shadow-xs",
             config.badgeClass
           )}
         >
@@ -261,7 +261,7 @@ export const StemStrip: React.FC<StemStripProps> = ({
         ref={containerRef}
         onClick={handleWaveformClick}
         role="presentation"
-        className="relative flex-1 rounded-lg overflow-hidden border border-border/40 cursor-pointer shadow-inner min-w-[120px]"
+        className="relative flex-1 rounded-none overflow-hidden border border-border/40 cursor-pointer shadow-inner min-w-[120px]"
         style={{ height }}
       >
         <canvas ref={canvasRef} className="block w-full h-full" />
@@ -277,7 +277,7 @@ export const StemStrip: React.FC<StemStripProps> = ({
             onClick={onToggleMute}
             title={`Mute ${config.label}`}
             className={cn(
-              "h-8 w-8 rounded-lg border text-xs font-bold transition-all flex items-center justify-center",
+              "h-8 w-8 rounded-none border text-xs font-bold transition-all flex items-center justify-center",
               muted
                 ? "border-destructive/60 bg-destructive text-destructive-foreground shadow-xs"
                 : "border-border/70 bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground"
@@ -292,7 +292,7 @@ export const StemStrip: React.FC<StemStripProps> = ({
             onClick={onToggleSolo}
             title={`Solo ${config.label}`}
             className={cn(
-              "h-8 w-8 rounded-lg border text-xs font-bold transition-all flex items-center justify-center",
+              "h-8 w-8 rounded-none border text-xs font-bold transition-all flex items-center justify-center",
               solo
                 ? "border-primary/70 bg-muted text-foreground shadow-xs font-black"
                 : "border-border/70 bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground"
@@ -317,7 +317,7 @@ export const StemStrip: React.FC<StemStripProps> = ({
             value={volume}
             onChange={(e) => onVolumeChange(parseFloat(e.target.value))}
             aria-label={`${config.label} Volume`}
-            className="w-full accent-primary cursor-pointer h-1.5 bg-secondary rounded-lg appearance-none"
+            className="w-full accent-primary cursor-pointer h-1.5 bg-secondary rounded-none appearance-none"
           />
           <span className="text-[11px] font-mono text-muted-foreground w-7 text-right">
             {Math.round(volume * 100)}%

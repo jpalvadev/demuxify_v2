@@ -442,12 +442,12 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
     <section
       role="region"
       aria-labelledby="export-dialog-title"
-      className="w-full rounded-2xl border border-border bg-card p-6 sm:p-8 space-y-6 relative"
+      className="w-full rounded-none border border-border bg-card p-6 sm:p-8 space-y-6 relative"
     >
       {/* Header */}
       <div className="flex items-start justify-between border-b border-border/60 pb-4">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 border border-primary/20 text-primary">
+          <div className="flex h-10 w-10 items-center justify-center rounded-none bg-primary/10 border border-primary/20 text-primary">
             <Download className="h-5 w-5" />
           </div>
           <div>
@@ -467,7 +467,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
           aria-label="Close dialog"
           onClick={onClose}
           disabled={isExporting}
-          className="rounded-lg p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground transition-all disabled:opacity-50"
+          className="rounded-none p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground transition-all disabled:opacity-50"
         >
           <X className="h-5 w-5" />
         </button>
@@ -483,7 +483,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
             <label
               className={cn(
-                "flex items-center gap-2.5 p-3 rounded-xl border cursor-pointer transition-all",
+                "flex items-center gap-2.5 p-3 rounded-none border cursor-pointer transition-all",
                 mode === "single"
                   ? "border-primary bg-primary/10 text-foreground font-medium shadow-xs"
                   : "border-border bg-secondary/40 text-muted-foreground hover:bg-secondary/70"
@@ -508,7 +508,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
 
             <label
               className={cn(
-                "flex items-center gap-2.5 p-3 rounded-xl border cursor-pointer transition-all",
+                "flex items-center gap-2.5 p-3 rounded-none border cursor-pointer transition-all",
                 mode === "bundle"
                   ? "border-primary bg-primary/10 text-foreground font-medium shadow-xs"
                   : "border-border bg-secondary/40 text-muted-foreground hover:bg-secondary/70"
@@ -533,7 +533,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
 
             <label
               className={cn(
-                "flex items-center gap-2.5 p-3 rounded-xl border cursor-pointer transition-all",
+                "flex items-center gap-2.5 p-3 rounded-none border cursor-pointer transition-all",
                 mode === "mixdown"
                   ? "border-primary bg-primary/10 text-foreground font-medium shadow-xs"
                   : "border-border bg-secondary/40 text-muted-foreground hover:bg-secondary/70"
@@ -560,7 +560,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
 
         {/* Active Pitch & Tempo Adjustments Checkbox */}
         {hasActiveAdjustments && (
-          <div className="flex items-center justify-between p-3 rounded-xl border border-border/80 bg-secondary/40">
+          <div className="flex items-center justify-between p-3 rounded-none border border-border/80 bg-secondary/40">
             <label className="flex items-center gap-2.5 cursor-pointer select-none">
               <input
                 type="checkbox"
@@ -574,7 +574,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
                 <span className="text-xs font-semibold text-foreground">
                   Apply active Pitch & Tempo adjustments
                 </span>
-                <span className="font-mono text-[11px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-md border border-primary/20">
+                <span className="font-mono text-[11px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-none border border-primary/20">
                   {[
                     activePitch !== undefined && activePitch !== 0
                       ? `${activePitch > 0 ? "+" : ""}${activePitch} st`
@@ -606,7 +606,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
               value={selectedStem}
               onChange={(e) => setSelectedStem(e.target.value as StemName)}
               disabled={isExporting}
-              className="w-full rounded-xl border border-border bg-secondary/60 px-3.5 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 capitalize"
+              className="w-full rounded-none border border-border bg-secondary/60 px-3.5 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 capitalize"
             >
               {STEM_NAMES.map((stem) => (
                 <option
@@ -638,7 +638,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
                       type="button"
                       onClick={() => handleApplyPreset(preset.id)}
                       disabled={isExporting}
-                      className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-lg border border-border bg-secondary/50 text-foreground hover:bg-secondary hover:border-primary/40 active:scale-95 transition-all text-center disabled:opacity-50"
+                      className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-none border border-border bg-secondary/50 text-foreground hover:bg-secondary hover:border-primary/40 active:scale-95 transition-all text-center disabled:opacity-50"
                     >
                       {PresetIcon && <PresetIcon className="h-3 w-3" />}
                       <span>{preset.label}</span>
@@ -653,7 +653,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
               <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Stem Controls
               </label>
-              <div className="space-y-2 rounded-xl border border-border bg-secondary/20 p-3">
+              <div className="space-y-2 rounded-none border border-border bg-secondary/20 p-3">
                 {STEM_NAMES.map((stem) => {
                   const Icon = STEM_ICONS[stem];
                   const { enabled, volume } = stemControls[stem];
@@ -661,7 +661,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
                     <div
                       key={stem}
                       className={cn(
-                        "flex items-center gap-3 p-2 rounded-lg transition-colors",
+                        "flex items-center gap-3 p-2 rounded-none transition-colors",
                         enabled
                           ? "bg-card/70 border border-border/50"
                           : "opacity-50 bg-secondary/30"
@@ -710,7 +710,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
                           }
                           aria-label={`${stem} volume`}
                           disabled={!enabled || isExporting}
-                          className="w-full accent-primary cursor-pointer h-1.5 bg-secondary rounded-lg appearance-none disabled:opacity-50"
+                          className="w-full accent-primary cursor-pointer h-1.5 bg-secondary rounded-none appearance-none disabled:opacity-50"
                         />
                         <span className="text-[11px] font-mono text-muted-foreground w-8 text-right">
                           {Math.round((enabled ? volume : 0) * 100)}%
@@ -724,7 +724,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
 
             {/* Master Volume and Anti-Clipping controls */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-              <div className="space-y-1.5 rounded-xl border border-border bg-secondary/20 p-3">
+              <div className="space-y-1.5 rounded-none border border-border bg-secondary/20 p-3">
                 <div className="flex items-center justify-between text-xs">
                   <span className="font-semibold text-foreground">
                     Master Volume
@@ -742,11 +742,11 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
                   onChange={(e) => setMasterGain(parseFloat(e.target.value))}
                   aria-label="Master Mixdown Volume"
                   disabled={isExporting}
-                  className="w-full accent-primary cursor-pointer h-1.5 bg-secondary rounded-lg appearance-none"
+                  className="w-full accent-primary cursor-pointer h-1.5 bg-secondary rounded-none appearance-none"
                 />
               </div>
 
-              <div className="flex items-center rounded-xl border border-border bg-secondary/20 p-3">
+              <div className="flex items-center rounded-none border border-border bg-secondary/20 p-3">
                 <label className="flex items-start gap-2.5 cursor-pointer select-none">
                   <input
                     type="checkbox"
@@ -781,7 +781,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
           <div className="grid grid-cols-2 gap-3">
             <label
               className={cn(
-                "flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all",
+                "flex items-center gap-3 p-3 rounded-none border cursor-pointer transition-all",
                 format === "wav"
                   ? "border-primary bg-primary/10 text-foreground font-medium shadow-xs"
                   : "border-border bg-secondary/40 text-muted-foreground hover:bg-secondary/70"
@@ -806,7 +806,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
 
             <label
               className={cn(
-                "flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all",
+                "flex items-center gap-3 p-3 rounded-none border cursor-pointer transition-all",
                 format === "mp3"
                   ? "border-primary bg-primary/10 text-foreground font-medium shadow-xs"
                   : "border-border bg-secondary/40 text-muted-foreground hover:bg-secondary/70"
@@ -848,7 +848,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
                 setBitDepth(parseInt(e.target.value, 10) as 16 | 24)
               }
               disabled={isExporting}
-              className="w-full rounded-xl border border-border bg-secondary/60 px-3.5 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+              className="w-full rounded-none border border-border bg-secondary/60 px-3.5 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
             >
               <option value="16" className="bg-card text-foreground">
                 16-bit PCM (CD Standard)
@@ -874,7 +874,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
                 setBitrate(parseInt(e.target.value, 10) as Mp3Bitrate)
               }
               disabled={isExporting}
-              className="w-full rounded-xl border border-border bg-secondary/60 px-3.5 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+              className="w-full rounded-none border border-border bg-secondary/60 px-3.5 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
             >
               {VALID_MP3_BITRATES.map((br) => (
                 <option key={br} value={br} className="bg-card text-foreground">
@@ -892,7 +892,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
 
         {/* Progress Indicator (Visible while exporting or upon recent progress) */}
         {(isExporting || (progress > 0 && !error)) && (
-          <div className="space-y-2 rounded-xl border border-primary/20 bg-primary/5 p-3.5">
+          <div className="space-y-2 rounded-none border border-primary/20 bg-primary/5 p-3.5">
             <div className="flex items-center justify-between text-xs">
               <span className="flex items-center gap-1.5 text-primary font-medium">
                 {isExporting ? (
@@ -911,7 +911,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
               aria-valuenow={progress}
               aria-valuemin={0}
               aria-valuemax={100}
-              className="h-2 w-full overflow-hidden rounded-full bg-secondary"
+              className="h-2 w-full overflow-hidden rounded-none bg-secondary"
             >
               <div
                 className="h-full bg-primary transition-all duration-300 ease-out"
@@ -925,7 +925,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
         {successNotification && (
           <div
             role="status"
-            className="flex items-center gap-2.5 rounded-xl border border-status-ok/30 bg-status-ok/10 p-3.5 text-xs text-status-ok"
+            className="flex items-center gap-2.5 rounded-none border border-status-ok/30 bg-status-ok/10 p-3.5 text-xs text-status-ok"
           >
             <CheckCircle2 className="h-4 w-4 shrink-0" />
             <span>{successNotification}</span>
@@ -936,7 +936,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
         {error && (
           <div
             role="alert"
-            className="flex items-center gap-2.5 rounded-xl border border-destructive/30 bg-destructive/10 p-3.5 text-xs text-destructive"
+            className="flex items-center gap-2.5 rounded-none border border-destructive/30 bg-destructive/10 p-3.5 text-xs text-destructive"
           >
             <AlertTriangle className="h-4 w-4 shrink-0" />
             <span>Export failed: {error}</span>
@@ -950,7 +950,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
           type="button"
           onClick={onClose}
           disabled={isExporting}
-          className="px-4 py-2 text-sm font-medium rounded-xl border border-border bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground transition-all disabled:opacity-50"
+          className="px-4 py-2 text-sm font-medium rounded-none border border-border bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground transition-all disabled:opacity-50"
         >
           Close
         </button>
@@ -958,7 +958,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
           type="button"
           onClick={handleExport}
           disabled={isExporting || isMixdownExportDisabled}
-          className="flex items-center gap-2 px-5 py-2 text-sm font-semibold rounded-xl bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 active:scale-95 transition-all disabled:opacity-50"
+          className="flex items-center gap-2 px-5 py-2 text-sm font-semibold rounded-none bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 active:scale-95 transition-all disabled:opacity-50"
         >
           {isExporting ? (
             <>

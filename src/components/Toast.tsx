@@ -77,11 +77,11 @@ export const Toast: React.FC<ToastProps> = ({ toast, onDismiss }) => {
       aria-live={style.ariaLive}
       data-testid={`toast-${toast.type}`}
       className={cn(
-        "pointer-events-auto flex items-start gap-3 rounded-xl border p-4 shadow-xl backdrop-blur-md transition-all animate-in slide-in-from-bottom-3 duration-200",
+        "pointer-events-auto flex items-start gap-3 rounded-none border p-4 shadow-xl backdrop-blur-md transition-all animate-in slide-in-from-bottom-3 duration-200",
         style.border
       )}
     >
-      <div className={cn("p-1 rounded-lg shrink-0 mt-0.5", style.badgeBg)}>
+      <div className={cn("p-1 rounded-none shrink-0 mt-0.5", style.badgeBg)}>
         <Icon className={cn("h-4 w-4", style.iconColor)} />
       </div>
 
@@ -93,7 +93,7 @@ export const Toast: React.FC<ToastProps> = ({ toast, onDismiss }) => {
         type="button"
         aria-label="Dismiss Notification"
         onClick={() => onDismiss(toast.id)}
-        className="text-muted-foreground hover:text-foreground shrink-0 rounded-md p-1 transition-colors -mr-1 -mt-1"
+        className="text-muted-foreground hover:text-foreground shrink-0 rounded-none p-1 transition-colors -mr-1 -mt-1"
       >
         <X className="h-3.5 w-3.5" />
       </button>

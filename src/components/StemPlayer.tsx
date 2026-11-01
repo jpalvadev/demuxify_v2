@@ -405,14 +405,14 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
       role="region"
       aria-label="Stem Player"
       className={cn(
-        "w-full rounded-2xl border border-border bg-card/70 p-4 sm:p-6 shadow-md backdrop-blur-md space-y-6",
+        "w-full rounded-none border border-border bg-card/70 p-4 sm:p-6 shadow-md backdrop-blur-md space-y-6",
         className
       )}
     >
       {/* Player Header with Title and Global Transport */}
       <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 border-b border-border/60 pb-4">
         <div className="flex items-center gap-2.5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 border border-primary/20 text-primary">
+          <div className="flex h-9 w-9 items-center justify-center rounded-none bg-primary/10 border border-primary/20 text-primary">
             <Layers className="h-5 w-5" />
           </div>
           <div>
@@ -433,7 +433,7 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
           {/* Time Display: strong mono readout (Bold port of the .tread row) */}
           <div
             data-testid="stem-player-time"
-            className="flex items-center gap-1 font-mono text-lg font-extrabold tracking-tight bg-secondary/60 px-3 py-1.5 rounded-xl border border-border/60"
+            className="flex items-center gap-1 font-mono text-lg font-extrabold tracking-tight bg-secondary/60 px-3 py-1.5 rounded-none border border-border/60"
             style={{ fontFamily: MONO_FONT_STACK }}
           >
             <span className="text-primary font-bold">
@@ -452,7 +452,7 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
               aria-label="Seek to Start"
               title="Seek to start"
               onClick={handleReset}
-              className="flex h-11 w-11 items-center justify-center rounded-xl border border-border bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground transition-all"
+              className="flex h-11 w-11 items-center justify-center rounded-none border border-border bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground transition-all"
             >
               <SkipBack className="h-4 w-4" />
               <span className="hidden sm:inline font-mono uppercase text-[10px] font-bold">
@@ -466,7 +466,7 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
               aria-pressed={isPlaying}
               title="Play (Space)"
               onClick={handlePlay}
-              className="flex h-11 px-5 items-center justify-center gap-2 rounded-xl bg-primary text-primary-foreground font-semibold shadow-sm hover:bg-primary/90 active:scale-95 transition-all"
+              className="flex h-11 px-5 items-center justify-center gap-2 rounded-none bg-primary text-primary-foreground font-semibold shadow-sm hover:bg-primary/90 active:scale-95 transition-all"
             >
               <Play className="h-4 w-4 fill-current" />
               <span>Play</span>
@@ -478,7 +478,7 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
               aria-pressed={!isPlaying}
               title="Pause (Space)"
               onClick={handlePause}
-              className="flex h-11 px-5 items-center justify-center gap-2 rounded-xl border border-border bg-secondary/60 text-foreground hover:bg-secondary transition-all"
+              className="flex h-11 px-5 items-center justify-center gap-2 rounded-none border border-border bg-secondary/60 text-foreground hover:bg-secondary transition-all"
             >
               <Pause className="h-4 w-4 fill-current" />
               <span>Pause</span>
@@ -490,7 +490,7 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
                 aria-label="Purge Session"
                 title="Purge session and start fresh"
                 onClick={onPurgeSession}
-                className="flex h-10 px-3 items-center justify-center gap-1.5 rounded-xl border border-border bg-secondary/60 text-muted-foreground hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30 transition-all text-xs font-semibold"
+                className="flex h-10 px-3 items-center justify-center gap-1.5 rounded-none border border-border bg-secondary/60 text-muted-foreground hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30 transition-all text-xs font-semibold"
               >
                 <Trash2 className="h-4 w-4" />
                 <span className="hidden sm:inline">Reset Session</span>
@@ -518,7 +518,7 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
                   setIsExportDialogOpen(true);
                 }
               }}
-              className="flex h-10 px-3.5 items-center justify-center gap-2 rounded-xl border border-border bg-secondary/60 text-foreground font-medium shadow-xs hover:bg-secondary hover:border-primary/40 active:scale-95 transition-all text-xs sm:text-sm"
+              className="flex h-10 px-3.5 items-center justify-center gap-2 rounded-none border border-border bg-secondary/60 text-foreground font-medium shadow-xs hover:bg-secondary hover:border-primary/40 active:scale-95 transition-all text-xs sm:text-sm"
             >
               <Download className="h-4 w-4 text-primary" />
               <span>Export Stems</span>
@@ -538,7 +538,7 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
                 handleMasterVolumeChange(parseFloat(e.target.value))
               }
               aria-label="Master Volume"
-              className="w-24 accent-primary cursor-pointer h-1.5 bg-secondary rounded-lg appearance-none"
+              className="w-24 accent-primary cursor-pointer h-1.5 bg-secondary rounded-none appearance-none"
             />
             <span className="text-xs font-mono text-muted-foreground w-7 text-right">
               {Math.round(masterVolume * 100)}%
@@ -562,10 +562,10 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
       )}
 
       {/* Time-Stretch & Pitch Shift Controls */}
-      <div className="rounded-xl border border-border/60 bg-secondary/30 p-4 space-y-4">
+      <div className="rounded-none border border-border/60 bg-secondary/30 p-4 space-y-4">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary border border-primary/20">
+            <div className="flex h-7 w-7 items-center justify-center rounded-none bg-primary/10 text-primary border border-primary/20">
               <Gauge className="h-4 w-4" />
             </div>
             <div>
@@ -585,7 +585,7 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
             title="Reset pitch to 0 and tempo to 1.0x"
             onClick={handleResetTimeStretch}
             disabled={Math.abs(tempo - 1.0) < 0.001 && pitch === 0}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-border/80 bg-secondary/80 text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-secondary transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-none border border-border/80 bg-secondary/80 text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-secondary transition-all disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <RotateCcw className="h-3.5 w-3.5" />
             <span>Reset Pitch & Tempo</span>
@@ -594,7 +594,7 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
           {/* Tempo Section */}
-          <div className="rounded-xl border border-border/50 bg-card/60 p-3.5 space-y-3">
+          <div className="rounded-none border border-border/50 bg-card/60 p-3.5 space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
                 <Gauge className="h-3.5 w-3.5 text-primary" />
@@ -602,7 +602,7 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
               </span>
               <span
                 data-testid="current-tempo-label"
-                className="font-mono text-xs font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-md border border-primary/20"
+                className="font-mono text-xs font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-none border border-primary/20"
               >
                 {tempo.toFixed(2)}x
               </span>
@@ -615,7 +615,7 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
                 title="Slow down 0.05x"
                 onClick={handleDecrementTempo}
                 disabled={tempo <= 0.5}
-                className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                className="flex h-8 w-8 items-center justify-center rounded-none border border-border bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-all"
               >
                 <Minus className="h-3.5 w-3.5" />
               </button>
@@ -634,7 +634,7 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
                     handleTempoChange(parseFloat(e.target.value))
                   }
                   aria-label="Playback Tempo"
-                  className="w-full accent-primary cursor-pointer h-1.5 bg-secondary rounded-lg appearance-none"
+                  className="w-full accent-primary cursor-pointer h-1.5 bg-secondary rounded-none appearance-none"
                 />
                 <span className="text-[11px] font-mono text-muted-foreground">
                   2.00x
@@ -647,7 +647,7 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
                 title="Speed up 0.05x"
                 onClick={handleIncrementTempo}
                 disabled={tempo >= 2.0}
-                className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                className="flex h-8 w-8 items-center justify-center rounded-none border border-border bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-all"
               >
                 <Plus className="h-3.5 w-3.5" />
               </button>
@@ -665,7 +665,7 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
                     aria-pressed={isSelected}
                     onClick={() => handleTempoChange(preset)}
                     className={cn(
-                      "flex-1 py-1 rounded-md text-[10px] sm:text-[11px] font-semibold border transition-all",
+                      "flex-1 py-1 rounded-none text-[10px] sm:text-[11px] font-semibold border transition-all",
                       isSelected
                         ? "bg-primary text-primary-foreground border-primary shadow-sm"
                         : "bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground border-border/60"
@@ -679,7 +679,7 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
           </div>
 
           {/* Pitch Section */}
-          <div className="rounded-xl border border-border/50 bg-card/60 p-3.5 space-y-3">
+          <div className="rounded-none border border-border/50 bg-card/60 p-3.5 space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
                 <Music className="h-3.5 w-3.5 text-accent" />
@@ -687,7 +687,7 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
               </span>
               <span
                 data-testid="current-pitch-label"
-                className="font-mono text-xs font-bold text-foreground bg-secondary px-2 py-0.5 rounded-md border border-border"
+                className="font-mono text-xs font-bold text-foreground bg-secondary px-2 py-0.5 rounded-none border border-border"
               >
                 {pitch === 0
                   ? "0 st"
@@ -706,7 +706,7 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
                 title="Shift pitch down 1 semitone"
                 onClick={handleDecrementPitch}
                 disabled={pitch <= -12}
-                className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                className="flex h-8 w-8 items-center justify-center rounded-none border border-border bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-all"
               >
                 <Minus className="h-3.5 w-3.5" />
               </button>
@@ -725,7 +725,7 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
                     handlePitchChange(parseFloat(e.target.value))
                   }
                   aria-label="Pitch Shift"
-                  className="w-full accent-primary cursor-pointer h-1.5 bg-secondary rounded-lg appearance-none"
+                  className="w-full accent-primary cursor-pointer h-1.5 bg-secondary rounded-none appearance-none"
                 />
                 <span className="text-[11px] font-mono text-muted-foreground">
                   +12
@@ -738,7 +738,7 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
                 title="Shift pitch up 1 semitone"
                 onClick={handleIncrementPitch}
                 disabled={pitch >= 12}
-                className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                className="flex h-8 w-8 items-center justify-center rounded-none border border-border bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-all"
               >
                 <Plus className="h-3.5 w-3.5" />
               </button>
@@ -770,13 +770,13 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
                 aria-checked={formantPreservation}
                 onClick={handleToggleFormant}
                 className={cn(
-                  "relative inline-flex h-5 w-9 sm:h-6 sm:w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden",
+                  "relative inline-flex h-5 w-9 sm:h-6 sm:w-11 shrink-0 cursor-pointer rounded-none border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden",
                   formantPreservation ? "bg-primary" : "bg-muted"
                 )}
               >
                 <span
                   className={cn(
-                    "pointer-events-none inline-block h-4 w-4 sm:h-5 sm:w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out",
+                    "pointer-events-none inline-block h-4 w-4 sm:h-5 sm:w-5 transform rounded-none bg-white shadow-lg ring-0 transition duration-200 ease-in-out",
                     formantPreservation
                       ? "translate-x-4 sm:translate-x-5"
                       : "translate-x-0"

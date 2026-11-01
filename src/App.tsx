@@ -109,7 +109,7 @@ const tabPanelClass = (gated: boolean, active: boolean) =>
   // display-hidden inside the stage.
   gated || !active
     ? "hidden"
-    : "absolute inset-0 overflow-y-auto overflow-x-hidden rounded-2xl border border-primary/70 bg-card/80 p-4 sm:px-6 sm:py-6 transition-colors";
+    : "absolute inset-0 overflow-y-auto overflow-x-hidden rounded-none border border-muted-foreground/60 bg-card/80 p-4 sm:px-6 sm:py-6 transition-colors";
 
 export const App: React.FC = () => {
   // Dark-only contract (ticket 09): no theme state — html keeps `dark` forever
@@ -555,7 +555,7 @@ export const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col font-sans transition-colors duration-200">
+    <div className="grizzly-grid min-h-screen bg-background text-foreground flex flex-col font-sans transition-colors duration-200">
       <Header />
 
       {/* Full-bleed shell (artifact `.app`: no max-width; rail + stage fill the
@@ -564,7 +564,7 @@ export const App: React.FC = () => {
         {/* Tab rail: horizontal top strip on mobile portrait, vertical left rail at md+ */}
         <nav
           aria-label="Tab rail"
-          className="grid grid-cols-[112px_112px_112px] sm:grid-cols-[112px_112px_112px_112px_112px] gap-2 items-center overflow-hidden w-full bg-card/50 pb-4 md:w-[250px] lg:w-[280px] md:flex md:flex-col md:no-wrap md:justify-start md:items-stretch md:gap-2.5 md:border-r md:border-border/60"
+          className="grid grid-cols-[112px_112px_112px] sm:grid-cols-[112px_112px_112px_112px_112px] gap-2 items-center overflow-hidden w-full bg-card/50 pb-4 md:w-[250px] lg:w-[280px] md:flex md:flex-col md:no-wrap md:justify-start md:items-start md:gap-2.5 md:border-r md:border-border/60"
         >
           {TAB_REGISTRY.map((tab) => {
             const gated = tab.gatedUntilStems && !stemsReady;
@@ -576,7 +576,7 @@ export const App: React.FC = () => {
                 aria-label={tab.title}
                 aria-current={active ? "true" : undefined}
                 onClick={() => handleSelectTab(tab.id)}
-                className={`flex flex-col items-center justify-center gap-1 rounded-lg px-1 py-2 min-h-[44px] min-w-[44px] text-[10px] font-bold tracking-wide text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:flex-1 md:px-3 md:py-2.5 md:text-sm md:flex-row md:justify-start md:items-center md:gap-3 ${gated ? "opacity-50 text-muted-foreground" : ""} ${active ? "bg-primary/10 border-primary/60 shadow-sm" : ""}`.trim()}
+                className={`flex flex-col items-center justify-center gap-1 rounded-none px-1 py-2 min-h-[44px] min-w-[44px] text-[10px] font-bold uppercase tracking-[0.2em] text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:w-full md:px-3 md:py-2.5 md:text-sm md:flex-row md:justify-start md:items-center md:gap-3 ${gated ? "opacity-50 text-muted-foreground" : ""} ${active ? "bg-primary text-primary-foreground border-primary" : ""}`.trim()}
               >
                 <span className="whitespace-nowrap">{tab.title}</span>
                 {gated && (
@@ -603,7 +603,13 @@ export const App: React.FC = () => {
             aria-label="Separate Tab"
             className={tabPanelClass(false, activeTab === "separate")}
           >
-            <section className="space-y-4">
+            <section className="relative space-y-4">
+              {/* Grizzlython hero band (grz-02): full-bleed coral block fading
+                  downward behind the stage top — the snapshot's hero moment. */}
+              <div
+                aria-hidden="true"
+                className="absolute left-0 right-0 top-0 h-14 bg-primary/70 border-b-1 border-dashed border-muted-foreground/50 pointer-events-none grizzly-hero-fade"
+              />
               <div className="space-y-1">
                 <h2
                   className="font-display text-2xl font-bold tracking-tight text-foreground sm:text-3xl"
@@ -621,7 +627,7 @@ export const App: React.FC = () => {
               {decodeError && (
                 <div
                   role="alert"
-                  className="flex items-start gap-3 rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive"
+                  className="flex items-start gap-3 rounded-none border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive"
                 >
                   <AlertCircle className="h-5 w-5 shrink-0 mt-0.5" />
                   <div className="flex-1">
@@ -633,7 +639,7 @@ export const App: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setDecodeError(null)}
-                    className="rounded-lg border border-destructive/20 px-2 py-1 text-xs font-medium hover:bg-destructive/20 transition-colors"
+                    className="rounded-none border border-destructive/20 px-2 py-1 text-xs font-medium hover:bg-destructive/20 transition-colors"
                   >
                     Dismiss
                   </button>
@@ -668,7 +674,7 @@ export const App: React.FC = () => {
 
               {/* Decoding In-Progress Indicator */}
               {isDecoding && (
-                <div className="flex flex-col items-center justify-center rounded-2xl border border-border bg-card/60 p-12 text-center shadow-sm">
+                <div className="flex flex-col items-center justify-center rounded-none border border-border bg-card/60 p-12 text-center shadow-sm">
                   <Loader2 className="h-8 w-8 animate-spin text-primary mb-3" />
                   <h3 className="font-display text-base font-semibold text-foreground">
                     Decoding Audio Buffer
@@ -725,7 +731,7 @@ export const App: React.FC = () => {
                     <div
                       role="region"
                       aria-label="Separation Complete"
-                      className="rounded-2xl border border-status-ok/30 bg-status-ok/10 p-5 shadow-sm space-y-3"
+                      className="rounded-none border border-status-ok/30 bg-status-ok/10 p-5 shadow-sm space-y-3"
                     >
                       <div className="flex items-center gap-2.5 text-status-ok">
                         <CheckCircle2 className="h-5 w-5 shrink-0" />
@@ -737,7 +743,7 @@ export const App: React.FC = () => {
                         {STEM_NAMES.map((stem) => (
                           <div
                             key={stem}
-                            className="flex items-center gap-2 rounded-xl border border-border bg-card/80 p-3 shadow-xs"
+                            className="flex items-center gap-2 rounded-none border border-border bg-card/80 p-3 shadow-xs"
                           >
                             <Music className="h-4 w-4 text-primary shrink-0" />
                             <div>
@@ -804,7 +810,7 @@ export const App: React.FC = () => {
                       transportActionsRef.current.seekToStart();
                       handleSeek(0);
                     }}
-                    className="flex h-11 w-11 items-center justify-center rounded-xl border border-border bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground transition-all"
+                    className="flex h-11 w-11 items-center justify-center rounded-none border border-border bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground transition-all"
                   >
                     <SkipBack className="h-4 w-4" />
                     <span className="font-mono uppercase text-[9px] font-bold tracking-wider">
@@ -816,7 +822,7 @@ export const App: React.FC = () => {
                     aria-label="Play"
                     title="Play (Space)"
                     onClick={() => transportActionsRef.current.play()}
-                    className="flex h-11 px-4 items-center justify-center gap-2 rounded-xl bg-primary text-primary-foreground font-semibold shadow-sm hover:bg-primary/90 active:scale-95 transition-all"
+                    className="flex h-11 px-4 items-center justify-center gap-2 rounded-none bg-primary text-primary-foreground font-semibold shadow-sm hover:bg-primary/90 active:scale-95 transition-all"
                   >
                     <Play className="h-4 w-4 fill-current" />
                     <span className="font-mono text-[10px] font-bold uppercase">
@@ -828,7 +834,7 @@ export const App: React.FC = () => {
                     aria-label="Pause"
                     title="Pause (Space)"
                     onClick={() => transportActionsRef.current.pause()}
-                    className="flex h-11 px-4 items-center justify-center gap-2 rounded-xl border border-border bg-secondary/60 text-foreground hover:bg-secondary transition-all"
+                    className="flex h-11 px-4 items-center justify-center gap-2 rounded-none border border-border bg-secondary/60 text-foreground hover:bg-secondary transition-all"
                   >
                     <Pause className="h-4 w-4 fill-current" />
                     <span className="font-mono text-[10px] font-bold uppercase">
@@ -984,7 +990,13 @@ export const App: React.FC = () => {
         </div>
       </main>
 
-      <footer className="border-t border-border/60 py-6 text-center text-xs text-muted-foreground">
+      <footer
+        className="border-t border-border/60 py-6 text-center text-xs text-muted-foreground"
+        style={{
+          backgroundImage:
+            "linear-gradient(to top, hsl(var(--color-grizzly-deep-red) / 0.5), hsl(var(--color-grizzly-deep-red) / 0.18) 55%, transparent)",
+        }}
+      >
         <p>
           Demuxify Web • 100% Client-Side Audio Source Separation • Powered by
           Client Neural Inference &amp; WebGPU

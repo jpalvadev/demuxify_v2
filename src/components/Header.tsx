@@ -15,7 +15,7 @@ export const Header: React.FC = () => {
     <header className="sticky top-0 z-30 border-b border-border/80 bg-background/95 backdrop-blur-md">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-2.5 sm:px-6 sm:py-3">
         <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted border border-border text-primary">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-none bg-muted border border-border text-primary">
             <Waves className="h-4.5 w-4.5" />
           </div>
           <div className="flex items-center gap-2">
@@ -29,7 +29,7 @@ export const Header: React.FC = () => {
             <span
               data-testid="header-status-dot"
               aria-hidden="true"
-              className="inline-block h-2 w-2 rounded-full bg-primary"
+              className="inline-block h-2 w-2 rounded-none bg-primary grizzly-pulse"
             />
           </div>
         </div>

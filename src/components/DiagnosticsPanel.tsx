@@ -63,7 +63,7 @@ export const DiagnosticsPanel: React.FC = () => {
     <section
       role="region"
       aria-label="System Diagnostics"
-      className="w-full rounded-2xl border border-border bg-card p-4 space-y-3"
+      className="w-full rounded-none border border-border bg-card p-4 space-y-3"
     >
       {/* Header */}
       <div className="flex items-center justify-between gap-2 border-b border-border/60 pb-2">
@@ -82,11 +82,11 @@ export const DiagnosticsPanel: React.FC = () => {
 
       {/* Sub-header Controls / Tabs */}
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 py-1 text-xs">
-        <div className="flex items-center gap-1 rounded-lg bg-muted p-1">
+        <div className="flex items-center gap-1 rounded-none bg-muted p-1">
           <button
             type="button"
             onClick={() => setActiveTab("logs")}
-            className={`rounded-md px-3 py-1 font-medium transition-colors ${
+            className={`rounded-none px-3 py-1 font-medium transition-colors ${
               activeTab === "logs"
                 ? "bg-background text-foreground shadow-xs"
                 : "text-muted-foreground hover:text-foreground"
@@ -97,7 +97,7 @@ export const DiagnosticsPanel: React.FC = () => {
           <button
             type="button"
             onClick={() => setActiveTab("env")}
-            className={`rounded-md px-3 py-1 font-medium transition-colors ${
+            className={`rounded-none px-3 py-1 font-medium transition-colors ${
               activeTab === "env"
                 ? "bg-background text-foreground shadow-xs"
                 : "text-muted-foreground hover:text-foreground"
@@ -140,7 +140,7 @@ export const DiagnosticsPanel: React.FC = () => {
               {filteredLogs.map((log) => (
                 <div
                   key={log.id}
-                  className={`rounded-lg border p-2 transition-colors ${
+                  className={`rounded-none border p-2 transition-colors ${
                     log.level === "error"
                       ? "border-destructive/40 bg-destructive/10 text-destructive-foreground"
                       : log.level === "warn"
@@ -220,7 +220,7 @@ export const DiagnosticsPanel: React.FC = () => {
         <button
           type="button"
           onClick={handleClearLogs}
-          className="flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground active:scale-95 transition-all"
+          className="flex items-center gap-1.5 rounded-none border border-border bg-card px-3 py-1 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground active:scale-95 transition-all"
         >
           <Trash2 className="h-3.5 w-3.5" />
           Clear Logs
@@ -229,7 +229,7 @@ export const DiagnosticsPanel: React.FC = () => {
         <button
           type="button"
           onClick={handleCopyReport}
-          className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 active:scale-95 transition-all"
+          className="flex items-center gap-1.5 rounded-none bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 active:scale-95 transition-all"
         >
           {copied ? (
             <>

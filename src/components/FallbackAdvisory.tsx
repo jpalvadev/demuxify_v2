@@ -12,7 +12,7 @@ export const FallbackAdvisory: React.FC<FallbackAdvisoryProps> = ({
   return (
     <div
       role="alert"
-      className="rounded-xl border border-status-warn/30 bg-status-warn/10 p-4 text-status-warn shadow-sm transition-all"
+      className="rounded-none border border-status-warn/30 bg-status-warn/10 p-4 text-status-warn shadow-sm transition-all"
     >
       <div className="flex items-start gap-3">
         <AlertCircle className="w-5 h-5 text-status-warn mt-0.5 shrink-0" />

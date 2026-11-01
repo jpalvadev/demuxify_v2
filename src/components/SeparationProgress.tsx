@@ -92,12 +92,12 @@ export const SeparationProgress: React.FC<SeparationProgressProps> = ({
     <div
       role="region"
       aria-label="Separation Progress"
-      className="relative overflow-hidden rounded-2xl border border-border bg-card p-6 shadow-md transition-all animate-in fade-in duration-300"
+      className="relative overflow-hidden rounded-none border border-border bg-card p-6 shadow-md transition-all animate-in fade-in duration-300"
     >
       {/* Header Info */}
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-none bg-primary/10 text-primary">
             {isDownloading && <Download className="h-5 w-5 animate-bounce" />}
             {isSeparating && <Cpu className="h-5 w-5 animate-pulse" />}
             {isError && <AlertTriangle className="h-5 w-5 text-destructive" />}
@@ -165,7 +165,7 @@ export const SeparationProgress: React.FC<SeparationProgressProps> = ({
             <button
               type="button"
               onClick={onCancel}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-muted/60 px-3 py-1.5 text-xs font-medium text-foreground hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30 transition-colors"
+              className="inline-flex items-center gap-1.5 rounded-none border border-border bg-muted/60 px-3 py-1.5 text-xs font-medium text-foreground hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30 transition-colors"
               aria-label="Cancel separation"
             >
               <XCircle className="h-3.5 w-3.5" />
@@ -177,7 +177,7 @@ export const SeparationProgress: React.FC<SeparationProgressProps> = ({
             <button
               type="button"
               onClick={onRetry}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-primary bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+              className="inline-flex items-center gap-1.5 rounded-none border border-primary bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
             >
               <RefreshCw className="h-3.5 w-3.5" />
               <span>Retry</span>
@@ -190,7 +190,7 @@ export const SeparationProgress: React.FC<SeparationProgressProps> = ({
       <div
         role="status"
         aria-label="Active Model Advisory"
-        className="mt-4 flex items-center justify-between rounded-xl border border-primary/20 bg-primary/5 px-3 py-2 text-xs"
+        className="mt-4 flex items-center justify-between rounded-none border border-primary/20 bg-primary/5 px-3 py-2 text-xs"
       >
         <div className="flex items-center gap-2">
           <span className="font-semibold text-primary">
@@ -213,10 +213,10 @@ export const SeparationProgress: React.FC<SeparationProgressProps> = ({
             aria-valuenow={percent}
             aria-valuemin={0}
             aria-valuemax={100}
-            className="h-2.5 w-full overflow-hidden rounded-full bg-secondary"
+            className="h-2.5 w-full overflow-hidden rounded-none bg-secondary"
           >
             <div
-              className="h-full bg-primary transition-all duration-300 ease-out rounded-full"
+              className="h-full bg-primary transition-all duration-300 ease-out rounded-none"
               style={{ width: `${percent}%` }}
             />
           </div>

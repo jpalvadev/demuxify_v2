@@ -1,0 +1,1377 @@
+<!doctype html>
+<html lang="en" data-od-id="grizzlython-skin-reference">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>DEMUXIFY — GRIZZLYTHON SKIN REFERENCE</title>
+    <style>
+      /* Grizzlython re-skin of Demuxify. Identity referent: solana.com/grizzlython
+   (Wayback 2023-07-13). Palette below is the locked mandate; no other chromes. */
+      :root {
+        --black: #161515;
+        --cream: #eae7dd;
+        --tan-2: #979385;
+        --tan-faded: rgba(151, 147, 133, 0.5);
+        --peach: #f1b994;
+        --red: #ef474a;
+        --red-ghost: rgba(239, 71, 74, 0.05);
+        --deep: #c12f2f;
+        --deep-70: rgba(193, 47, 47, 0.7);
+        --grid: rgba(151, 147, 133, 0.06);
+        --stem-vocals: #f452be;
+        --stem-drums: #a672f3;
+        --stem-bass: #faa638;
+        --stem-other: #4bc5f1;
+        --display: "Arial Black", "Helvetica Neue", Arial, sans-serif;
+        --body: "Helvetica Neue", Helvetica, Arial, sans-serif;
+        --mono: "Courier New", Courier, ui-monospace, monospace;
+        --reg: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='13' height='13'%3E%3Cpath d='M0.5 6.5H12.5M6.5 0.5V12.5' stroke='%23979385' stroke-dasharray='2 2'/%3E%3C/svg%3E");
+      }
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        border-radius: 0;
+      }
+      button {
+        border: 0;
+        background: none;
+        font-family: var(--body);
+        font-size: inherit;
+        font-weight: inherit;
+        letter-spacing: inherit;
+        text-transform: none;
+        cursor: pointer;
+        padding: 0;
+        text-align: left;
+      }
+      p,
+      h1,
+      h2,
+      h3 {
+        margin: 0;
+      }
+      html,
+      body {
+        margin: 0;
+        background: var(--black);
+        color: var(--cream);
+      }
+      body {
+        font-family: var(--body);
+        background-image:
+          linear-gradient(var(--grid) 1px, transparent 1px),
+          linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+        background-size: 32px 32px;
+        background-attachment: fixed;
+      }
+      ::selection {
+        background: var(--red);
+        color: var(--cream);
+      }
+      /* ---------- reference-sheet chrome ---------- */
+      .sheet {
+        padding: 52px 44px 60px;
+        position: relative;
+      }
+      .mast {
+        display: flex;
+        align-items: baseline;
+        gap: 22px;
+        margin: 0 0 30px;
+      }
+      .mast h1 {
+        font-family: var(--display);
+        font-size: 15px;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: var(--cream);
+        margin: 0;
+      }
+      .mast-note {
+        font-family: var(--mono);
+        font-size: 11px;
+        line-height: 1.5;
+        letter-spacing: 0.06em;
+        color: var(--tan-2);
+        max-width: 52ch;
+      }
+      .mast-rule {
+        width: 100%;
+        height: 1px;
+        background: var(--tan-2);
+        margin: 22px 0 14px;
+      }
+      .palette {
+        display: flex;
+        gap: 26px;
+        margin: 0 0 8px;
+      }
+      .palette div {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+      }
+      .palette i {
+        width: 11px;
+        height: 11px;
+      }
+      .palette b {
+        font-family: var(--mono);
+        font-size: 10px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--tan-2);
+        white-space: nowrap;
+      }
+      .sw-vocals {
+        background: var(--stem-vocals);
+      }
+      .sw-drums {
+        background: var(--stem-drums);
+      }
+      .sw-bass {
+        background: var(--stem-bass);
+      }
+      .sw-other {
+        background: var(--stem-other);
+      }
+      /* frames */
+      .frame {
+        margin: 34px 0 0;
+      }
+      .frame-cap {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-family: var(--mono);
+        font-size: 11px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--tan-2);
+        margin: 0 0 16px;
+      }
+      .frame-cap em {
+        display: block;
+        width: 11px;
+        height: 11px;
+        background: var(--reg);
+        background-repeat: no-repeat;
+      }
+      .fit-d {
+        width: calc(1440px * var(--fit-d, 1));
+        height: calc(900px * var(--fit-d, 1));
+        position: relative;
+        overflow: hidden;
+      }
+      .fit-m {
+        width: calc(390px * var(--fit-m, 1));
+        height: calc(844px * var(--fit-m, 1));
+        position: relative;
+        overflow: hidden;
+      }
+      .fit-m,
+      .fit-d {
+        background: var(--black);
+        border: 1px solid var(--tan-2);
+      }
+      /* ---------- app shell (shared base) ---------- */
+      .shell {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        background: var(--black);
+      }
+      .shell::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background-image:
+          linear-gradient(var(--grid) 1px, transparent 1px),
+          linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+        background-size: 32px 32px;
+      }
+      .shell-hd {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border-bottom: 1px solid var(--tan-faded);
+      }
+      .wordmark {
+        font-family: var(--display);
+        text-transform: uppercase;
+        color: var(--cream);
+        line-height: 1;
+        letter-spacing: 0.18em;
+      }
+      .hd-cluster {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+      }
+      .dot {
+        width: 9px;
+        height: 9px;
+        background: var(--red);
+      }
+      .hd-status {
+        font-family: var(--mono);
+        font-size: 11px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--tan-2);
+        white-space: nowrap;
+      }
+      .chip {
+        font-family: var(--display);
+        font-size: 11px;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        line-height: 1;
+        color: var(--black);
+        background: var(--cream);
+        padding: 13px 16px 13px 19px;
+        cursor: pointer;
+      }
+      .chip--red {
+        background: var(--red);
+        color: var(--cream);
+      }
+      .chip:hover {
+        background: var(--peach);
+      }
+      .chip--red:hover {
+        background: var(--deep);
+      }
+      .chip:focus-visible {
+        outline: 2px solid var(--cream);
+        outline-offset: 3px;
+      }
+      .chip--red:focus-visible {
+        outline: 2px solid var(--red);
+        outline-offset: 3px;
+      }
+      .chip:active {
+        background: var(--tan-2);
+        color: var(--black);
+      }
+      .chip--red:active {
+        background: var(--deep);
+        color: var(--tan-2);
+      }
+      /* rail */
+      .rail {
+        background: var(--black);
+        border-right: 1px solid var(--tan-faded);
+        display: flex;
+        flex-direction: column;
+      }
+      .rail-tab {
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        height: 52px;
+        padding: 0 0 0 26px;
+        cursor: pointer;
+        font-family: var(--display);
+        font-size: 12px;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        line-height: 1;
+        color: var(--tan-2);
+      }
+      .rail-tab + .rail-tab {
+        border-top: 1px solid var(--tan-faded);
+      }
+      .rail-tab:hover {
+        background: var(--red-ghost);
+        color: var(--cream);
+      }
+      .rail-tab:focus-visible {
+        outline: 2px solid var(--red);
+        outline-offset: -3px;
+      }
+      .rail-tab.act {
+        background: var(--red);
+        color: var(--cream);
+      }
+      .rail-tab.act:hover {
+        background: var(--deep);
+        color: var(--cream);
+      }
+      .rail-tab.gated {
+        color: var(--tan-faded);
+      }
+      /* stage */
+      .stage {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+      }
+      .hero {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 0;
+        height: 196px;
+        background: var(--red);
+      }
+      .hero-tag {
+        position: absolute;
+        left: 26px;
+        top: 14px;
+        font-family: var(--mono);
+        font-size: 10px;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--black);
+      }
+      /* chamfered hairline card: notched top-right, 1px outline + diagonal hairline */
+      .card {
+        position: relative;
+        background: var(--black);
+        border: 1px solid var(--tan-2);
+        --ch: 26px;
+        clip-path: polygon(
+          0 0,
+          calc(100% - var(--ch)) 0,
+          100% var(--ch),
+          100% 100%,
+          0 100%
+        );
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+        padding: 0 26px 24px 20px;
+      }
+      .card::after {
+        content: "";
+        position: absolute;
+        top: 1px;
+        right: calc(var(--ch) - 1px);
+        width: calc((var(--ch) - 1px) * 1.41421);
+        height: 1px;
+        background: var(--tan-2);
+        transform: rotate(45deg);
+        transform-origin: 0 0;
+      }
+      .card-hd {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 18px;
+      }
+      .card-title {
+        font-family: var(--display);
+        font-size: 18px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--cream);
+        line-height: 1.2;
+        margin: 0;
+      }
+      .card-meta {
+        font-family: var(--mono);
+        font-size: 11px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--tan-2);
+        white-space: nowrap;
+      }
+      /* waveform strip */
+      .wave {
+        position: relative;
+        height: 96px;
+        background: var(--black);
+        border: 1px solid var(--tan-faded);
+      }
+      .wave svg {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+      }
+      .wave-read {
+        position: absolute;
+        left: 10px;
+        top: 6px;
+        font-family: var(--mono);
+        font-size: 10px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--tan-2);
+      }
+      .playhead {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 1px;
+        background: var(--cream);
+        left: 38%;
+      }
+      /* stems */
+      .stems {
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+      }
+      .stem {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        height: 52px;
+        padding: 0 0 0 18px;
+        border-top: 1px solid var(--tan-faded);
+      }
+      .stem-chip {
+        width: 12px;
+        height: 12px;
+        background: var(--stem-c);
+      }
+      .stem-name {
+        font-family: var(--body);
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: var(--cream);
+      }
+      .stem-bars {
+        display: flex;
+        align-items: center;
+        gap: 3px;
+        height: 30px;
+        width: 84px;
+      }
+      .stem-bars i {
+        width: 3px;
+        background: var(--stem-c);
+      }
+      .stem-code {
+        font-family: var(--mono);
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        color: var(--tan-2);
+        white-space: nowrap;
+        margin-left: auto;
+      }
+      .mast-note span {
+        font-family: var(--mono);
+        font-size: 10px;
+        letter-spacing: 0.06em;
+        color: var(--cream);
+      }
+      .app-m .shell-mid {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+      }
+      .app-m .ft-plus {
+        width: 11px;
+        height: 11px;
+      }
+      .stem-vocals {
+        --stem-c: var(--stem-vocals);
+      }
+      .stem-drums {
+        --stem-c: var(--stem-drums);
+      }
+      .stem-bass {
+        --stem-c: var(--stem-bass);
+      }
+      .stem-other {
+        --stem-c: var(--stem-other);
+      }
+      .card-act {
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 22px;
+      }
+      .chip--sep {
+        font-size: 13px;
+        padding: 16px 26px 16px 30px;
+      }
+      .act-meta {
+        font-family: var(--mono);
+        font-size: 10px;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--tan-2);
+        white-space: nowrap;
+      }
+      /* session readout under the card */
+      .session {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        margin: 26px 40px 0 32px;
+        border: 1px solid var(--tan-faded);
+        padding: 14px 18px 14px 16px;
+      }
+      .session-row {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 20px;
+        font-family: var(--mono);
+        font-size: 10px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--tan-2);
+        line-height: 1.6;
+      }
+      .session b {
+        color: var(--peach);
+      }
+      /* footer */
+      .shell-ft {
+        position: relative;
+        background: var(--black);
+        border-top: 1px solid var(--tan-2);
+      }
+      .shell-ft::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background: linear-gradient(
+          to top,
+          var(--deep) 0%,
+          var(--deep-70) 38%,
+          rgba(193, 47, 47, 0) 100%
+        );
+      }
+      .ft-credits {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 26px;
+        font-family: var(--body);
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--cream);
+      }
+      .ft-plus {
+        display: block;
+        width: 13px;
+        height: 13px;
+        background: var(--reg);
+        background-repeat: no-repeat;
+      }
+      /* desktop sizing */
+      .app-d {
+        width: 1440px;
+        height: 900px;
+        transform: scale(var(--fit-d, 1));
+        transform-origin: 0 0;
+      }
+      .app-d .shell-hd {
+        height: 62px;
+        padding: 0 40px 0 40px;
+      }
+      .app-d .wordmark {
+        font-size: 21px;
+      }
+      .app-d .hd-cluster {
+        gap: 18px;
+      }
+      .app-d .shell-mid {
+        display: flex;
+        flex-direction: row;
+        flex: 1;
+      }
+      .app-d .rail {
+        width: 244px;
+      }
+      .app-d .shell-ft {
+        flex: 0;
+        height: 118px;
+        padding: 44px 40px 26px;
+      }
+      .app-d .card {
+        margin: 44px 40px 0 32px;
+        gap: 18px;
+      }
+      .app-d .chip {
+        padding: 13px 16px 13px 19px;
+      }
+      /* interaction polish (flat, colour-only) */
+      .chip,
+      .rail-tab {
+        transition:
+          background 0.12s linear,
+          color 0.12s linear;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .chip,
+        .rail-tab {
+          transition: none;
+        }
+      }
+      /* dashed "+" registration marks */
+      .reg {
+        position: absolute;
+        width: 13px;
+        height: 13px;
+        background: var(--reg);
+        background-repeat: no-repeat;
+        pointer-events: none;
+      }
+      .reg.tl {
+        left: 3px;
+        top: 3px;
+      }
+      .reg.bl {
+        left: 3px;
+        bottom: 3px;
+      }
+      .reg.br {
+        right: 3px;
+        bottom: 3px;
+      }
+      .reg.tr {
+        right: 22px;
+        top: 10px;
+      }
+      .app-m .reg.tl {
+        left: 2px;
+        top: 2px;
+      }
+      .app-m .reg.bl {
+        left: 2px;
+        bottom: 2px;
+      }
+      .app-m .reg.br {
+        right: 2px;
+        bottom: 2px;
+      }
+      .app-m .reg.tr {
+        right: 13px;
+        top: 8px;
+      }
+      .stage-r {
+        position: absolute;
+        width: 13px;
+        height: 13px;
+        background: var(--reg);
+        background-repeat: no-repeat;
+        pointer-events: none;
+      }
+      .stage-r.tl {
+        left: 12px;
+        top: 12px;
+      }
+      .stage-r.tr {
+        right: 14px;
+        top: 12px;
+      }
+      .stage-r.bl {
+        left: 12px;
+        bottom: 12px;
+      }
+      .stage-r.br {
+        right: 14px;
+        bottom: 12px;
+      }
+      .reg--sm {
+        width: 11px;
+        height: 11px;
+      }
+      /* mobile sizing */
+      .app-m {
+        width: 390px;
+        height: 844px;
+        transform: scale(var(--fit-m, 1));
+        transform-origin: 0 0;
+      }
+      .app-m .shell-hd {
+        height: 52px;
+        padding: 0 16px;
+      }
+      .app-m .wordmark {
+        font-size: 16px;
+        letter-spacing: 0.16em;
+      }
+      .app-m .hd-cluster {
+        gap: 10px;
+      }
+      .app-m .dot {
+        width: 8px;
+        height: 8px;
+      }
+      .app-m .hd-status {
+        font-size: 10px;
+        letter-spacing: 0.08em;
+      }
+      .app-m .chip {
+        font-size: 10px;
+        padding: 12px 12px 12px 14px;
+      }
+      .app-m .shell-mid {
+        display: flex;
+        flex-direction: column;
+      }
+      .app-m .rail {
+        flex: 0;
+        height: 44px;
+        flex-direction: row;
+        border-right: none;
+        border-bottom: 1px solid var(--tan-faded);
+        padding: 0;
+      }
+      .app-m .rail-tab {
+        flex: 1;
+        justify-content: center;
+        padding: 0;
+        height: 44px;
+        font-size: 9px;
+        letter-spacing: 0.2em;
+      }
+      .app-m .rail-tab + .rail-tab {
+        border-left: 1px solid var(--tan-faded);
+        border-top: 0;
+      }
+      .app-m .hero {
+        height: 104px;
+      }
+      .app-m .hero-tag {
+        left: 14px;
+        top: 8px;
+        font-size: 9px;
+        letter-spacing: 0.12em;
+      }
+      .app-m .card {
+        margin: 26px 16px 0 14px;
+        --ch: 16px;
+        gap: 16px;
+        padding: 0 14px 14px 14px;
+      }
+      .app-m .card-hd {
+        flex-direction: column;
+        gap: 6px;
+        align-items: baseline;
+      }
+      .app-m .card-title {
+        font-size: 14px;
+      }
+      .app-m .card-meta {
+        font-size: 9px;
+        letter-spacing: 0.08em;
+      }
+      .app-m .wave {
+        height: 72px;
+      }
+      .app-m .stem {
+        height: 44px;
+        gap: 11px;
+        padding: 0 0 0 12px;
+      }
+      .app-m .stem-name {
+        font-size: 9px;
+        letter-spacing: 0.18em;
+      }
+      .app-m .stem-bars {
+        width: 48px;
+        gap: 2px;
+      }
+      .app-m .stem-bars i {
+        width: 2px;
+      }
+      .app-m .stem-code {
+        font-size: 9px;
+        margin-left: auto;
+      }
+      .app-m .card-act {
+        flex-direction: column;
+        gap: 8px;
+        align-items: stretch;
+      }
+      .app-m .chip--sep {
+        width: 100%;
+        display: flex;
+        justify-content: center;
+        font-size: 11px;
+        padding: 15px 2px 15px 6px;
+      }
+      .app-m .act-meta {
+        font-size: 9px;
+        text-align: center;
+      }
+      .app-m .session {
+        margin: 18px 16px 0 14px;
+        padding: 10px 12px 10px 10px;
+      }
+      .app-m .session-row {
+        font-size: 9px;
+        line-height: 1.5;
+      }
+      .app-m .shell-ft {
+        flex: 0;
+        height: 112px;
+        padding: 26px 18px 22px;
+      }
+      .app-m .ft-credits {
+        flex-direction: column;
+        gap: 12px;
+        font-size: 9px;
+        letter-spacing: 0.14em;
+      }
+      .app-m .stem-bars {
+        width: 50px;
+        gap: 2px;
+        justify-content: space-between;
+      }
+      .app-m .wave-read {
+        font-size: 9px;
+        left: 7px;
+        top: 4px;
+      }
+      .app-m .chip--sep {
+        width: 100%;
+        display: flex;
+        justify-content: center;
+        font-size: 11px;
+        padding: 15px 2px 15px 6px;
+      }
+      .app-m .reg,
+      .app-m .reg--sm {
+        width: 11px;
+        height: 11px;
+      }
+
+      .app-m .stage-r.tl {
+        left: 6px;
+        top: 6px;
+      }
+      .app-m .stage-r.tr {
+        right: 8px;
+        top: 6px;
+      }
+      .app-m .stage-r.bl {
+        left: 6px;
+        bottom: 6px;
+      }
+      .app-m .stage-r.br {
+        right: 8px;
+        bottom: 6px;
+      }
+      .app-m .session-row span:last-child {
+        color: var(--tan-2);
+      }
+      .app-m .shell-ft::after {
+        background: linear-gradient(
+          to top,
+          var(--deep) 0%,
+          var(--deep-70) 46%,
+          rgba(193, 47, 47, 0) 100%
+        );
+      }
+      /* sheet responsiveness */
+      .fit-d,
+      .fit-m {
+        margin: 0 auto;
+      }
+      @media (max-width: 1100px) {
+        .sheet {
+          padding: 32px 20px 40px;
+        }
+        .mast {
+          flex-direction: column;
+          gap: 10px;
+        }
+        .palette {
+          display: none;
+        }
+      }
+      @media print {
+        body {
+          background: #fff;
+          color: #000;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="sheet">
+      <div class="mast" data-od-id="sheet-masthead">
+        <h1>Demuxify · Grizzlython skin</h1>
+        <p class="mast-note">
+          Re-skin reference for the Demuxify audio-separation app. Identity
+          referent: solana.com/grizzlython as archived 13 Jul 2023 — near-black
+          canvas, coral hero blocks, cream ALL-CAPS, chamfered hairline cards,
+          dashed registration marks. Port the two shells below into
+          <span>src/App.tsx</span> and <span>src/components/</span>; engine
+          logic stays untouched.
+        </p>
+        <div class="palette" data-od-id="sheet-palette">
+          <div><i style="background: var(--red)"></i><b>Grizzly-red</b></div>
+          <div>
+            <i style="background: var(--cream)"></i><b>Grizzly-cream</b>
+          </div>
+          <div><i style="background: var(--tan-2)"></i><b>Tan-2</b></div>
+          <div><i style="background: var(--peach)"></i><b>Peach</b></div>
+          <div><i style="background: var(--deep)"></i><b>Footer red</b></div>
+          <div><i style="background: var(--stem-vocals)"></i><b>Vocals</b></div>
+          <div><i style="background: var(--stem-drums)"></i><b>Drums</b></div>
+          <div><i style="background: var(--stem-bass)"></i><b>Bass</b></div>
+          <div><i style="background: var(--stem-other)"></i><b>Other</b></div>
+        </div>
+        <div class="mast-rule"></div>
+      </div>
+
+      <section class="frame" data-od-id="frame-desktop">
+        <div class="frame-cap">
+          <i class="ft-plus" aria-hidden="true"></i>Desktop — 1440 × 900 · 1:1 ·
+          rail left
+        </div>
+        <div class="fit-d">
+          <div class="shell app-d" data-od-id="shell-desktop">
+            <header class="shell-hd" data-od-id="shell-desktop-header">
+              <h1 class="wordmark" data-od-id="shell-desktop-wordmark">
+                Demuxify
+              </h1>
+              <div class="hd-cluster">
+                <i class="dot" aria-hidden="true"></i>
+                <p class="hd-status">1 track loaded</p>
+                <button
+                  class="chip"
+                  data-od-id="shell-desktop-import"
+                  type="button"
+                >
+                  Import
+                </button>
+              </div>
+            </header>
+
+            <div class="shell-mid">
+              <nav
+                class="rail"
+                data-od-id="shell-desktop-rail"
+                aria-label="Tab shell"
+              >
+                <button
+                  class="rail-tab act"
+                  data-od-id="shell-desktop-tab-separate"
+                  type="button"
+                >
+                  Separate
+                </button>
+                <button
+                  class="rail-tab gated"
+                  data-od-id="shell-desktop-tab-listen"
+                  type="button"
+                >
+                  Listen
+                </button>
+                <button
+                  class="rail-tab gated"
+                  data-od-id="shell-desktop-tab-mix"
+                  type="button"
+                >
+                  Mix
+                </button>
+                <button
+                  class="rail-tab gated"
+                  data-od-id="shell-desktop-tab-export"
+                  type="button"
+                >
+                  Export
+                </button>
+                <button
+                  class="rail-tab"
+                  data-od-id="shell-desktop-tab-system"
+                  type="button"
+                >
+                  System
+                </button>
+              </nav>
+              <section class="stage" data-od-id="shell-desktop-stage">
+                <div class="hero" data-od-id="shell-desktop-hero">
+                  <p class="hero-tag">
+                    Grizzlython skin ref · solana snapshot 13 jul 2023
+                  </p>
+                </div>
+                <div class="card" data-od-id="shell-desktop-card">
+                  <i class="reg tl" aria-hidden="true"></i
+                  ><i class="reg tr" aria-hidden="true"></i
+                  ><i class="reg bl" aria-hidden="true"></i
+                  ><i class="reg br" aria-hidden="true"></i>
+                  <header class="card-hd">
+                    <h2
+                      class="card-title"
+                      data-od-id="shell-desktop-track-title"
+                    >
+                      The Midnight Gravel — Take 03
+                    </h2>
+                    <p class="card-meta">03:41 · 44.1 khz · stereo</p>
+                  </header>
+                  <div class="wave" data-od-id="shell-desktop-wave">
+                    <svg
+                      viewBox="0 0 200 40"
+                      preserveAspectRatio="none"
+                      aria-hidden="true"
+                    >
+                      <polygon
+                        points="0,20 4,18 8,14 12,8 16,13 20,17 24,10 28,5 32,12 36,16 40,9 44,4 48,13 52,17 56,11 60,6 64,14 68,18 72,10 76,15 80,7 84,13 88,17 92,11 96,5 100,14 104,18 108,9 112,16 116,19 120,12 124,7 128,14 132,18 136,10 140,16 144,8 148,13 152,19 156,11 160,17 164,9 168,15 172,6 176,13 180,18 184,10 188,15 192,7 196,12 200,20 196,28 192,33 188,25 184,30 180,22 176,27 172,34 168,25 164,31 160,23 156,29 152,21 148,27 144,32 140,24 136,30 132,22 128,26 124,33 120,28 116,21 112,24 108,31 104,22 100,26 96,35 92,29 88,23 84,27 80,33 76,25 72,30 68,22 64,26 60,34 56,29 52,23 48,27 44,36 40,31 36,24 32,28 28,35 24,30 20,23 16,27 12,32 8,26 4,22"
+                        fill="#ef474a"
+                        fill-opacity="0.12"
+                        stroke="#ef474a"
+                        stroke-width="1"
+                        vector-effect="non-scaling-stroke"
+                      />
+                      <line
+                        x1="0"
+                        y1="20"
+                        x2="200"
+                        y2="20"
+                        stroke="#979385"
+                        stroke-dasharray="3 3"
+                      />
+                    </svg>
+                    <p class="wave-read">00:00 / 03:41 · 44.1 khz · 2 ch</p>
+                    <i class="playhead" aria-hidden="true"></i>
+                  </div>
+                  <div class="stems">
+                    <div
+                      class="stem stem-vocals"
+                      data-od-id="shell-desktop-stem-vocals"
+                    >
+                      <i class="stem-chip"></i
+                      ><span class="stem-name">Vocals</span
+                      ><span class="stem-bars"
+                        ><i style="height: 12px"></i><i style="height: 19px"></i
+                        ><i style="height: 9px"></i><i style="height: 23px"></i
+                        ><i style="height: 14px"></i><i style="height: 7px"></i
+                        ><i style="height: 21px"></i><i style="height: 16px"></i
+                        ><i style="height: 10px"></i><i style="height: 25px"></i
+                        ><i style="height: 12px"></i><i style="height: 18px"></i
+                        ><i style="height: 8px"></i></span
+                      ><span class="stem-code">03:41.6 · 312 640 fr</span>
+                    </div>
+                    <div
+                      class="stem stem-drums"
+                      data-od-id="shell-desktop-stem-drums"
+                    >
+                      <i class="stem-chip"></i
+                      ><span class="stem-name">Drums</span
+                      ><span class="stem-bars"
+                        ><i style="height: 22px"></i><i style="height: 8px"></i
+                        ><i style="height: 26px"></i><i style="height: 11px"></i
+                        ><i style="height: 17px"></i><i style="height: 24px"></i
+                        ><i style="height: 6px"></i><i style="height: 20px"></i
+                        ><i style="height: 13px"></i><i style="height: 27px"></i
+                        ><i style="height: 9px"></i><i style="height: 19px"></i
+                        ><i style="height: 15px"></i></span
+                      ><span class="stem-code">03:41.0 · 44 100 hz</span>
+                    </div>
+                    <div
+                      class="stem stem-bass"
+                      data-od-id="shell-desktop-stem-bass"
+                    >
+                      <i class="stem-chip"></i
+                      ><span class="stem-name">Bass</span
+                      ><span class="stem-bars"
+                        ><i style="height: 16px"></i><i style="height: 14px"></i
+                        ><i style="height: 20px"></i><i style="height: 12px"></i
+                        ><i style="height: 18px"></i><i style="height: 15px"></i
+                        ><i style="height: 22px"></i><i style="height: 11px"></i
+                        ><i style="height: 19px"></i><i style="height: 13px"></i
+                        ><i style="height: 21px"></i><i style="height: 17px"></i
+                        ><i style="height: 12px"></i></span
+                      ><span class="stem-code">03:41.0 · 2 094 hz</span>
+                    </div>
+                    <div
+                      class="stem stem-other"
+                      data-od-id="shell-desktop-stem-other"
+                    >
+                      <i class="stem-chip"></i
+                      ><span class="stem-name">Other</span
+                      ><span class="stem-bars"
+                        ><i style="height: 9px"></i><i style="height: 24px"></i
+                        ><i style="height: 13px"></i><i style="height: 6px"></i
+                        ><i style="height: 21px"></i><i style="height: 17px"></i
+                        ><i style="height: 26px"></i><i style="height: 8px"></i
+                        ><i style="height: 19px"></i><i style="height: 23px"></i
+                        ><i style="height: 11px"></i><i style="height: 15px"></i
+                        ><i style="height: 20px"></i></span
+                      ><span class="stem-code">03:41.2 · 44.1 khz</span>
+                    </div>
+                  </div>
+                  <div class="card-act">
+                    <button
+                      class="chip chip--red chip--sep"
+                      data-od-id="shell-desktop-separate-cta"
+                      type="button"
+                    >
+                      Separate
+                    </button>
+                    <p class="act-meta">HT-DEMUCS · ONNXRUNTIME · 4 STEMS</p>
+                  </div>
+                </div>
+                <div class="session" data-od-id="shell-desktop-session">
+                  <i class="reg tl" aria-hidden="true"></i
+                  ><i class="reg br" aria-hidden="true"></i>
+                  <p class="session-row">
+                    <span>Session 04 · Onnxruntime CUDA</span
+                    ><span><b>HT-Demucs · Balanced</b></span>
+                  </p>
+                  <p class="session-row">
+                    <span>1 track loaded · 00:03:41:22</span
+                    ><span>Separation idle</span>
+                  </p>
+                </div>
+                <i class="stage-r tl" aria-hidden="true"></i
+                ><i class="stage-r tr" aria-hidden="true"></i
+                ><i class="stage-r bl" aria-hidden="true"></i
+                ><i class="stage-r br" aria-hidden="true"></i>
+              </section>
+            </div>
+            <footer class="shell-ft" data-od-id="shell-desktop-footer">
+              <div class="ft-credits" data-od-id="shell-desktop-credits">
+                <i class="ft-plus" aria-hidden="true"></i>
+                <span
+                  >Demuxify v2 · grizzlython skin ref · stems via HT-Demucs /
+                  ONNX · identity after solana grizzlython, 13 jul 2023</span
+                >
+                <i class="ft-plus" aria-hidden="true"></i>
+              </div>
+            </footer>
+          </div>
+        </div>
+      </section>
+      <section class="frame" data-od-id="frame-mobile">
+        <div class="frame-cap">
+          <i class="ft-plus" aria-hidden="true"></i>Mobile — 390 × 844 · 1:1 ·
+          rail becomes top strip
+        </div>
+        <div class="fit-m">
+          <div class="shell app-m" data-od-id="shell-mobile">
+            <header class="shell-hd" data-od-id="shell-mobile-header">
+              <h1 class="wordmark" data-od-id="shell-mobile-wordmark">
+                Demuxify
+              </h1>
+              <div class="hd-cluster">
+                <i class="dot" aria-hidden="true"></i>
+                <p class="hd-status">1 track loaded</p>
+                <button
+                  class="chip"
+                  data-od-id="shell-mobile-import"
+                  type="button"
+                >
+                  Import
+                </button>
+              </div>
+            </header>
+            <div class="shell-mid">
+              <nav
+                class="rail"
+                data-od-id="shell-mobile-rail"
+                aria-label="Tab shell"
+              >
+                <button
+                  class="rail-tab act"
+                  data-od-id="shell-mobile-tab-separate"
+                  type="button"
+                >
+                  Separate
+                </button>
+                <button
+                  class="rail-tab gated"
+                  data-od-id="shell-mobile-tab-listen"
+                  type="button"
+                >
+                  Listen
+                </button>
+                <button
+                  class="rail-tab gated"
+                  data-od-id="shell-mobile-tab-mix"
+                  type="button"
+                >
+                  Mix
+                </button>
+                <button
+                  class="rail-tab gated"
+                  data-od-id="shell-mobile-tab-export"
+                  type="button"
+                >
+                  Export
+                </button>
+                <button
+                  class="rail-tab"
+                  data-od-id="shell-mobile-tab-system"
+                  type="button"
+                >
+                  System
+                </button>
+              </nav>
+              <section class="stage" data-od-id="shell-mobile-stage">
+                <div class="hero" data-od-id="shell-mobile-hero">
+                  <p class="hero-tag">Grizzlython skin · 13 jul 2023 ref</p>
+                </div>
+                <div class="card" data-od-id="shell-mobile-card">
+                  <i class="reg tl" aria-hidden="true"></i
+                  ><i class="reg tr" aria-hidden="true"></i
+                  ><i class="reg bl" aria-hidden="true"></i
+                  ><i class="reg br" aria-hidden="true"></i>
+                  <header class="card-hd">
+                    <h2
+                      class="card-title"
+                      data-od-id="shell-mobile-track-title"
+                    >
+                      The Midnight Gravel — Take 03
+                    </h2>
+                    <p class="card-meta">03:41 · 44.1 khz</p>
+                  </header>
+                  <div class="wave" data-od-id="shell-mobile-wave">
+                    <svg
+                      viewBox="0 0 200 40"
+                      preserveAspectRatio="none"
+                      aria-hidden="true"
+                    >
+                      <polygon
+                        points="0,20 4,18 8,14 12,8 16,13 20,17 24,10 28,5 32,12 36,16 40,9 44,4 48,13 52,17 56,11 60,6 64,14 68,18 72,10 76,15 80,7 84,13 88,17 92,11 96,5 100,14 104,18 108,9 112,16 116,19 120,12 124,7 128,14 132,18 136,10 140,16 144,8 148,13 152,19 156,11 160,17 164,9 168,15 172,6 176,13 180,18 184,10 188,15 192,7 196,12 200,20 196,28 192,33 188,25 184,30 180,22 176,27 172,34 168,25 164,31 160,23 156,29 152,21 148,27 144,32 140,24 136,30 132,22 128,26 124,33 120,28 116,21 112,24 108,31 104,22 100,26 96,35 92,29 88,23 84,27 80,33 76,25 72,30 68,22 64,26 60,34 56,29 52,23 48,27 44,36 40,31 36,24 32,28 28,35 24,30 20,23 16,27 12,32 8,26 4,22"
+                        fill="#ef474a"
+                        fill-opacity="0.12"
+                        stroke="#ef474a"
+                        stroke-width="1"
+                        vector-effect="non-scaling-stroke"
+                      />
+                      <line
+                        x1="0"
+                        y1="20"
+                        x2="200"
+                        y2="20"
+                        stroke="#979385"
+                        stroke-dasharray="3 3"
+                      />
+                    </svg>
+                    <p class="wave-read">00:00 / 03:41</p>
+                    <i class="playhead" aria-hidden="true"></i>
+                  </div>
+                  <div class="stems">
+                    <div
+                      class="stem stem-vocals"
+                      data-od-id="shell-mobile-stem-vocals"
+                    >
+                      <i class="stem-chip"></i
+                      ><span class="stem-name">Vocals</span
+                      ><span class="stem-bars"
+                        ><i style="height: 10px"></i><i style="height: 18px"></i
+                        ><i style="height: 8px"></i><i style="height: 21px"></i
+                        ><i style="height: 13px"></i><i style="height: 24px"></i
+                        ><i style="height: 9px"></i><i style="height: 17px"></i
+                        ><i style="height: 12px"></i></span
+                      ><span class="stem-code">03:41.6</span>
+                    </div>
+                    <div
+                      class="stem stem-drums"
+                      data-od-id="shell-mobile-stem-drums"
+                    >
+                      <i class="stem-chip"></i
+                      ><span class="stem-name">Drums</span
+                      ><span class="stem-bars"
+                        ><i style="height: 22px"></i><i style="height: 8px"></i
+                        ><i style="height: 25px"></i><i style="height: 11px"></i
+                        ><i style="height: 19px"></i><i style="height: 6px"></i
+                        ><i style="height: 23px"></i><i style="height: 13px"></i
+                        ><i style="height: 20px"></i></span
+                      ><span class="stem-code">03:41.0</span>
+                    </div>
+                    <div
+                      class="stem stem-bass"
+                      data-od-id="shell-mobile-stem-bass"
+                    >
+                      <i class="stem-chip"></i
+                      ><span class="stem-name">Bass</span
+                      ><span class="stem-bars"
+                        ><i style="height: 15px"></i><i style="height: 20px"></i
+                        ><i style="height: 12px"></i><i style="height: 18px"></i
+                        ><i style="height: 22px"></i><i style="height: 11px"></i
+                        ><i style="height: 19px"></i><i style="height: 14px"></i
+                        ><i style="height: 21px"></i></span
+                      ><span class="stem-code">03:41.0</span>
+                    </div>
+                    <div
+                      class="stem stem-other"
+                      data-od-id="shell-mobile-stem-other"
+                    >
+                      <i class="stem-chip"></i
+                      ><span class="stem-name">Other</span
+                      ><span class="stem-bars"
+                        ><i style="height: 9px"></i><i style="height: 23px"></i
+                        ><i style="height: 12px"></i><i style="height: 7px"></i
+                        ><i style="height: 20px"></i><i style="height: 24px"></i
+                        ><i style="height: 10px"></i><i style="height: 16px"></i
+                        ><i style="height: 21px"></i></span
+                      ><span class="stem-code">03:41.2</span>
+                    </div>
+                  </div>
+                  <div class="card-act">
+                    <button
+                      class="chip chip--red chip--sep"
+                      data-od-id="shell-mobile-separate-cta"
+                      type="button"
+                    >
+                      Separate
+                    </button>
+                    <p class="act-meta">HT-DEMUCS · 4 STEMS</p>
+                  </div>
+                </div>
+                <div class="session" data-od-id="shell-mobile-session">
+                  <i class="reg tl" aria-hidden="true"></i
+                  ><i class="reg br" aria-hidden="true"></i>
+                  <p class="session-row">
+                    <span>Session 04 · Onnxruntime</span
+                    ><span><b>HT-Demucs</b></span>
+                  </p>
+                  <p class="session-row">
+                    <span>1 loaded · 00:03:41:22</span><span>Idle</span>
+                  </p>
+                </div>
+                <i class="stage-r tl" aria-hidden="true"></i
+                ><i class="stage-r tr" aria-hidden="true"></i
+                ><i class="stage-r bl" aria-hidden="true"></i
+                ><i class="stage-r br" aria-hidden="true"></i>
+              </section>
+            </div>
+            <footer class="shell-ft" data-od-id="shell-mobile-footer">
+              <div class="ft-credits" data-od-id="shell-mobile-credits">
+                <i class="ft-plus" aria-hidden="true"></i>
+                <span>Demuxify v2 · grizzlython skin</span>
+                <span>HT-Demucs / ONNX · ref 13 jul 2023</span>
+                <i class="ft-plus" aria-hidden="true"></i>
+              </div>
+            </footer>
+          </div>
+        </div>
+      </section>
+      <script>
+        (function () {
+          function fit() {
+            var w = window.innerWidth || 1440;
+            var dw = (w - 96) / 1440,
+              mw = (w - 72) / 390;
+            var r = document.documentElement;
+            r.style.setProperty(
+              "--fit-d",
+              String(Math.max(0.2, Math.min(1, dw)))
+            );
+            r.style.setProperty(
+              "--fit-m",
+              String(Math.max(0.3, Math.min(1, mw)))
+            );
+          }
+          fit();
+          window.addEventListener("resize", fit);
+        })();
+      </script>
+    </div>
+  </body>
+</html>

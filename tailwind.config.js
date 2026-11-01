@@ -52,8 +52,24 @@ export default {
         // Bold pairing (ticket 01 sheet): Archivo Black display for
         // headings/branding, JetBrains Mono for readouts. woff2 subsets are
         // bundled in ticket 10; until then these fall back to the stacks.
-        display: ['"Archivo Black"', '"Archivo"', "Impact", "sans-serif"],
+        display: [
+          '"BlenderPro"',
+          '"Diatype"',
+          '"Archivo Black"',
+          "Impact",
+          "sans-serif",
+        ],
+        sans: [
+          '"Diatype"',
+          '"Helvetica Neue"',
+          "Helvetica",
+          "Arial",
+          "ui-sans-serif",
+          "system-ui",
+          "sans-serif",
+        ],
         mono: [
+          '"DSemi"',
           '"JetBrains Mono"',
           "ui-monospace",
           "SFMono-Regular",

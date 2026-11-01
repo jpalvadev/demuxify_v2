@@ -1,29 +1,63 @@
-/* Bundled Bold pairing (ticket 10): latin-subset woff2 live in public/fonts/ and are
-   declared with LOCAL urls only, so the offline-first PWA never fetches a CDN font.
-   `font-display: block` matches the sheet's no-flicker rule for the subset faces. */
+/* Grizzlython skin (grz-01): faces bundled from the Wayback snapshot of
+   solana.com/grizzlython (web.archive.org 2023-07-13 capture, im_ raw woff2 URLs)
+   into public/fonts/grizzly. Declared with LOCAL urls only, so the offline-first
+   PWA never fetches a CDN font. Archivo/JetBrains names stay in the fallback
+   tails of the stacks (ticket 10 seam); their subsets are no longer shipped. */
 @font-face {
-  font-family: "Archivo Black";
+  font-family: "Diatype";
   font-style: normal;
   font-weight: 400;
   font-display: block;
-  src: url("/fonts/archivo-black-latin.woff2") format("woff2");
-  unicode-range:
-    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
-    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212,
-    U+2215, U+FEFF, U+FFFD;
+  src: url("/fonts/grizzly/diatype-regular.woff2") format("woff2");
 }
-
 @font-face {
-  font-family: "JetBrains Mono";
+  font-family: "Diatype";
   font-style: normal;
-  /* variable axis: readouts use 400-800 weights from one subset file */
-  font-weight: 400 800;
+  font-weight: 500;
   font-display: block;
-  src: url("/fonts/jetbrains-mono-latin.woff2") format("woff2");
-  unicode-range:
-    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
-    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212,
-    U+2215, U+FEFF, U+FFFD;
+  src: url("/fonts/grizzly/diatype-medium.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Diatype";
+  font-style: normal;
+  font-weight: 700;
+  font-display: block;
+  src: url("/fonts/grizzly/diatype-bold.woff2") format("woff2");
+}
+@font-face {
+  font-family: "DSemi";
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+  src: url("/fonts/grizzly/dsemi-regular.woff2") format("woff2");
+}
+@font-face {
+  font-family: "DSemi";
+  font-style: normal;
+  font-weight: 500;
+  font-display: block;
+  src: url("/fonts/grizzly/dsemi-medium.woff2") format("woff2");
+}
+@font-face {
+  font-family: "DSemi";
+  font-style: normal;
+  font-weight: 700;
+  font-display: block;
+  src: url("/fonts/grizzly/dsemi-bold.woff2") format("woff2");
+}
+@font-face {
+  font-family: "BlenderPro";
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+  src: url("/fonts/grizzly/blenderpro-book.woff2") format("woff2");
+}
+@font-face {
+  font-family: "BlenderPro";
+  font-style: normal;
+  font-weight: 700;
+  font-display: block;
+  src: url("/fonts/grizzly/blenderpro-bold.woff2") format("woff2");
 }
 
 @tailwind base;
@@ -35,26 +69,35 @@
      the shadcn HSL CSS-variable architecture: token names unchanged, values
      retuned to the ticket 01 sheet (:root verbatim, hsl() components only). */
   :root {
-    --background: 232 12% 4%;
-    --foreground: 232 6% 96%;
-    --card: 232 10% 9%;
-    --card-foreground: 232 6% 96%;
-    --popover: 232 9% 13%;
-    --popover-foreground: 232 6% 96%;
-    --primary: 92 100% 58%;
-    --primary-foreground: 232 24% 6%;
-    --secondary: 232 9% 13%;
-    --secondary-foreground: 232 6% 72%;
-    --muted: 232 8% 18%;
-    --muted-foreground: 232 6% 56%;
-    --accent: 232 8% 18%;
-    --accent-foreground: 232 6% 72%;
-    --destructive: 358 78% 62%;
-    --destructive-foreground: 232 24% 6%;
-    --border: 232 12% 22%;
-    --input: 232 10% 16%;
-    --ring: 92 100% 58%;
-    --radius: 0.75rem;
+    /* Grizzlython identity (grz-01): lifted verbatim from the Wayback snapshot
+       of solana.com/grizzlython (2023-07-13). black #161515 · cream #eae7dd
+       · tan #979385 · peach #f1b994 · coral #ef474a · deep red #c12f2f. */
+    --color-grizzly-black: 0 2% 8%;
+    --color-grizzly-tan-1: 46 23% 89%;
+    --color-grizzly-tan-2: 47 8% 56%;
+    --color-grizzly-peach: 23 77% 76%;
+    --color-grizzly-red: 358 84% 61%;
+    --color-grizzly-deep-red: 358 61% 47%;
+    --background: 0 2% 8%;
+    --foreground: 46 23% 89%;
+    --card: 0 2% 12%;
+    --card-foreground: 46 23% 89%;
+    --popover: 0 2% 16%;
+    --popover-foreground: 46 23% 89%;
+    --primary: 358 84% 61%;
+    --primary-foreground: 46 23% 89%;
+    --secondary: 0 2% 16%;
+    --secondary-foreground: 47 8% 56%;
+    --muted: 0 2% 16%;
+    --muted-foreground: 47 8% 56%;
+    --accent: 358 84% 61%;
+    --accent-foreground: 46 23% 89%;
+    --destructive: 358 84% 61%;
+    --destructive-foreground: 46 23% 89%;
+    --border: 47 8% 44%;
+    --input: 0 2% 16%;
+    --ring: 358 84% 61%;
+    --radius: 0;
 
     /* Stem quartet (ticket 01 --stem-* tokens): the one identity set used
        consistently across stem chips, waveform canvases and stem strips. */
@@ -65,8 +108,10 @@
 
     /* Status hues (ticket 01 --ok/--warn tokens): the declared set behind every
        ok / caution surface, so no surface reads the default Tailwind palette. */
-    --status-ok: 140 72% 52%;
-    --status-warn: 48 95% 58%;
+    /* Grz status roles: ok reads peach (the snapshot highlight ink), warn
+       reads the deep-red footer hue so alerts never leave the identity. */
+    --status-ok: 23 77% 76%;
+    --status-warn: 358 61% 47%;
   }
 }
 
@@ -108,5 +153,42 @@
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--muted));
+  background: hsl(var(--color-grizzly-tan-2));
+}
+
+/* Grizzlython skin chrome (grz-02): primitives ported from the OpenDesign
+   grizzlython-skin artifact (Bold design-system plugin). Zero-radius chips come
+   from the token retune (--radius: 0) plus rounded-none utilities; the rules
+   below add the canvas grid, the fading hero band and the brand pulse. */
+.grizzly-grid {
+  background-image:
+    linear-gradient(
+      hsl(var(--color-grizzly-tan-2) / 0.06) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      90deg,
+      hsl(var(--color-grizzly-tan-2) / 0.06) 1px,
+      transparent 1px
+    );
+  background-size: 32px 32px;
+}
+
+.grizzly-hero-fade {
+  -webkit-mask-image: linear-gradient(to bottom, black 10%, transparent 100%);
+  mask-image: linear-gradient(to bottom, black 10%, transparent 100%);
+}
+
+.grizzly-pulse {
+  animation: grizzly-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes grizzly-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
 }

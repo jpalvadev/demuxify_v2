@@ -57,19 +57,19 @@ export const SourceMixCard: React.FC<SourceMixCardProps> = ({
   return (
     <div
       className={cn(
-        "rounded-2xl border border-border bg-card/90 p-5 shadow-sm backdrop-blur-sm transition-all sm:p-6",
+        "rounded-none border border-border bg-card/90 p-5 shadow-sm backdrop-blur-sm transition-all sm:p-6",
         className
       )}
     >
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         {/* File info */}
         <div className="flex items-start gap-3.5 min-w-0">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-none bg-primary/10 text-primary">
             <Music2 className="h-6 w-6" />
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <span className="inline-flex items-center rounded-full bg-muted/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-secondary-foreground">
+              <span className="inline-flex items-center rounded-none bg-muted/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-secondary-foreground">
                 Source Mix
               </span>
               <span className="text-xs text-muted-foreground">
@@ -92,7 +92,7 @@ export const SourceMixCard: React.FC<SourceMixCardProps> = ({
               type="button"
               onClick={onChangeFile}
               disabled={isProcessing}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-secondary/50 px-3 py-1.5 text-xs font-medium text-foreground hover:bg-secondary transition-colors disabled:opacity-50 disabled:pointer-events-none"
+              className="inline-flex items-center gap-1.5 rounded-none border border-border bg-secondary/50 px-3 py-1.5 text-xs font-medium text-foreground hover:bg-secondary transition-colors disabled:opacity-50 disabled:pointer-events-none"
             >
               <RefreshCw className="h-3.5 w-3.5" />
               <span>Change</span>
@@ -104,7 +104,7 @@ export const SourceMixCard: React.FC<SourceMixCardProps> = ({
               onClick={onRemove}
               disabled={isProcessing}
               aria-label="Remove Source Mix"
-              className="inline-flex items-center justify-center rounded-lg border border-border bg-secondary/50 p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30 transition-colors disabled:opacity-50 disabled:pointer-events-none"
+              className="inline-flex items-center justify-center rounded-none border border-border bg-secondary/50 p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30 transition-colors disabled:opacity-50 disabled:pointer-events-none"
             >
               <X className="h-4 w-4" />
             </button>
@@ -113,7 +113,7 @@ export const SourceMixCard: React.FC<SourceMixCardProps> = ({
       </div>
 
       {/* Metadata Badges Grid */}
-      <div className="mt-4 grid grid-cols-3 gap-2.5 rounded-xl bg-secondary/40 p-3 sm:gap-4 sm:p-4">
+      <div className="mt-4 grid grid-cols-3 gap-2.5 rounded-none bg-secondary/40 p-3 sm:gap-4 sm:p-4">
         <div className="flex items-center gap-2.5">
           <Clock className="h-4 w-4 text-secondary-foreground shrink-0" />
           <div>
@@ -158,7 +158,7 @@ export const SourceMixCard: React.FC<SourceMixCardProps> = ({
             type="button"
             onClick={onStartSeparation}
             disabled={isProcessing}
-            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-primary border border-primary px-6 py-2.5 text-sm font-bold text-primary-foreground shadow-md hover:brightness-90 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60 disabled:cursor-not-allowed"
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-none bg-primary border border-primary px-6 py-2.5 text-sm font-bold text-primary-foreground shadow-md hover:brightness-90 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60 disabled:cursor-not-allowed"
           >
             <Sparkles className="h-4 w-4 animate-pulse" />
             <span>

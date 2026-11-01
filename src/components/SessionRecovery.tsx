@@ -31,18 +31,18 @@ export const SessionRecovery: React.FC<SessionRecoveryProps> = ({
       aria-label="Previous Session Recovery"
       role="region"
       className={cn(
-        "rounded-2xl border border-border/60 bg-card/95 p-4 sm:p-5 shadow-sm backdrop-blur-sm transition-all",
+        "rounded-none border border-border/60 bg-card/95 p-4 sm:p-5 shadow-sm backdrop-blur-sm transition-all",
         className
       )}
     >
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-start gap-3.5">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-secondary text-secondary-foreground">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-none bg-secondary text-secondary-foreground">
             <History className="h-5 w-5" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-secondary-foreground">
+              <span className="inline-flex items-center gap-1 rounded-none bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-secondary-foreground">
                 <Music className="h-3 w-3" /> Auto-Saved Session
               </span>
             </div>
@@ -64,7 +64,7 @@ export const SessionRecovery: React.FC<SessionRecoveryProps> = ({
             aria-label="Discard Session"
             onClick={onDiscard}
             disabled={isResuming}
-            className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-border bg-secondary/60 px-3.5 py-2 text-xs font-semibold text-muted-foreground hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30 transition-all disabled:opacity-50 disabled:pointer-events-none"
+            className="inline-flex items-center justify-center gap-1.5 rounded-none border border-border bg-secondary/60 px-3.5 py-2 text-xs font-semibold text-muted-foreground hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30 transition-all disabled:opacity-50 disabled:pointer-events-none"
           >
             <Trash2 className="h-3.5 w-3.5" />
             <span>Discard</span>
@@ -75,7 +75,7 @@ export const SessionRecovery: React.FC<SessionRecoveryProps> = ({
             aria-label={isResuming ? "Restoring Session..." : "Resume Session"}
             onClick={onResume}
             disabled={isResuming}
-            className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 active:scale-95 transition-all disabled:opacity-70 disabled:pointer-events-none"
+            className="inline-flex items-center justify-center gap-1.5 rounded-none bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 active:scale-95 transition-all disabled:opacity-70 disabled:pointer-events-none"
           >
             {isResuming ? (
               <>

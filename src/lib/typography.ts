@@ -3,6 +3,9 @@
 // @font-face rules in src/index.css, so nothing here can reach a CDN font service; the
 // generic tails keep the Tailwind default sans as the fallback stack.
 export const DISPLAY_FONT_STACK =
-  '"Archivo Black", "Archivo", Impact, sans-serif';
+  // Grizzlython pairing (grz-01): BlenderPro display grotesque with Diatype
+  // behind it; Archivo Black stays in the fallback tail (ticket 10 seam).
+  '"BlenderPro", "Diatype", "Archivo Black", "Archivo", Impact, sans-serif';
 export const MONO_FONT_STACK =
-  '"JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace';
+  // DSemi is the snapshot's semi-mono readout face (Diatype Semi-Mono).
+  '"DSemi", "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace';

@@ -14,7 +14,7 @@ export const WebGPUStatusBadge: React.FC<WebGPUStatusBadgeProps> = ({
   if (isLoading || !capability) {
     return (
       <div
-        className="inline-flex items-center gap-2 px-3 py-1 text-xs font-medium rounded-full bg-muted text-muted-foreground border border-border"
+        className="inline-flex items-center gap-2 px-3 py-1 text-xs font-medium rounded-none bg-muted text-muted-foreground border border-border"
         title="Detecting graphics acceleration capabilities..."
       >
         <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -30,12 +30,12 @@ export const WebGPUStatusBadge: React.FC<WebGPUStatusBadgeProps> = ({
       "Hardware Acceleration";
     return (
       <div
-        className="inline-flex items-center gap-2 px-3 py-1 text-xs font-semibold rounded-full bg-status-ok/15 text-status-ok border border-status-ok/30"
+        className="inline-flex items-center gap-2 px-3 py-1 text-xs font-semibold rounded-none bg-status-ok/15 text-status-ok border border-status-ok/30"
         title={`WebGPU Active: ${deviceName}`}
       >
         <span className="relative flex h-2 w-2">
-          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-status-ok opacity-75"></span>
-          <span className="relative inline-flex rounded-full h-2 w-2 bg-status-ok"></span>
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-none bg-status-ok opacity-75"></span>
+          <span className="relative inline-flex rounded-none h-2 w-2 bg-status-ok"></span>
         </span>
         <Zap className="w-3.5 h-3.5 text-status-ok" />
         <span>WebGPU Active</span>
@@ -50,7 +50,7 @@ export const WebGPUStatusBadge: React.FC<WebGPUStatusBadgeProps> = ({
 
   return (
     <div
-      className="inline-flex items-center gap-2 px-3 py-1 text-xs font-semibold rounded-full bg-status-warn/15 text-status-warn border border-status-warn/30"
+      className="inline-flex items-center gap-2 px-3 py-1 text-xs font-semibold rounded-none bg-status-warn/15 text-status-warn border border-status-warn/30"
       title={capability.errorReason || "Running in CPU/WASM fallback mode"}
     >
       <AlertTriangle className="w-3.5 h-3.5 text-status-warn" />
