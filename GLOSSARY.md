@@ -61,8 +61,12 @@ The full overview visual representation of the audio mix used for primary timeli
 _Avoid_: Timeline bar, progress bar, audio visualizer
 
 **Tab Shell**:
-The persistent application frame that organizes the tools into fixed, mutually exclusive tabs, replacing the single-column card flow and all modal overlays.
+The persistent application frame that hosts the Brand Unit and organizes the tools into fixed, mutually exclusive tabs, replacing the single-column card flow and all modal overlays.
 _Avoid_: Workspace, menu, dashboard, card stack
+
+**Brand Unit**:
+The identity lockup (icon mark, wordmark, status dot, mono tagline) carried inside the Tab Shell chrome — at the head of the rail on desktop and in the top band on mobile — never as a separate page header.
+_Avoid_: Header, top bar, sidebar, masthead, logo row
 
 **Tab**:
 One of the four persistent, mutually exclusive tool surfaces inside the Tab Shell — Separate, Mix, Export, or System — always visible and never opened as a modal; Mix and Export are unavailable (grayscaled) until Stems exist.

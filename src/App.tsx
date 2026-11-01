@@ -7,6 +7,7 @@ import React, {
 } from "react";
 import { AlertCircle, Loader2, CheckCircle2, Music } from "lucide-react";
 import { Header } from "./components/Header";
+import { BrandUnit } from "./components/BrandUnit";
 import { SourceMixDropzone } from "./components/SourceMixDropzone";
 import { FallbackAdvisory } from "./components/FallbackAdvisory";
 import { SourceMixCard } from "./components/SourceMixCard";
@@ -550,7 +551,13 @@ export const App: React.FC = () => {
 
   return (
     <div className="grizzly-grid min-h-screen bg-background text-foreground flex flex-col font-sans transition-colors duration-200">
-      <Header />
+      {/* Rail-hosted chrome (ADR-0009, ticket 01): at md and up there is no page-level
+          header — the page opens straight into the Tab Shell and the Brand Unit lives at
+          the head of the Tab Rail. Below md the header strip keeps rendering unchanged
+          until ticket 02 merges it into the mobile sticky block. */}
+      <div data-testid="mobile-header-block" className="md:hidden">
+        <Header />
+      </div>
 
       {/* Full-bleed shell (artifact `.app`: no max-width; rail + stage fill the
           viewport; at md+ the rail is a fixed column beside the fluid stage). */}
@@ -560,6 +567,10 @@ export const App: React.FC = () => {
           aria-label="Tab rail"
           className="grid grid-cols-4 gap-1 items-stretch py-2.5 pb-4 overflow-hidden w-full bg-card/50 sm:grid-cols-[112px_112px_112px_112px] md:grid-cols-[112px_112px_112px_112px] md:w-[250px] lg:w-[280px] md:flex md:flex-col md:no-wrap md:justify-start md:items-start md:gap-2.5 md:border-r md:border-grz-600/40"
         >
+          {/* Brand Unit at the rail head (ticket 01): icon box + DEMUXIFY wordmark +
+              status dot, mono tagline on its own line beneath; flush on canvas, no
+              bordered card — the rail chips keep the rail's only borders. */}
+          <BrandUnit />
           {TAB_REGISTRY.map((tab) => {
             const gated = tab.gatedUntilStems && !stemsReady;
             const active = activeTab === tab.id;

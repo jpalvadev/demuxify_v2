@@ -36,7 +36,7 @@ describe("App UI Shell", () => {
     });
   });
 
-  it("renders application branding and header", async () => {
+  it("renders the Brand Unit at the Tab Rail head with no page-level header at md and up", async () => {
     vi.spyOn(webgpuModule, "detectWebGPUCapability").mockResolvedValue({
       supported: true,
       isFallback: false,
@@ -45,12 +45,30 @@ describe("App UI Shell", () => {
 
     render(<App />);
 
-    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
-      /demuxify/i
-    );
+    // The Brand Unit lives inside the Tab Rail, not in a page-level header
+    const rail = screen.getByRole("navigation", { name: /tab rail/i });
+    const brand = within(rail).getByTestId("brand-unit");
+    expect(brand).toBeInTheDocument();
+
+    // The single top-level heading is the rail wordmark (until ticket 02 drops
+    // the mobile-scoped header, the header's own h1 is mobile chrome).
+    const heading = within(brand).getByRole("heading", { level: 1 });
+    expect(heading).toHaveTextContent(/demuxify/i);
+
+    // Lockup parts: icon-mark box, 8px pulsing status dot, mono tagline line
     expect(
-      screen.getByText(/client-side stem separation/i)
+      within(brand).getByTestId("brand-unit-status-dot")
     ).toBeInTheDocument();
+    expect(
+      within(brand).getByText(/client-side stem separation/i)
+    ).toBeInTheDocument();
+
+    // Responsive lockup split asserted by class tokens (the DOM seam cannot
+    // evaluate media queries — grz-18 precedent): the rail-hosted lockup paints
+    // at md and up, and the page-level header is mobile-scoped out at md+.
+    expect(brand.getAttribute("class") ?? "").toContain("md:flex");
+    const headerWrap = screen.getByTestId("mobile-header-block");
+    expect(headerWrap.getAttribute("class") ?? "").toContain("md:hidden");
 
     await waitFor(() => {
       expect(screen.getByText(/webgpu active/i)).toBeInTheDocument();
@@ -1539,8 +1557,11 @@ describe("App UI Shell", () => {
 
     const mixTab = screen.getByRole("region", { name: /mix tab/i });
 
-    // Display face: branding h1 + Tab banners (the bundled Archivo Black subset)
-    const branding = screen.getByRole("heading", { level: 1 });
+    // Display face: branding h1 (the rail Brand Unit) + Tab banners (the bundled
+    // Archivo Black subset)
+    const railNav = screen.getByRole("navigation", { name: /tab rail/i });
+    const brandUnit = within(railNav).getByTestId("brand-unit");
+    const branding = within(brandUnit).getByRole("heading", { level: 1 });
     const mixBanner = within(mixTab).getByRole("heading", {
       level: 3,
       name: /multi-track stem player/i,
