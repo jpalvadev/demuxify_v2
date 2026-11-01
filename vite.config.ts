@@ -47,7 +47,8 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ["**/*.{js,css,html,ico,png,svg,wasm}"],
+        // woff2: the bundled Bold faces (public/fonts/ subsets) are precached offline
+        globPatterns: ["**/*.{js,css,html,ico,png,svg,wasm,woff,woff2}"],
         maximumFileSizeToCacheInBytes: 35 * 1024 * 1024,
       },
     }),

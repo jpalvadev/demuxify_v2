@@ -24,6 +24,7 @@ import { MasterWaveform } from "./MasterWaveform";
 import { ExportDialog } from "./ExportDialog";
 import { WaveformPeaks } from "../lib/waveformPeaks";
 import { cn } from "../lib/utils";
+import { DISPLAY_FONT_STACK, MONO_FONT_STACK } from "../lib/typography";
 
 // Tab Shell (ADR-0007): live mixer + time-stretch state bridge so the Export Tab
 // panel can be mounted at the app level instead of inside the player. When
@@ -415,7 +416,10 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
             <Layers className="h-5 w-5" />
           </div>
           <div>
-            <h3 className="text-lg font-bold tracking-tight text-foreground">
+            <h3
+              className="font-display text-lg font-bold tracking-tight text-foreground"
+              style={{ fontFamily: DISPLAY_FONT_STACK }}
+            >
               Multi-Track Stem Player
             </h3>
             <p className="text-xs text-muted-foreground">
@@ -427,7 +431,11 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
         {/* Global Transport Bar */}
         <div className="flex flex-wrap items-center justify-between md:justify-end gap-3 sm:gap-4">
           {/* Time Display: strong mono readout (Bold port of the .tread row) */}
-          <div className="flex items-center gap-1 font-mono text-lg font-extrabold tracking-tight bg-secondary/60 px-3 py-1.5 rounded-xl border border-border/60">
+          <div
+            data-testid="stem-player-time"
+            className="flex items-center gap-1 font-mono text-lg font-extrabold tracking-tight bg-secondary/60 px-3 py-1.5 rounded-xl border border-border/60"
+            style={{ fontFamily: MONO_FONT_STACK }}
+          >
             <span className="text-primary font-bold">
               {formatTime(currentTime)}
             </span>

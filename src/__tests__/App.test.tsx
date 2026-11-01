@@ -1215,6 +1215,44 @@ describe("App UI Shell", () => {
     });
   });
 
+  it("paints the bundled Bold faces on banners, branding and time readouts", async () => {
+    completeSeparationMocks();
+
+    render(<App />);
+    await loadAndSeparate();
+
+    const listenTab = screen.getByRole("region", { name: /listen tab/i });
+
+    // Display face: branding h1 + Tab banners (the bundled Archivo Black subset)
+    const branding = screen.getByRole("heading", { level: 1 });
+    const listenBanner = within(listenTab).getByRole("heading", {
+      level: 3,
+      name: /^listen$/i,
+    });
+    expect(window.getComputedStyle(branding).fontFamily).toMatch(
+      /Archivo Black/
+    );
+    expect(window.getComputedStyle(listenBanner).fontFamily).toMatch(
+      /Archivo Black/
+    );
+    expect(window.getComputedStyle(branding).fontFamily).toMatch(
+      /sans-serif\s*$/
+    );
+
+    // Mono face: Transport readouts + Stem Player time display (JetBrains Mono subset)
+    const transportReadout = screen.getByTestId("transport-readout");
+    const stemPlayerTime = screen.getByTestId("stem-player-time");
+    expect(window.getComputedStyle(transportReadout).fontFamily).toMatch(
+      /JetBrains Mono/
+    );
+    expect(window.getComputedStyle(stemPlayerTime).fontFamily).toMatch(
+      /JetBrains Mono/
+    );
+    expect(window.getComputedStyle(transportReadout).fontFamily).toMatch(
+      /monospace\s*$/
+    );
+  });
+
   it("shares the Master Waveform spine across Listen and Mix at the identical playhead", async () => {
     completeSeparationMocks();
 

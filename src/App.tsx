@@ -56,6 +56,14 @@ import {
   SessionMixerState,
 } from "./lib/sessionStore";
 import { StemMixerStates } from "./lib/stemPlayerEngine";
+import { DISPLAY_FONT_STACK, MONO_FONT_STACK } from "./lib/typography";
+
+// Bold pairing (ticket 10): the bundled display face paints the focal Tab banners and
+// branding, the bundled mono face paints Transport readouts. These focal nodes carry the
+// stack inline (in addition to the `font-display`/`font-mono` utilities elsewhere) so the
+// css-asserted app-shell seam can read the applied face through getComputedStyle.
+const BANNER_FONT = { fontFamily: DISPLAY_FONT_STACK };
+const READOUT_FONT = { fontFamily: MONO_FONT_STACK };
 
 const SUPPORTED_EXTENSIONS = [".mp3", ".wav", ".flac", ".ogg", ".aac", ".m4a"];
 const SUPPORTED_MIME_TYPES = [
@@ -570,7 +578,10 @@ export const App: React.FC = () => {
           >
             <section className="space-y-4">
               <div className="space-y-1">
-                <h2 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+                <h2
+                  className="font-display text-2xl font-bold tracking-tight text-foreground sm:text-3xl"
+                  style={BANNER_FONT}
+                >
                   Separate Music Into Stems
                 </h2>
                 <p className="text-sm text-muted-foreground sm:text-base">
@@ -632,7 +643,7 @@ export const App: React.FC = () => {
               {isDecoding && (
                 <div className="flex flex-col items-center justify-center rounded-2xl border border-border bg-card/60 p-12 text-center shadow-sm">
                   <Loader2 className="h-8 w-8 animate-spin text-primary mb-3" />
-                  <h3 className="text-base font-semibold text-foreground">
+                  <h3 className="font-display text-base font-semibold text-foreground">
                     Decoding Audio Buffer
                   </h3>
                   <p className="text-xs text-muted-foreground mt-1">
@@ -691,7 +702,7 @@ export const App: React.FC = () => {
                     >
                       <div className="flex items-center gap-2.5 text-emerald-600 dark:text-emerald-400">
                         <CheckCircle2 className="h-5 w-5 shrink-0" />
-                        <h3 className="text-base font-semibold">
+                        <h3 className="font-display text-base font-semibold">
                           Separation Complete: 4 Discrete Stems Generated
                         </h3>
                       </div>
@@ -730,7 +741,10 @@ export const App: React.FC = () => {
             className={tabPanelClass(!stemsReady, activeTab === "listen")}
           >
             <div className="flex items-center justify-between gap-2">
-              <h3 className="text-base font-semibold tracking-tight text-foreground sm:text-lg">
+              <h3
+                className="font-display text-base font-semibold tracking-tight text-foreground sm:text-lg"
+                style={BANNER_FONT}
+              >
                 Listen
               </h3>
               <p className="text-sm text-muted-foreground">
@@ -795,7 +809,11 @@ export const App: React.FC = () => {
                     </span>
                   </button>
                 </div>
-                <p className="font-mono font-extrabold tracking-tight text-lg text-foreground">
+                <p
+                  data-testid="transport-readout"
+                  className="font-mono font-extrabold tracking-tight text-lg text-foreground"
+                  style={READOUT_FONT}
+                >
                   <span>{formatTransportTime(currentTime)}</span>
                   <span className="text-muted-foreground"> / </span>
                   <span>
@@ -850,7 +868,7 @@ export const App: React.FC = () => {
               </>
             ) : (
               <div className="flex items-center justify-between gap-2">
-                <h3 className="text-base font-semibold tracking-tight text-foreground sm:text-lg">
+                <h3 className="font-display text-base font-semibold tracking-tight text-foreground sm:text-lg">
                   Mix
                 </h3>
                 <p className="text-sm text-muted-foreground">
@@ -871,7 +889,7 @@ export const App: React.FC = () => {
             decodedSourceMix ? (
               <>
                 <div className="flex items-center justify-between gap-2">
-                  <h3 className="text-base font-semibold tracking-tight text-foreground sm:text-lg">
+                  <h3 className="font-display text-base font-semibold tracking-tight text-foreground sm:text-lg">
                     Export
                   </h3>
                   <p className="text-sm text-muted-foreground">
@@ -893,7 +911,7 @@ export const App: React.FC = () => {
               </>
             ) : (
               <div className="flex items-center justify-between gap-2">
-                <h3 className="text-base font-semibold tracking-tight text-foreground sm:text-lg">
+                <h3 className="font-display text-base font-semibold tracking-tight text-foreground sm:text-lg">
                   Export
                 </h3>
                 <p className="text-sm text-muted-foreground">
@@ -910,7 +928,7 @@ export const App: React.FC = () => {
             className={tabPanelClass(false, activeTab === "system")}
           >
             <div className="flex items-center justify-between gap-2">
-              <h3 className="text-base font-semibold tracking-tight text-foreground sm:text-lg">
+              <h3 className="font-display text-base font-semibold tracking-tight text-foreground sm:text-lg">
                 System
               </h3>
               <p className="text-sm text-muted-foreground">
