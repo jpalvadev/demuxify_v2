@@ -616,15 +616,6 @@ export const App: React.FC = () => {
                   then the subtitle as cream body copy (13/leading-20 mobile, 15/leading-23 desktop,
                   660px measure). Vertical rhythm per the sheet: 40 · 1 · 16 · 26 · 12 · 13 · 14 ·
                   46 · 20 desktop, 44 · 1 · 14 · 18 · 6 · 11 · 10 · 60 · 14 mobile. */}
-              <div
-                aria-hidden="true"
-                className="grizzly-hero-strip h-11 sm:h-10 flex items-center justify-between gap-6 px-3.5 sm:px-4"
-              >
-                <span className="hidden sm:flex font-mono text-[9px] font-medium uppercase tracking-[0.14em] whitespace-nowrap text-background">
-                  In-browser · nothing uploaded
-                </span>
-                <span className="hidden sm:block w-1.5 h-3 bg-background" />
-              </div>
               <div className="border-t-[1px] border-dashed sm:border-solid border-muted-foreground/60 px-3.5 sm:px-4 pt-3.5 sm:pt-4 pb-4.5 sm:pb-5">
                 <h2
                   className="font-display text-[15px] leading-[18px] font-bold uppercase tracking-[0.07em] text-foreground sm:text-[22px] sm:leading-[26px] sm:tracking-[0.06em]"
@@ -979,13 +970,10 @@ export const App: React.FC = () => {
         </div>
       </main>
 
-      <footer
-        className="w-full block border-t-2 border-status-warn py-3 text-center text-[10px] text-muted-foreground"
-        style={{
-          backgroundImage:
-            "linear-gradient(to bottom, hsl(var(--color-grizzly-deep-red) / 0.12), hsl(var(--color-grizzly-deep-red) / 0))",
-        }}
-      >
+      {/* Footer (ADR-0009): the red gradient slab and the 2px warn rule died
+          with the hero band; the page ends flat on one tan hairline — the
+          same token as the rail chip dividers and the System band border. */}
+      <footer className="w-full block border-t border-grz-600/40 py-3 text-center text-[10px] text-muted-foreground">
         <p>
           <span className="block">
             Demuxify Web • 100% Client-Side Audio Source Separation

@@ -1679,4 +1679,36 @@ describe("App UI Shell", () => {
 
     toastModule.toastManager.clear();
   });
+
+  it("opens the Separate Tab on its title zone and ends the page on a flat tan-hairline footer", async () => {
+    vi.spyOn(webgpuModule, "detectWebGPUCapability").mockResolvedValue({
+      supported: true,
+      isFallback: false,
+    });
+
+    render(<App />);
+
+    // Hero-band death (ADR-0009): no coral strip and no state copy above the
+    // Separate Tab title zone at any viewport (class token + copy check).
+    const separateTab = screen.getByRole("region", { name: /separate tab/i });
+    expect(separateTab.querySelectorAll(".grizzly-hero-strip")).toHaveLength(0);
+    expect(
+      screen.queryByText(/in-browser · nothing uploaded/i)
+    ).not.toBeInTheDocument();
+
+    // Flat footer (ADR-0009): one tan hairline using the rail-chip token, no
+    // 2px warn rule, no gradient slab; the two centered micro lines stay.
+    const footer = document.querySelectorAll("footer")[0];
+    const footerClasses = (footer.getAttribute("class") ?? "").split(" ");
+    expect(footerClasses).toContain("border-t");
+    expect(footerClasses).toContain("border-grz-600/40");
+    expect(footerClasses.some((c) => c.startsWith("border-t-2"))).toBe(false);
+    expect(footerClasses.some((c) => c.includes("border-status-warn"))).toBe(
+      false
+    );
+    expect(footer.getAttribute("style") ?? "").not.toContain("gradient");
+    expect(
+      screen.getByText(/powered by client neural inference/i)
+    ).toBeInTheDocument();
+  });
 });

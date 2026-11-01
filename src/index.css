@@ -187,26 +187,6 @@
   background-size: 32px 32px;
 }
 
-/* Hero rule (grz-03, OpenDesign run 7): mobile portrait gets the slim coral→0
-   strip (capped at 44px) that fades into the canvas behind the dashed tan seam;
-   at sm+ the same element is a FLAT SOLID coral rule — the sheet keeps the fade
-   only in the mobile strip ("40 · SOLID coral, flat matte · no fade"). Declared
-   outside the utility layer so the responsive swap lives here, not in a
-   `sm:bg-primary` utility that this rule would otherwise override. */
-.grizzly-hero-strip {
-  background: linear-gradient(
-    180deg,
-    hsl(var(--primary)) 0%,
-    hsl(var(--primary) / 0) 100%
-  );
-}
-
-@media (min-width: 640px) {
-  .grizzly-hero-strip {
-    background: hsl(var(--primary));
-  }
-}
-
 .grizzly-pulse {
   animation: grizzly-pulse 2.4s ease-in-out infinite;
 }
