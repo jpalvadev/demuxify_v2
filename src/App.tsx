@@ -560,11 +560,11 @@ export const App: React.FC = () => {
 
       {/* Full-bleed shell (artifact `.app`: no max-width; rail + stage fill the
           viewport; at md+ the rail is a fixed column beside the fluid stage). */}
-      <main className="flex-1 w-full px-4 sm:px-6 flex flex-col gap-4 md:flex-row md:gap-5">
+      <main className="flex-1 w-full px-2 sm:px-6 flex flex-col gap-4 md:flex-row md:gap-5">
         {/* Tab rail: horizontal top strip on mobile portrait, vertical left rail at md+ */}
         <nav
           aria-label="Tab rail"
-          className="grid grid-cols-[112px_112px_112px] sm:grid-cols-[112px_112px_112px_112px_112px] gap-2 items-center overflow-hidden w-full bg-card/50 pb-4 md:w-[250px] lg:w-[280px] md:flex md:flex-col md:no-wrap md:justify-start md:items-start md:gap-2.5 md:border-r md:border-border/60"
+          className="grid grid-cols-5 gap-1 items-stretch py-2.5 pb-4 overflow-hidden w-full bg-card/50 sm:grid-cols-[112px_112px_112px_112px_112px] md:grid-cols-[112px_112px_112px] md:w-[250px] lg:w-[280px] md:flex md:flex-col md:no-wrap md:justify-start md:items-start md:gap-2.5 md:border-r md:border-border/60"
         >
           {TAB_REGISTRY.map((tab) => {
             const gated = tab.gatedUntilStems && !stemsReady;
@@ -576,11 +576,11 @@ export const App: React.FC = () => {
                 aria-label={tab.title}
                 aria-current={active ? "true" : undefined}
                 onClick={() => handleSelectTab(tab.id)}
-                className={`flex flex-col items-center justify-center gap-1 rounded-none px-1 py-2 min-h-[44px] min-w-[44px] text-[10px] font-bold uppercase tracking-[0.2em] text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:w-full md:px-3 md:py-2.5 md:text-sm md:flex-row md:justify-start md:items-center md:gap-3 ${gated ? "opacity-50 text-muted-foreground" : ""} ${active ? "bg-primary text-primary-foreground border-primary" : ""}`.trim()}
+                className={`flex flex-col items-center justify-center gap-1 rounded-none px-[3px] py-2 min-h-[44px] min-w-[44px] text-[7px] sm:text-[9px] md:text-sm font-bold uppercase tracking-[0.2em] text-muted-foreground border border-muted/60 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:w-full md:px-3 md:py-2.5 md:text-sm md:flex-row md:justify-start md:items-center md:gap-3 ${gated ? "opacity-50 text-muted-foreground" : ""} ${active ? "bg-primary text-primary-foreground border-primary" : ""}`.trim()}
               >
                 <span className="whitespace-nowrap">{tab.title}</span>
                 {gated && (
-                  <span className="font-mono text-[9px] font-medium tracking-wide text-muted-foreground">
+                  <span className="font-mono text-[6px] sm:text-[9px] font-medium tracking-wide text-muted-foreground">
                     {TAB_GATING_REASON}
                   </span>
                 )}
@@ -608,7 +608,7 @@ export const App: React.FC = () => {
                   downward behind the stage top — the snapshot's hero moment. */}
               <div
                 aria-hidden="true"
-                className="absolute left-0 right-0 top-0 h-14 bg-primary/70 border-b-1 border-dashed border-muted-foreground/50 pointer-events-none grizzly-hero-fade"
+                className="absolute left-0 right-0 top-0 h-11 bg-primary/70 border-b-1 border-dashed border-muted-foreground/50 pointer-events-none grizzly-hero-fade"
               />
               <div className="space-y-1">
                 <h2
@@ -991,15 +991,19 @@ export const App: React.FC = () => {
       </main>
 
       <footer
-        className="border-t border-border/60 py-6 text-center text-xs text-muted-foreground"
+        className="w-full block border-t-2 border-status-warn py-3 text-center text-[10px] text-muted-foreground"
         style={{
           backgroundImage:
-            "linear-gradient(to top, hsl(var(--color-grizzly-deep-red) / 0.5), hsl(var(--color-grizzly-deep-red) / 0.18) 55%, transparent)",
+            "linear-gradient(to bottom, hsl(var(--color-grizzly-deep-red) / 0.12), hsl(var(--color-grizzly-deep-red) / 0))",
         }}
       >
         <p>
-          Demuxify Web • 100% Client-Side Audio Source Separation • Powered by
-          Client Neural Inference &amp; WebGPU
+          <span className="block">
+            Demuxify Web • 100% Client-Side Audio Source Separation
+          </span>
+          <span className="block">
+            Powered by Client Neural Inference &amp; WebGPU
+          </span>
         </p>
       </footer>
     </div>

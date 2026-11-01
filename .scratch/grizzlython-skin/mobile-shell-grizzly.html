@@ -1,0 +1,353 @@
+<!doctype html>
+<html lang="en" data-od-id="mobile-shell-grizzly">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>DEMUXIFY — GRIZZLYTHON MOBILE SHELL</title>
+    <style>
+      /* Grizzlython mobile shell chrome (390×844, fluid 320–430). Palette + font
+   stacks bound verbatim from grizzlython-skin.html. Chrome only; stage
+   content is placeholder. --radius 0 everywhere. */
+      :root {
+        --black: #161515;
+        --cream: #eae7dd;
+        --tan-2: #979385;
+        --tan-faded: rgba(151, 147, 133, 0.5);
+        --peach: #f1b994;
+        --red: #ef474a;
+        --red-ghost: rgba(239, 71, 74, 0.05);
+        --deep: #c12f2f;
+        --deep-12: rgba(193, 47, 47, 0.12);
+        --deep-0: rgba(193, 47, 47, 0);
+        --red-0: rgba(239, 71, 74, 0);
+        --grid: rgba(151, 147, 133, 0.06);
+        --display: "Arial Black", "Helvetica Neue", Arial, sans-serif;
+        --body: "Helvetica Neue", Helvetica, Arial, sans-serif;
+        --mono: "Courier New", Courier, ui-monospace, monospace;
+      }
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        border-radius: 0;
+      }
+      button {
+        border: 0;
+        background: none;
+        font-family: var(--body);
+        font-size: inherit;
+        font-weight: inherit;
+        letter-spacing: inherit;
+        text-transform: none;
+        cursor: pointer;
+        padding: 0;
+        text-align: left;
+      }
+      p,
+      h1,
+      h2 {
+        margin: 0;
+      }
+      html,
+      body {
+        margin: 0;
+        background: var(--black);
+        color: var(--cream);
+      }
+      body {
+        font-family: var(--body);
+        background-image:
+          linear-gradient(var(--grid) 1px, transparent 1px),
+          linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+        background-size: 32px 32px;
+        background-attachment: fixed;
+        min-height: 100dvh;
+      }
+      ::selection {
+        background: var(--red);
+        color: var(--cream);
+      }
+      /* shell: fluid phone column · 390 reference · works 320–430 */
+      .shell {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        width: min(100%, 430px);
+        margin: 0 auto;
+        min-height: min(844px, 100dvh);
+      }
+      /* header bar · exactly 56px */
+      .hd {
+        flex: 0;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        height: 56px;
+        padding: 0 14px;
+        border-bottom: 1px solid var(--tan-faded);
+      }
+      .hd-mark {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .hd-logo {
+        width: 24px;
+        height: 14px;
+      }
+      .hd-word {
+        font-family: var(--display);
+        font-size: 17px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--cream);
+        line-height: 1;
+      }
+      .hd-dot {
+        width: 9px;
+        height: 9px;
+        background: var(--red);
+      }
+      /* rail: one row of 5 chips · 64px strip (< 12% of viewport height) */
+      .rail {
+        flex: 0;
+        display: grid;
+        grid-template-columns: repeat(5, minmax(44px, 1fr));
+        gap: 4px;
+        align-items: stretch;
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--tan-faded);
+      }
+      .tab {
+        display: grid;
+        justify-items: center;
+        align-content: center;
+        gap: 3px;
+        min-height: 44px;
+        padding: 8px 3px;
+        border: 1px solid var(--tan-2);
+        font-family: var(--body);
+        font-weight: 700;
+        font-size: clamp(7.2px, calc(2.9vw - 2px), 10px);
+        line-height: 1.35;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: var(--tan-2);
+        cursor: pointer;
+        transition:
+          background 0.12s linear,
+          color 0.12s linear;
+      }
+      .tab-lbl {
+        display: block;
+      }
+      .tab--gated {
+        border: 1px solid var(--tan-faded);
+      }
+      .tab-why {
+        font-family: var(--mono);
+        font-size: clamp(5.4px, calc(1.7vw - 1.3px), 6.5px);
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--tan-2);
+      }
+      .tab--act {
+        background: var(--red);
+        border: 1px solid var(--red);
+        color: var(--cream);
+      }
+      .tab:hover {
+        background: var(--red-ghost);
+        color: var(--cream);
+      }
+      .tab--act:hover {
+        background: var(--deep);
+      }
+      .tab:focus-visible {
+        outline: 2px solid var(--peach);
+        outline-offset: 2px;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .tab {
+          transition: none;
+        }
+      }
+      /* stage: hero band (≤44px, fades down, dashed bottom edge) + hairline card */
+      .stage {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        padding: 16px 14px 12px;
+      }
+      .card {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        border: 1px solid var(--tan-2);
+        padding: 0 12px 14px;
+        min-height: 150px;
+      }
+      .card::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 0;
+        height: 44px;
+        background: linear-gradient(to bottom, var(--red), var(--red-0));
+        border-bottom: 1px dashed var(--tan-2);
+        z-index: -1;
+        pointer-events: none;
+      }
+      .card-title {
+        font-family: var(--display);
+        font-size: 15px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--cream);
+        line-height: 1;
+        margin: 16px 0 0;
+      }
+      .card-meta {
+        font-family: var(--mono);
+        font-size: 9px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--tan-2);
+      }
+      .card-note {
+        font-size: 10px;
+        line-height: 1.6;
+        color: var(--tan-2);
+      }
+      .chip-red {
+        align-self: flex-start;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-family: var(--display);
+        font-size: 11px;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        line-height: 1;
+        color: var(--cream);
+        background: var(--red);
+        padding: 12px 18px;
+        cursor: pointer;
+        transition: background 0.12s linear;
+      }
+      .chip-red:hover {
+        background: var(--deep);
+      }
+      .chip-red:focus-visible {
+        outline: 2px solid var(--peach);
+        outline-offset: 2px;
+      }
+      /* footer: FLAT + tiny · 2px deep-red hairline, ≤12% fade, two short lines */
+      .ft {
+        flex: 0;
+        position: relative;
+        display: grid;
+        justify-items: center;
+        border-top: 2px solid var(--deep);
+        padding: 13px 16px 15px;
+      }
+      .ft::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        z-index: -1;
+        pointer-events: none;
+        background: linear-gradient(to bottom, var(--deep-12), var(--deep-0));
+      }
+      .ft-txt {
+        display: grid;
+        justify-items: center;
+        font-family: var(--body);
+        font-weight: 700;
+        font-size: 10px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--tan-2);
+        line-height: 1.7;
+      }
+      .ft-txt span {
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shell" data-od-id="shell-mobile-portrait">
+      <!-- TAILWIND header: flex items-center justify-between h-[56px] px-3.5 border-b hairline-faded -->
+      <header class="hd" data-od-id="shell-hd">
+        <div class="hd-mark">
+          <svg
+            class="hd-logo"
+            data-od-id="shell-logo-wave"
+            viewBox="0 0 24 14"
+            fill="none"
+          >
+            <polyline
+              points="0.8,7 4,3.4 8,10.6 12,2.6 16,11.2 20.4,7"
+              stroke="#ef474a"
+              stroke-width="1.6"
+              stroke-linecap="square"
+            />
+          </svg>
+          <span class="hd-word">Demuxify</span>
+        </div>
+        <i class="hd-dot" aria-hidden="true"></i>
+      </header>
+
+      <!-- TAILWIND rail row: grid grid-cols-5 gap-1 items-stretch py-2.5 px-3 -->
+      <!-- TAILWIND chip: grid place-content-center min-h-[44px] px-[3px] text-[10px] font-bold uppercase tracking-[0.2em] border -->
+      <nav class="rail" data-od-id="shell-rail" aria-label="Tab shell rail">
+        <button class="tab tab--act" data-od-id="tab-separate" type="button">
+          <span class="tab-lbl">Separate</span>
+        </button>
+        <button class="tab tab--gated" data-od-id="tab-listen" type="button">
+          <span class="tab-lbl">Listen</span
+          ><span class="tab-why">No stems yet</span>
+        </button>
+        <button class="tab tab--gated" data-od-id="tab-mix" type="button">
+          <span class="tab-lbl">Mix</span
+          ><span class="tab-why">No stems yet</span>
+        </button>
+        <button class="tab tab--gated" data-od-id="tab-export" type="button">
+          <span class="tab-lbl">Export</span
+          ><span class="tab-why">No stems yet</span>
+        </button>
+        <button class="tab" data-od-id="tab-system" type="button">
+          <span class="tab-lbl">System</span>
+        </button>
+      </nav>
+      <main class="stage" data-od-id="shell-stage">
+        <div class="card" data-od-id="stage-card">
+          <h2 class="card-title" data-od-id="stage-title">Separate</h2>
+          <p class="card-meta" data-od-id="stage-meta">
+            03:41 · 44.1 khz · ht-demucs balanced · idle
+          </p>
+          <p class="card-note" data-od-id="stage-note">
+            placeholder · waveform strip, stem rows and the red separate chip
+            port here
+          </p>
+          <button
+            class="chip-red"
+            data-od-id="stage-separate-cta"
+            type="button"
+          >
+            Separate
+          </button>
+        </div>
+      </main>
+      <!-- TAILWIND footer: border-t-2 border-status-warn py-3 text-center text-[10px] -->
+      <footer class="ft" data-od-id="shell-ft">
+        <p class="ft-txt" data-od-id="ft-credits">
+          <span>Demuxify v2 · grizzlython skin</span
+          ><span>HT-Demucs / ONNX · 13 jul 2023</span>
+        </p>
+      </footer>
+    </div>
+  </body>
+</html>
