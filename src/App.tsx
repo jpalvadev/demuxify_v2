@@ -6,7 +6,6 @@ import React, {
   createElement,
 } from "react";
 import { AlertCircle, Loader2, CheckCircle2, Music } from "lucide-react";
-import { Header } from "./components/Header";
 import { BrandUnit } from "./components/BrandUnit";
 import { SourceMixDropzone } from "./components/SourceMixDropzone";
 import { FallbackAdvisory } from "./components/FallbackAdvisory";
@@ -57,7 +56,7 @@ import {
   SessionMixerState,
 } from "./lib/sessionStore";
 import { StemMixerStates } from "./lib/stemPlayerEngine";
-import { DISPLAY_FONT_STACK } from "./lib/typography";
+import { DISPLAY_FONT_STACK, MONO_FONT_STACK } from "./lib/typography";
 
 // Bold pairing (ticket 10): the bundled display face paints the focal Tab banners and
 // branding; the bundled mono face is painted inline by the Transport readouts inside the
@@ -551,25 +550,26 @@ export const App: React.FC = () => {
 
   return (
     <div className="grizzly-grid min-h-screen bg-background text-foreground flex flex-col font-sans transition-colors duration-200">
-      {/* Rail-hosted chrome (ADR-0009, ticket 01): at md and up there is no page-level
-          header — the page opens straight into the Tab Shell and the Brand Unit lives at
-          the head of the Tab Rail. Below md the header strip keeps rendering unchanged
-          until ticket 02 merges it into the mobile sticky block. */}
-      <div data-testid="mobile-header-block" className="md:hidden">
-        <Header />
-      </div>
+      {/* Rail-hosted chrome (ADR-0009, ticket 02): the page-level header is dead at
+          every breakpoint — identity and navigation now live in the single sticky Tab
+          Rail block below, a brand row over the four-chip Tab row. */}
 
       {/* Full-bleed shell (artifact `.app`: no max-width; rail + stage fill the
           viewport; at md+ the rail is a fixed column beside the fluid stage). */}
       <main className="flex-1 w-full px-2 sm:px-6 flex flex-col gap-4 md:flex-row md:gap-5">
-        {/* Tab rail: horizontal top strip on mobile portrait, vertical left rail at md+ */}
+        {/* Tab rail: ONE sticky top block at every breakpoint (ADR-0009 ticket 02).
+            Mobile portrait: brand row (col-span-4) over the four-chip Tab row inside
+            this same block; at md+ it becomes the fixed vertical rail column beside
+            the stage. Sticky + z-30 replaces the dead page-level header's pinning;
+            mobile paints the header's old chrome backdrop so scrolling stage content
+            never ghosts through the pinned block. */}
         <nav
           aria-label="Tab rail"
-          className="grid grid-cols-4 gap-1 items-stretch py-2.5 pb-4 overflow-hidden w-full bg-card/50 sm:grid-cols-[112px_112px_112px_112px] md:grid-cols-[112px_112px_112px_112px] md:w-[250px] lg:w-[280px] md:flex md:flex-col md:no-wrap md:justify-start md:items-start md:gap-2.5 md:border-r md:border-grz-600/40"
+          className="sticky top-0 z-30 grid grid-cols-4 gap-1 items-stretch py-2.5 pb-4 overflow-hidden w-full backdrop-blur-md bg-background/95 md:bg-card/50 sm:grid-cols-[112px_112px_112px_112px] md:grid-cols-[112px_112px_112px_112px] md:w-[250px] lg:w-[280px] md:flex md:flex-col md:no-wrap md:justify-start md:items-start md:gap-2.5 md:border-r md:border-grz-600/40"
         >
-          {/* Brand Unit at the rail head (ticket 01): icon box + DEMUXIFY wordmark +
-              status dot, mono tagline on its own line beneath; flush on canvas, no
-              bordered card — the rail chips keep the rail's only borders. */}
+          {/* Brand Unit at the rail head: same lockup everywhere; on mobile the col-span-4
+              puts it on its own row above the four chips; the mono tagline line is rail-hosted
+              only (hidden md:block — the mobile lockup stays reduced at ~108px total). */}
           <BrandUnit />
           {TAB_REGISTRY.map((tab) => {
             const gated = tab.gatedUntilStems && !stemsReady;
@@ -954,6 +954,15 @@ export const App: React.FC = () => {
               </div>
             )}
             <div className="pt-1 space-y-3">
+              {/* Identity statement on mobile (ADR-0009 story 12): the pinned mobile block
+                  carries the reduced lockup without the tagline, so the System Tab carries
+                  the mono identity line instead. */}
+              <p
+                className="font-mono text-xs font-medium tracking-wide text-muted-foreground"
+                style={{ fontFamily: MONO_FONT_STACK }}
+              >
+                Client-Side Stem Separation
+              </p>
               <WebGPUStatusBadge
                 capability={capability}
                 isLoading={isDetectingWebGPU}

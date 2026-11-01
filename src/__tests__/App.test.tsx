@@ -36,7 +36,7 @@ describe("App UI Shell", () => {
     });
   });
 
-  it("renders the Brand Unit at the Tab Rail head with no page-level header at md and up", async () => {
+  it("hosts the Brand Unit in the one sticky Tab Rail block with no page-level header at any breakpoint", async () => {
     vi.spyOn(webgpuModule, "detectWebGPUCapability").mockResolvedValue({
       supported: true,
       isFallback: false,
@@ -45,30 +45,48 @@ describe("App UI Shell", () => {
 
     render(<App />);
 
-    // The Brand Unit lives inside the Tab Rail, not in a page-level header
+    // One shell chrome region: the Tab Rail is the only navigation, the page-level
+    // <header> is gone for good (ticket 02), and the rail itself carries the pinning.
     const rail = screen.getByRole("navigation", { name: /tab rail/i });
+    expect(screen.getAllByRole("navigation")).toHaveLength(1);
+    expect(screen.queryByRole("header")).toBeNull();
+
+    // Sticky merged block asserted by class tokens (the DOM seam cannot evaluate
+    // media queries — grz-18 precedent): the rail is one sticky top block at every
+    // breakpoint, brand row over the four-chip Tab row.
+    const railClasses = rail.getAttribute("class") ?? "";
+    for (const token of ["sticky", "top-0", "z-30"]) {
+      expect(railClasses).toContain(token);
+    }
+
+    // The Brand Unit lives inside the Tab Rail, not in a page-level header
     const brand = within(rail).getByTestId("brand-unit");
     expect(brand).toBeInTheDocument();
 
-    // The single top-level heading is the rail wordmark (until ticket 02 drops
-    // the mobile-scoped header, the header's own h1 is mobile chrome).
+    // The lockup paints at every breakpoint (no display-gating tokens) and its
+    // col-span-4 row is what merges brand row over chip row on the mobile grid.
+    const brandClasses = brand.getAttribute("class") ?? "";
+    expect(brandClasses).not.toMatch(/(^|\s)hidden(\s|$|:)/);
+    expect(brandClasses).toContain("col-span-4");
+
+    // The single top-level heading is the rail wordmark
     const heading = within(brand).getByRole("heading", { level: 1 });
     expect(heading).toHaveTextContent(/demuxify/i);
 
-    // Lockup parts: icon-mark box, 8px pulsing status dot, mono tagline line
+    // Lockup parts: 8px pulsing status dot; the mono tagline line is rail-hosted
+    // only — desktop paints it (`hidden md:block`), the mobile lockup is reduced.
     expect(
       within(brand).getByTestId("brand-unit-status-dot")
     ).toBeInTheDocument();
-    expect(
-      within(brand).getByText(/client-side stem separation/i)
-    ).toBeInTheDocument();
+    const tagline = within(brand).getByText(/client-side stem separation/i);
+    expect(tagline.getAttribute("class") ?? "").toContain("md:block");
 
-    // Responsive lockup split asserted by class tokens (the DOM seam cannot
-    // evaluate media queries — grz-18 precedent): the rail-hosted lockup paints
-    // at md and up, and the page-level header is mobile-scoped out at md+.
-    expect(brand.getAttribute("class") ?? "").toContain("md:flex");
-    const headerWrap = screen.getByTestId("mobile-header-block");
-    expect(headerWrap.getAttribute("class") ?? "").toContain("md:hidden");
+    // The pinned mobile block drops the tagline, so the System Tab carries the
+    // identity statement instead (ADR-0009 story 12).
+    const systemPanel = screen.getByRole("region", { name: /^System Tab$/ });
+    expect(
+      within(systemPanel).getByText(/client-side stem separation/i)
+    ).toBeInTheDocument();
 
     await waitFor(() => {
       expect(screen.getByText(/webgpu active/i)).toBeInTheDocument();

@@ -20,7 +20,7 @@ export const BrandUnit: React.FC = () => {
   return (
     <div
       data-testid="brand-unit"
-      className="hidden md:flex flex-col items-start gap-0 shrink-0 md:mb-2"
+      className="flex flex-col items-start gap-0 shrink-0 col-span-4 md:mb-2"
     >
       <div className="flex items-center gap-3">
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-none bg-muted border border-border text-primary">
