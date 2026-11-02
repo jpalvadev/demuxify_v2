@@ -549,10 +549,7 @@ export class StemPlayerEngine {
     this.downbeatPhase = normalized;
     this.regenerateClickBuffer();
     if (this.playing) {
-      this.restartClickSource(
-        this.audioContext.currentTime,
-        this.currentOffset
-      );
+      this.reanchorClickOnLivePlayhead();
     }
   }
 
@@ -570,10 +567,7 @@ export class StemPlayerEngine {
     this.beatGrid = beatGridSec;
     this.regenerateClickBuffer();
     if (this.playing) {
-      this.restartClickSource(
-        this.audioContext.currentTime,
-        this.currentOffset
-      );
+      this.reanchorClickOnLivePlayhead();
     }
   }
 
@@ -584,10 +578,10 @@ export class StemPlayerEngine {
     if (enabled) {
       this.regenerateClickBuffer();
       if (this.playing) {
-        this.restartClickSource(
-          this.audioContext.currentTime,
-          this.currentOffset
-        );
+        // Anchor at the live playhead: mid-playback toggling must resume where
+        // the Stems actually are, not at the last play/seek position (the
+        // stale currentOffset only tracks starts, like setTempo's re-lock does).
+        this.reanchorClickOnLivePlayhead();
       }
     } else {
       this.stopClickSource();
@@ -625,10 +619,7 @@ export class StemPlayerEngine {
     );
     this.regenerateClickBuffer();
     if (this.playing) {
-      this.restartClickSource(
-        this.audioContext.currentTime,
-        this.currentOffset
-      );
+      this.reanchorClickOnLivePlayhead();
     }
   }
 
@@ -671,6 +662,16 @@ export class StemPlayerEngine {
     );
     buffer.getChannelData(0).set(samples);
     this.clickBuffer = buffer;
+  }
+
+  // Shared re-anchor for every mid-playback Click Track lane edit (enable,
+  // Meter, Downbeat hunt, Beat Grid re-lock): the lane relays from the live
+  // playhead, never the stale currentOffset, so it can't shift off the Stems.
+  private reanchorClickOnLivePlayhead(): void {
+    this.restartClickSource(
+      this.audioContext.currentTime,
+      this.getCurrentTime()
+    );
   }
 
   private restartClickSource(startTime: number, offset: number): void {

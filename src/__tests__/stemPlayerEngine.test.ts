@@ -898,6 +898,84 @@ describe("StemPlayerEngine", () => {
       expect(engine.getActiveSources()).toHaveLength(4);
     });
 
+    it("re-enabling the Click Track mid-playback resumes at the live playhead, not at the last play/seek position", async () => {
+      const engine = new StemPlayerEngine(dummyStems, {
+        audioContext: mockCtx as any,
+        sampleRate,
+        beatGrid: beatGridSec,
+      });
+      engine.setClickTrackEnabled(true);
+      await engine.play();
+      // play() anchors the lane at (10.0, 0): 0s into the song at t=10.
+      expect(mockCtx.createdSources).toHaveLength(5);
+      expect(mockCtx.createdSources[4].start).toHaveBeenCalledWith(10, 0);
+
+      // Four seconds in, the user flips the rail off and back on.
+      mockCtx.currentTime = 14;
+      engine.toggleClickTrack();
+      mockCtx.currentTime = 16;
+      engine.toggleClickTrack();
+      // The resumed lane must anchor at the live playhead (6s at t=16),
+      // never where play() started, or the clicks shift off the drums.
+      const resumed = mockCtx.createdSources[5];
+      expect(resumed.start).toHaveBeenCalledWith(16, 6);
+      expect(engine.getActiveSources()).toHaveLength(5);
+    });
+
+    it("changing the Meter mid-playback recreates the lane on the live playhead, not at the play position", async () => {
+      const engine = new StemPlayerEngine(dummyStems, {
+        audioContext: mockCtx as any,
+        sampleRate,
+        beatGrid: beatGridSec,
+      });
+      engine.setClickTrackEnabled(true);
+      await engine.play();
+      expect(mockCtx.createdSources[4].start).toHaveBeenCalledWith(10, 0);
+
+      mockCtx.currentTime = 14;
+      engine.setClickTrackMeter("3/4");
+      // Regenerated channel on the new Meter must ride the same timeline:
+      // anchored at the live playhead (4s at t=14).
+      expect(mockCtx.createdSources).toHaveLength(6);
+      expect(mockCtx.createdSources[5].start).toHaveBeenCalledWith(14, 4);
+    });
+
+    it("the rail's −/+ downbeat hunt mid-playback keeps clicks on the live playhead", async () => {
+      const engine = new StemPlayerEngine(dummyStems, {
+        audioContext: mockCtx as any,
+        sampleRate,
+        beatGrid: beatGridSec,
+      });
+      engine.setClickTrackEnabled(true);
+      await engine.play();
+      expect(mockCtx.createdSources[4].start).toHaveBeenCalledWith(10, 0);
+
+      mockCtx.currentTime = 14;
+      engine.rotateClickTrackDownbeat(1);
+      // Accent-only change, yet the regenerated lane must stay on the
+      // timeline it was heard on: anchored at the live playhead.
+      expect(mockCtx.createdSources).toHaveLength(6);
+      expect(mockCtx.createdSources[5].start).toHaveBeenCalledWith(14, 4);
+      expect(engine.getClickTrackDownbeatPhase()).toBe(1);
+    });
+
+    it("re-locking the Beat Grid mid-playback relays the lane from the live playhead", async () => {
+      const engine = new StemPlayerEngine(dummyStems, {
+        audioContext: mockCtx as any,
+        sampleRate,
+        beatGrid: beatGridSec,
+      });
+      engine.setClickTrackEnabled(true);
+      await engine.play();
+      expect(mockCtx.createdSources[4].start).toHaveBeenCalledWith(10, 0);
+
+      mockCtx.currentTime = 14;
+      // The user picks another BPM candidate: same grid, new relay anchor.
+      engine.setBeatGrid(beatGridSec);
+      expect(mockCtx.createdSources).toHaveLength(6);
+      expect(mockCtx.createdSources[5].start).toHaveBeenCalledWith(14, 4);
+    });
+
     it("mutes and volumes the lane exactly like a Stem lane", () => {
       const engine = new StemPlayerEngine(dummyStems, {
         audioContext: mockCtx as any,
