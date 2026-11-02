@@ -1022,6 +1022,36 @@ describe("StemPlayerEngine", () => {
       );
     });
 
+    it("moves the accent along the Beat Grid with the Downbeat Phase: same clicks, deeper tone elsewhere", () => {
+      const fourFour: ClickTrackMeter = "4/4";
+      const onGrid = synthesizeClickTrackChannel(
+        beatGridSec,
+        fourFour,
+        sampleRate,
+        3
+      );
+      const shifted = synthesizeClickTrackChannel(
+        beatGridSec,
+        fourFour,
+        sampleRate,
+        3,
+        2
+      );
+
+      // Phase re-accents, it does not re-place: same onsets either way.
+      expect(clickOnsets(shifted, sampleRate)).toEqual(
+        clickOnsets(onGrid, sampleRate)
+      );
+
+      // Beat 2 is where the deeper tone now falls; beat 0 no longer carries it.
+      expect(peakNear(shifted, beatGridSec[2], sampleRate)).toBeGreaterThan(
+        peakNear(onGrid, beatGridSec[2], sampleRate)
+      );
+      expect(peakNear(onGrid, beatGridSec[0], sampleRate)).toBeGreaterThan(
+        peakNear(shifted, beatGridSec[0], sampleRate)
+      );
+    });
+
     it("swapping the Beat Grid re-synthesizes the lane the moment it arrives: no stale clicks, mixer and playhead untouched", async () => {
       const engine = new StemPlayerEngine(dummyStems, {
         audioContext: mockCtx as any,
@@ -1078,6 +1108,56 @@ describe("StemPlayerEngine", () => {
         meter: "4/4",
       });
       expect(engine.getCurrentTime()).toBe(0);
+
+      // The swap left the Downbeat Phase where it was: phase belongs to the
+      // grid pairing, and the re-lock that re-pairs it is the rail's pick, not
+      // this lane plumbing.
+      expect(engine.getClickTrackDownbeatPhase()).toBe(0);
+    });
+
+    it("re-reads the Downbeat Phase through the lane: rotation wraps, nothing else moves", async () => {
+      const engine = new StemPlayerEngine(dummyStems, {
+        audioContext: mockCtx as any,
+        sampleRate,
+        beatGrid: beatGridSec,
+        downbeatPhase: 2,
+        initialClickTrack: {
+          enabled: true,
+          muted: false,
+          volume: 0.5,
+          meter: "4/4",
+        },
+      });
+      await engine.play();
+      expect(engine.getClickTrackDownbeatPhase()).toBe(2);
+
+      // The automatic reading reached the heard lane: beat 2 carries the
+      // deeper tone, beat 0 does not.
+      const heard = mockCtx.createdSources[4].buffer.getChannelData(0);
+      expect(peakNear(heard, beatGridSec[2], sampleRate)).toBeGreaterThan(
+        peakNear(heard, beatGridSec[0], sampleRate)
+      );
+
+      // The rail's −/+ pair lands here: one beat per press, wrapping the
+      // grouping at the Meter's size.
+      engine.rotateClickTrackDownbeat(1);
+      expect(engine.getClickTrackDownbeatPhase()).toBe(3);
+      engine.rotateClickTrackDownbeat(1);
+      expect(engine.getClickTrackDownbeatPhase()).toBe(0);
+
+      // Out-of-range requests fold back into the grouping, wrap included.
+      engine.setClickTrackDownbeatPhase(6);
+      expect(engine.getClickTrackDownbeatPhase()).toBe(2);
+
+      // Re-reading is accent-only: the lane's mixer state never moved, and
+      // each re-read re-synthesizes in place (one channel per press).
+      expect(engine.getClickTrackState()).toEqual({
+        enabled: true,
+        muted: false,
+        volume: 0.5,
+        meter: "4/4",
+      });
+      expect(mockCtx.createBuffer).toHaveBeenCalledTimes(9);
     });
   });
 });

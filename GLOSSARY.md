@@ -91,3 +91,11 @@ _Avoid_: Time signature, feel, beat grouping
 **Click Track**:
 A synthesized metronome accompaniment locked to the Beat Grid, played alongside the Stems with its own mute and volume controls; it accompanies the Stems but is not one, and never one of the four Stems identities.
 _Avoid_: Metronome, fifth stem, drum loop, time track
+
+**Downbeat**:
+The accented first beat of a bar — where the Meter's grouping starts — sounded by the Click Track's deeper tone. Which beat of a Source Mix is the Downbeat is a listening decision, not a property of the beat positions, so it is suggested automatically and user-correctable.
+_Avoid_: Head of the bar, beat one, strong beat, accent beat
+
+**Downbeat Phase**:
+The one user-adjustable value per Beat Grid stating which beat position is the Downbeat; set by an automatic reading and rotatable one beat at a time, and re-read whenever the Beat Grid is re-locked to a different candidate tempo.
+_Avoid_: Phase offset, rotation, anacrusis, count-in

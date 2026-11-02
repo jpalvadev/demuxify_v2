@@ -56,6 +56,9 @@ class StubTempoWorker {
       ),
       analyzedBpm: bpm,
       duration: 2,
+      // ADR-0011: the widened complete message also carries the automatic
+      // Downbeat Phase; typecheck still polices that field's presence here.
+      downbeatPhase: 0,
     };
     tempoWorkerQueue.push(() => {
       this.onmessage?.({ data: complete } as MessageEvent);

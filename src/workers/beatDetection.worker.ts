@@ -4,6 +4,7 @@
 // and a Beat Grid of beat positions in seconds. The Click Track is NOT a Stem:
 // nothing here touches the StemName identities.
 import { combTempo, beatTrack } from "@audio/beat";
+import { pickDownbeatPhase } from "../lib/beatGridRepair";
 
 export interface TempoCandidate {
   bpm: number;
@@ -37,6 +38,11 @@ export type WorkerOutMessage =
       beatGrid: Float64Array;
       analyzedBpm: number;
       duration: number;
+      // ADR-0011 Downbeat Phase: which beat index of the Meter's grouping the
+      // automatic reading takes as the Downbeat, 0..beatsPerBar−1 for the
+      // lane's default "4/4" grouping. A suggestion, never presented as
+      // proven — the rail's −/+ pair is what makes it user-correctable.
+      downbeatPhase: number;
     }
   | { type: "cancelled" }
   | { type: "error"; error: string };
@@ -48,6 +54,12 @@ export type WorkerOutMessage =
 const MIN_BPM = 45;
 const MAX_BPM = 240;
 const CANDIDATE_COUNT = 4;
+
+// The lane's default grouping ("4/4", the Meter the Stem Player rail starts
+// on): the Beat Grid's Downbeat Phase is scored against that many beats per
+// bar, and a later Meter change wraps the phase rather than re-scoring
+// (ADR-0011).
+const DEFAULT_CLICK_TRACK_BEATS_PER_BAR = 4;
 
 let isCancelled = false;
 
@@ -126,7 +138,9 @@ async function handleStart(
     } satisfies WorkerOutMessage);
 
     // Phase-aligned Beat Grid: hint the top candidate (or the user-selected
-    // tempo on a re-lock) so clicks land where beats actually fall.
+    // tempo on a re-lock) so clicks land where beats actually fall. The
+    // tracker's own phase alignment is not the Downbeat reading: the Downbeat
+    // Phase below is scored separately over the analyzed channel (ADR-0011).
     const targetBpm = hintBpm && hintBpm > 0 ? hintBpm : topBpm;
     const trackResult = beatTrack(samples, { fs, bpm: targetBpm });
     if (isCancelled) {
@@ -134,12 +148,20 @@ async function handleStart(
       return;
     }
 
+    const downbeatPhase = pickDownbeatPhase(
+      trackResult.beats,
+      samples,
+      fs,
+      DEFAULT_CLICK_TRACK_BEATS_PER_BAR
+    );
+
     postMsg({
       type: "complete",
       candidates,
       beatGrid: trackResult.beats,
       analyzedBpm: trackResult.bpm,
       duration: samples.length / fs,
+      downbeatPhase,
     } satisfies WorkerOutMessage);
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : String(err);

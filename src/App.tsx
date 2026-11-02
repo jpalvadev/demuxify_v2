@@ -184,6 +184,10 @@ export const App: React.FC = () => {
   // Live Click Track rail state (ADR-0010): fed out of the Stem Player so the
   // Session snapshot can persist it (ticket 05). Never part of the Stem mixer.
   const clickTrackStateRef = useRef<ClickTrackMixerState | null>(null);
+  // Live Downbeat Phase (ADR-0011): sibling of the rail state above, never
+  // folded into ClickTrackMixerState — it pairs the Beat Grid with a
+  // grouping, and the rail's −/+ pair owns it once the user nudges it.
+  const downbeatPhaseRef = useRef<number | null>(null);
   const cachedSessionRef = useRef<DemuxifySession | null>(null);
   const autoSaverRef = useRef(createSessionAutoSaver(600));
 
@@ -294,6 +298,9 @@ export const App: React.FC = () => {
     const updatedSession: DemuxifySession = {
       ...session,
       tempo: result,
+      // ADR-0011: the reading travels with the re-locked tempo as a Session
+      // sibling, so the auto-saver writes the pairing the engine now runs.
+      downbeatPhase: result.downbeatPhase,
     };
     cachedSessionRef.current = updatedSession;
     autoSaverRef.current.debounceSave(updatedSession);
@@ -413,8 +420,18 @@ export const App: React.FC = () => {
       // Tempo Detector result, so the Separate-tab readout resumes
       // identical. Sessions without one re-run the detector on the
       // restored Source Mix instead.
-      setTempoAnalysis(session.tempo ?? null);
-      tempoResultRef.current = session.tempo ?? null;
+      // ADR-0011: the Session's own persisted pairing wins; only a Session
+      // written before the phase shipped falls back to 0, the pre-ADR-0011
+      // grouping the synthesis already used. Nothing re-guesses it silently.
+      const resumedTempo: TempoAnalysisResult | null = session.tempo
+        ? {
+            ...session.tempo,
+            downbeatPhase: session.downbeatPhase ?? 0,
+          }
+        : null;
+      setTempoAnalysis(resumedTempo);
+      tempoResultRef.current = resumedTempo;
+      downbeatPhaseRef.current = session.downbeatPhase ?? 0;
       if (!session.tempo) {
         startTempoAnalysis(buffer);
       }
@@ -470,6 +487,12 @@ export const App: React.FC = () => {
     if (!cachedSessionRef.current) return;
     const updatedSession: DemuxifySession = {
       ...cachedSessionRef.current,
+      // Mirror the live Downbeat Phase (ADR-0011): the rail's −/+ nudges
+      // travel with the Session exactly like the lane settings beside them,
+      // never inside them, and a Session written before the phase shipped
+      // keeps no phantom value here.
+      downbeatPhase:
+        downbeatPhaseRef.current ?? cachedSessionRef.current.downbeatPhase,
       // Mirror the live Click Track rail (ADR-0010 ticket 05): the lane is
       // domain-separate from the Stem mixer contract below.
       clickTrack:

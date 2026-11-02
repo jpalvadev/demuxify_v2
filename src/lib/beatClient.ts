@@ -21,6 +21,11 @@ export interface TempoAnalysisResult {
   // picked on a re-lock, otherwise the top-ranked reading. Persisted with the
   // Session so Session Recovery resumes clicks at the chosen feel.
   chosenTempoBpm?: number;
+  // ADR-0011 Downbeat Phase: the automatic reading the worker scored against
+  // this Beat Grid, 0..beatsPerBar−1. Re-locking re-runs the reading against
+  // the new grid (a nudge tuned against an old one is meaningless), and it is
+  // never presented as proven — the rail's −/+ pair is the user's override.
+  downbeatPhase: number;
 }
 
 export class BeatClient {
@@ -77,6 +82,10 @@ export class BeatClient {
               // The user's pick (re-lock hint) is the tempo the Beat Grid is
               // locked to; with no hint, the top-ranked reading is.
               chosenTempoBpm: this.currentHintBpm ?? data.analyzedBpm,
+              // The automatic Downbeat reading rides the same completion
+              // (ADR-0011): scored against this very grid, off the main
+              // thread, and passed through untouched for the rail to rotate.
+              downbeatPhase: data.downbeatPhase,
             });
             this.cleanupAnalysis();
           }
