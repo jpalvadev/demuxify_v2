@@ -1042,6 +1042,11 @@ export const App: React.FC = () => {
                     activeTimeStretch={exportDialogState?.timeStretch}
                     clickTrackBeatGrid={tempoAnalysis?.beatGrid}
                     clickTrackSettings={clickTrackStateRef.current ?? undefined}
+                    clickTrackDownbeatPhase={
+                      downbeatPhaseRef.current ??
+                      tempoAnalysis?.downbeatPhase ??
+                      0
+                    }
                   />
                 </div>
               </>

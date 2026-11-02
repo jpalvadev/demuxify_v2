@@ -13,7 +13,7 @@ import { InferenceClient } from "../lib/inferenceClient";
 import * as toastModule from "../lib/toast";
 import * as bundleZip from "../lib/bundleZip";
 import { WorkerOutMessage } from "../workers/beatDetection.worker";
-import { decodeWavOnsets } from "./wavOnsetsHelper";
+import { decodeWavOnsets, decodeWavOnsetPeakLevels } from "./wavOnsetsHelper";
 
 // --- Tempo Detector Worker stub (ticket 06) ---------------------------------
 // The app only ever reaches the heavy BPM pass through the Web Worker seam, so
@@ -2216,6 +2216,198 @@ describe("App UI Shell", () => {
           screen.getByTestId("click-track-downbeat-label")
         ).toHaveTextContent("Beat 3 of 4 · auto");
       });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("the Export Bundle's Click Track file obeys the rail's Downbeat Phase: a nudge before exporting deepens the nudged beat in the bundler's bytes, positions untouched", async () => {
+    vi.stubGlobal("Worker", StubTempoWorker);
+    try {
+      await separateAndDetectTempo();
+
+      // Lane on, rail nudged once: the live pairing is Beat 2 of 4 (phase 1).
+      fireEvent.click(screen.getByRole("switch", { name: /^click track$/i }));
+      fireEvent.click(screen.getByTestId("click-track-phase-plus"));
+      await waitFor(() => {
+        expect(
+          screen.getByTestId("click-track-downbeat-label")
+        ).toHaveTextContent(/^Beat 2 of 4$/);
+      });
+      await clickTabButton("Export");
+
+      const bundleSpy = vi.spyOn(bundleZip, "createStemBundleZip");
+      const exportPanel = await waitFor(() =>
+        within(screen.getByRole("region", { name: /export tab/i })).getByRole(
+          "region",
+          { name: /export audio stems/i }
+        )
+      );
+      fireEvent.click(
+        within(exportPanel).getByRole("radio", {
+          name: /full export bundle/i,
+        })
+      );
+      fireEvent.click(
+        within(exportPanel).getByRole("button", { name: /export & download/i })
+      );
+      await waitFor(() => {
+        expect(bundleSpy).toHaveBeenCalledTimes(1);
+      });
+
+      const options = bundleSpy.mock.calls[0][1] as Record<string, unknown>;
+      expect(options.clickTrack).toBeInstanceOf(Uint8Array);
+      const onsets = decodeWavOnsets(options.clickTrack as Uint8Array, 44100);
+      const levels = decodeWavOnsetPeakLevels(
+        options.clickTrack as Uint8Array,
+        44100
+      );
+
+      // Positions are the reading's own grid, untouched by the nudge...
+      const interval = 60 / 107.7;
+      const beatCount = Math.round(2 / interval);
+      expect(onsets).toHaveLength(beatCount);
+      for (let k = 0; k < beatCount; k++) {
+        expect(Math.abs(onsets[k] - k * interval)).toBeLessThan(3 / 44100);
+      }
+
+      // ...and the deeper tone is exactly the nudged beat: phase 1 of 4 puts
+      // it on index 1, louder than every other click on the file.
+      expect(levels).toHaveLength(beatCount);
+      const deepPeak = levels[1];
+      const maxShallow = Math.max(
+        ...levels.filter((_, k) => (((k - 1) % 4) + 4) % 4 !== 0)
+      );
+      expect(deepPeak).toBeGreaterThan(maxShallow * 1.2);
+
+      bundleSpy.mockRestore();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("an un-nudged export carries the automatic pick's phase, not an index-0 default: the re-locked file deepens beat 3, and one + press rotates that deep tone while every click stays put", async () => {
+    vi.stubGlobal("Worker", StubTempoWorker);
+    try {
+      await separateAndDetectTempo();
+      fireEvent.click(screen.getByRole("switch", { name: /^click track$/i }));
+
+      // Re-lock to the metric doubling: the hinted pass re-reads its own
+      // automatic phase (the stub marks hinted passes with phase 2) — Beat 3
+      // of 4, auto. No press ever touched the rail.
+      fireEvent.click(
+        screen.getByRole("button", {
+          name: /^re-lock beat grid to 215\.4 bpm$/i,
+        })
+      );
+      fireQueuedTempoCompletions();
+      await waitFor(() => {
+        expect(
+          screen.getByTestId("click-track-downbeat-label")
+        ).toHaveTextContent("Beat 3 of 4 · auto");
+      });
+      await clickTabButton("Export");
+
+      const bundleSpy = vi.spyOn(bundleZip, "createStemBundleZip");
+      const exportPanel = () =>
+        within(screen.getByRole("region", { name: /export tab/i })).getByRole(
+          "region",
+          { name: /export audio stems/i }
+        );
+      const exportFullBundle = async () => {
+        await waitFor(() => {
+          expect(
+            within(exportPanel()).getByRole("button", {
+              name: /export & download/i,
+            })
+          ).toBeEnabled();
+        });
+        fireEvent.click(
+          within(exportPanel()).getByRole("radio", {
+            name: /full export bundle/i,
+          })
+        );
+        fireEvent.click(
+          within(exportPanel()).getByRole("button", {
+            name: /export & download/i,
+          })
+        );
+      };
+      await exportFullBundle();
+      await waitFor(() => {
+        expect(bundleSpy).toHaveBeenCalledTimes(1);
+      });
+
+      const first = bundleSpy.mock.calls[0][1] as Record<string, unknown>;
+      const firstOnsets = decodeWavOnsets(
+        first.clickTrack as Uint8Array,
+        44100
+      );
+      const firstLevels = decodeWavOnsetPeakLevels(
+        first.clickTrack as Uint8Array,
+        44100
+      );
+      const interval = 60 / 215.4;
+      const beatCount = Math.round(2 / interval);
+      expect(firstOnsets).toHaveLength(beatCount);
+      for (let k = 0; k < beatCount; k++) {
+        expect(Math.abs(firstOnsets[k] - k * interval)).toBeLessThan(3 / 44100);
+      }
+      // The file deepens the AUTO phase (2), never an index-0 default: with
+      // 7 clicks on a 4-per-bar grouping, indices 2 and 6 carry the louder
+      // taps, and both sit above the level of every other click.
+      const loudOf = (phase: number, levels: number[]): number[] =>
+        levels
+          .map((peak, k) => ((((k - phase) % 4) + 4) % 4 === 0 ? peak : -1))
+          .filter((peak) => peak >= 0);
+      const quietMax = (phase: number, levels: number[]): number =>
+        Math.max(...levels.filter((_, k) => (((k - phase) % 4) + 4) % 4 !== 0));
+      const deepLevels = loudOf(2, firstLevels);
+      expect(deepLevels.length).toBeGreaterThan(0);
+      expect(Math.min(...deepLevels)).toBeGreaterThan(quietMax(2, firstLevels));
+      // Phase 0 (the pre-ADR-0011 default) would have deepened index 0 —
+      // honestly excluded: the auto pick is what the bytes carry.
+      expect(firstLevels[0]).toBeLessThan(firstLevels[2]);
+
+      // One + press against the SAME grid: only the deep tone moves. Export
+      // again and diff the file: identical click positions, rotated level.
+      await clickTabButton("mix");
+      fireEvent.click(screen.getByTestId("click-track-phase-plus"));
+      await waitFor(() => {
+        expect(
+          screen.getByTestId("click-track-downbeat-label")
+        ).toHaveTextContent(/^Beat 4 of 4$/);
+      });
+      await clickTabButton("Export");
+      await exportFullBundle();
+      await waitFor(() => {
+        expect(bundleSpy).toHaveBeenCalledTimes(2);
+      });
+
+      const second = bundleSpy.mock.calls[1][1] as Record<string, unknown>;
+      const secondOnsets = decodeWavOnsets(
+        second.clickTrack as Uint8Array,
+        44100
+      );
+      const secondLevels = decodeWavOnsetPeakLevels(
+        second.clickTrack as Uint8Array,
+        44100
+      );
+      expect(secondOnsets).toHaveLength(beatCount);
+      for (let k = 0; k < beatCount; k++) {
+        expect(Math.abs(secondOnsets[k] - firstOnsets[k])).toBeLessThan(
+          3 / 3000
+        );
+      }
+      const deepAgain = loudOf(3, secondLevels);
+      expect(deepAgain.length).toBeGreaterThan(0);
+      expect(Math.min(...deepAgain)).toBeGreaterThan(quietMax(3, secondLevels));
+      // The rotation really moved: beat 2 deepened in the first file but is
+      // an ordinary click in the second, and beat 3 flipped the other way.
+      expect(secondLevels[2]).toBeLessThan(firstLevels[2]);
+      expect(secondLevels[3]).toBeGreaterThan(firstLevels[3]);
+
+      bundleSpy.mockRestore();
     } finally {
       vi.unstubAllGlobals();
     }

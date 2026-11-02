@@ -61,6 +61,10 @@ export interface ExportDialogProps {
   // never see it.
   clickTrackBeatGrid?: Float64Array;
   clickTrackSettings?: ClickTrackMixerState;
+  // ADR-0011 Downbeat Phase (ticket 06): the App forwards its live rail/playback
+  // phase so the bundle's Click Track file deepens the same beat the rail
+  // points at — the phase lives beside the settings, never inside them.
+  clickTrackDownbeatPhase?: number;
 }
 
 export type ExportMode = "single" | "bundle" | "mixdown";
@@ -166,6 +170,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
   activeFormantPreservation: propFormant,
   clickTrackBeatGrid,
   clickTrackSettings,
+  clickTrackDownbeatPhase,
 }) => {
   const activeTempo = activeTimeStretch?.tempo ?? propTempo;
   const activePitch = activeTimeStretch?.pitch ?? propPitch;
@@ -453,7 +458,8 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
               clickGrid,
               clickTrackSettings.meter,
               sampleRate,
-              clickDurationSec
+              clickDurationSec,
+              clickTrackDownbeatPhase ?? 0
             ),
           ];
           clickTrackBytes =
@@ -565,6 +571,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
     activeFormantPreservation,
     clickTrackBeatGrid,
     clickTrackSettings,
+    clickTrackDownbeatPhase,
   ]);
 
   if (!isOpen) return null;
