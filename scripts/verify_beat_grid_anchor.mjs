@@ -202,21 +202,22 @@ async function main() {
     }
   }
   let worstRepairedOffLattice = 0;
+  let realGapsOverTolerance = 0;
   for (let i = 1; i < repaired.length; i++) {
     const gap = repaired[i] - repaired[i - 1];
     const k = Math.max(1, Math.round(gap / pulse));
-    worstRepairedOffLattice = Math.max(
-      worstRepairedOffLattice,
-      Math.abs(gap - k * pulse)
-    );
+    const off = Math.abs(gap - k * pulse);
+    worstRepairedOffLattice = Math.max(worstRepairedOffLattice, off);
+    if (off > repair.SNAP_TOLERANCE_SEC) realGapsOverTolerance++;
   }
   console.log(
     `repair on the real grid: ${beats.length} -> ${repaired.length} beats ` +
       (structuralNoOp
         ? `(structural no-op: nothing inserted/dropped; beats relocated up to ${worstMoveSec.toFixed(4)} s)`
         : "NOT structural no-op — unexpected structural change") +
-      `; worst repaired gap off lattice ${worstRepairedOffLattice.toFixed(4)} s ` +
-      `<= ${repair.SNAP_TOLERANCE_SEC} s (the seam guard, same exported constant)`
+      `; gaps off the pulse lattice beyond tolerance: ${realGapsOverTolerance} ` +
+      `(the AMENDED ADR-0011 contract: exactly the one ${leadInGapSec.toFixed(4)} s lead-in gap, ` +
+      `off by ${Math.abs(leadInGapSec - pulse).toFixed(4)} s — the pickup is kept, not cascaded)`
   );
 
   // 3) defect probe: plant a 0.31 s slip (beyond tolerance) and skip one
@@ -236,39 +237,47 @@ async function main() {
   const probeRaw = Float64Array.from(planted);
   const repairedProbe = repair.repairBeatGrid(probeRaw, trackResult.bpm);
   let probeWorst = 0;
+  let probeGapsOverTolerance = 0;
   for (let i = 1; i < repairedProbe.length; i++) {
     const gap = repairedProbe[i] - repairedProbe[i - 1];
     const k = Math.max(1, Math.round(gap / pulse));
-    probeWorst = Math.max(probeWorst, Math.abs(gap - k * pulse));
+    const off = Math.abs(gap - k * pulse);
+    probeWorst = Math.max(probeWorst, off);
+    if (off > repair.SNAP_TOLERANCE_SEC) probeGapsOverTolerance++;
   }
   console.log(
     `defect probe (planted ${PROBE_SLIP_SEC} s slip @ ~${PROBE_SLIP_AT_SEC} s + ` +
       `planted skipped pulse): ${planted.length} beats -> ${repairedProbe.length} ` +
       `(skipped beat ${repairedProbe.length > planted.length ? "re-inserted" : "NOT re-inserted"}); ` +
-      `worst repaired gap off lattice ${probeWorst.toFixed(4)} s`
+      `gaps off lattice beyond tolerance: ${probeGapsOverTolerance} (expect the one lead-in only)`
   );
 
   // Tolerance ordering on MEASURED quantities: natural body slips under the
   // tolerance, planted 0.31 s slip above it, probe repaired within it.
   const toleranceSec = repair.SNAP_TOLERANCE_SEC;
+  const leadInOffSec = Math.abs(leadInGapSec - pulse);
+  const latticeGuardSec = Math.max(toleranceSec, leadInOffSec);
   const claimsOk =
     fileBytes === EXPECTED_BYTES &&
     beats.length === RECORDED_TRACKER_BEATS &&
     intervals === RECORDED_TRACKER_INTERVALS &&
     kOne === intervals &&
     structuralNoOp &&
+    worstMoveSec <= 1e-9 &&
     maxOffLattice < toleranceSec &&
     PROBE_SLIP_SEC > toleranceSec &&
     repairedProbe.length === planted.length + 1 &&
-    worstRepairedOffLattice <= toleranceSec + 1e-9 &&
-    probeWorst <= toleranceSec + 1e-9;
+    realGapsOverTolerance === 1 &&
+    probeGapsOverTolerance === 1 &&
+    worstRepairedOffLattice <= latticeGuardSec + 1e-9 &&
+    probeWorst <= latticeGuardSec + 1e-9;
   console.log(
     claimsOk
-      ? `PASS: the ADR-0011 tolerance ordering replays — ${toleranceSec} s sits ` +
-          `above the measured natural band (max body slip ${maxOffLattice.toFixed(4)} s, ` +
-          `lead-in ${leadInGapSec.toFixed(4)} s) and below the planted ${PROBE_SLIP_SEC} s slip, ` +
-          "with repair guarding every repaired gap on the pulse lattice. " +
-          "The librosa anchor half replays via python scripts/check_bpm.py."
+      ? `PASS: the AMENDED ADR-0011 tolerance ordering replays — ${toleranceSec} s sits ` +
+          `above the measured natural band (max body slip ${maxOffLattice.toFixed(4)} s) and below ` +
+          `the planted ${PROBE_SLIP_SEC} s slip; the ${leadInGapSec.toFixed(4)} s lead-in is kept as ` +
+          `a pickup (0 beats relocated, its one off-lattice gap of ${leadInOffSec.toFixed(4)} s is ` +
+          `the documented exception, not a cascade). The librosa anchor half replays via python scripts/check_bpm.py.`
       : "FAIL: a replayable claim no longer holds (see lines above)"
   );
   process.exit(claimsOk ? 0 : 1);

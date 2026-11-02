@@ -22,7 +22,9 @@ const near = (a: number[], b: number[]) => {
 const assertAllGapsWithinTolerance = (beats: number[]) => {
   for (let i = 0; i + 1 < beats.length; i++) {
     const gap = beats[i + 1] - beats[i];
-    expect(Math.abs(gap - PULSE)).toBeLessThanOrEqual(TOL);
+    // +1e-9: decimal fixtures land exactly ON the tolerance, and float
+    // arithmetic can miss the boundary by epsilon — the contract is ≤ TOL.
+    expect(Math.abs(gap - PULSE)).toBeLessThanOrEqual(TOL + 1e-9);
   }
 };
 
@@ -110,5 +112,32 @@ describe("Beat Grid hybrid snap repair (ADR-0011)", () => {
     // Positions the lattice had to vouch for changed; rubato ones did not.
     expect(first[0]).toBe(0);
     expect(first[1]).toBeCloseTo(0.54, 9);
+  });
+
+  it("keeps a pickup (anacrusis) beat instead of cascading the whole grid (measured defect: real grid @ 107.7 BPM, lead-in 0.3483 s)", async () => {
+    // The reference Source Mix opens with a pickup: the first tracked gap is
+    // 0.3483 s (0.2088 s short of the 0.5571 s pulse) while every later gap
+    // matches the pulse. Chaining the lattice off the last EMITTED beat reads
+    // that short gap as a slip and relocates it — then re-measures the next
+    // gap against the relocated beat, poisoning the whole run (measured: 25
+    // beats moved up to 0.2088 s, 0.35 s..13.84 s). A short gap whose FOLLOWING
+    // gaps are on-lattice from the beat itself is a pickup: the beat is kept
+    // verbatim and the lattice resumes from it.
+    const pulse = 0.5571;
+    const times = [0, 0.3483];
+    for (let i = 2; i <= 13; i++) times.push(times[i - 1] + pulse);
+    const repaired = Array.from(
+      repairBeatGrid(Float64Array.from(times), 107.7)
+    );
+    near(repaired, times);
+  });
+
+  it("keeps a mid-run pickup: the isolated short gap moves one beat onto nothing — the on-lattice run after it survives", async () => {
+    // Mid-song variant: everything is on-lattice until one beat arrives 0.34
+    // s after the previous one and the run resumes at full pulse from it.
+    // Only that arrival gap is off-lattice; no beat relocates.
+    const times = [0, 0.5, 1.0, 1.34, 1.84, 2.34, 2.84];
+    const repaired = Array.from(repairBeatGrid(Float64Array.from(times), 120));
+    near(repaired, times);
   });
 });
