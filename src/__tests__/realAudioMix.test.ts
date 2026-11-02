@@ -16,6 +16,7 @@ import {
   formatClickTrackFileName,
 } from "../lib/bundleZip";
 import JSZip from "jszip";
+import { decodeWavOnsets } from "./wavOnsetsHelper";
 import {
   handleWorkerMessage,
   WorkerOutMessage,
@@ -374,50 +375,6 @@ describe("Real Audio Ingestion & Processing Pipeline (audioslave_stone.mp3)", ()
       stemBytes[stem] = mockStemWav;
     }
 
-    // Decode helper: WAV bytes -> click onsets in seconds. Walk the RIFF
-    // chunk list, read the Int16 LE data chunk, cluster first crossings.
-    const decodeWavOnsets = (bytes: Uint8Array): number[] => {
-      const onsets: number[] = [];
-      if (!bytes) return onsets;
-      let dataStart = -1;
-      let dataLen = 0;
-      for (let off = 12; off + 8 <= bytes.length;) {
-        const size =
-          bytes[off + 4] |
-          (bytes[off + 5] << 8) |
-          (bytes[off + 6] << 16) |
-          (bytes[off + 7] << 24);
-        const fourcc = String.fromCharCode(
-          bytes[off],
-          bytes[off + 1],
-          bytes[off + 2],
-          bytes[off + 3]
-        );
-        if (fourcc === "data") {
-          dataStart = off + 8;
-          dataLen = size;
-          break;
-        }
-        off += 8 + size + (size % 2);
-      }
-      if (dataStart < 0) return onsets;
-      let prev = false;
-      for (let s = 0; s * 2 + 1 < dataLen; s++) {
-        const raw =
-          bytes[dataStart + s * 2] | (bytes[dataStart + s * 2 + 1] << 8);
-        const v = raw >= 0x8000 ? raw - 0x10000 : raw;
-        const nz = Math.abs(v) > 100;
-        if (nz && !prev) {
-          const t = s / rate;
-          if (onsets.length === 0 || t - onsets[onsets.length - 1] > 0.1) {
-            onsets.push(t);
-          }
-        }
-        prev = nz;
-      }
-      return onsets;
-    };
-
     const medianInterval = (ts: number[]): number => {
       const gaps: number[] = [];
       for (let i = 0; i + 1 < ts.length; i++) {
@@ -448,7 +405,7 @@ describe("Real Audio Ingestion & Processing Pipeline (audioslave_stone.mp3)", ()
     const clickBytes = await zip.file(clickName)?.async("uint8array");
     expect(clickBytes).not.toBeNull();
     if (!clickBytes) return;
-    const onsets = decodeWavOnsets(clickBytes);
+    const onsets = decodeWavOnsets(clickBytes, rate);
     expect(onsets).toHaveLength(grid.length);
     for (let k = 0; k < grid.length; k++) {
       expect(Math.abs(onsets[k] - grid[k])).toBeLessThan(3 / rate);
@@ -486,7 +443,7 @@ describe("Real Audio Ingestion & Processing Pipeline (audioslave_stone.mp3)", ()
       ?.async("uint8array");
     expect(stretchedBytes).not.toBeNull();
     if (!stretchedBytes) return;
-    const stretchedOnsets = decodeWavOnsets(stretchedBytes);
+    const stretchedOnsets = decodeWavOnsets(stretchedBytes, rate);
     expect(stretchedOnsets).toHaveLength(stretchedGrid.length);
     for (let k = 0; k < stretchedGrid.length; k++) {
       expect(Math.abs(stretchedOnsets[k] - stretchedGrid[k])).toBeLessThan(

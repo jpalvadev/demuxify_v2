@@ -5,3 +5,5 @@ A Source Mix needs a Tempo Detector and a Beat-synchronized Click Track, but the
 Considered options: `@audio/beat` vs `realtime-bpm-analyzer` vs DIY tracker vs Essentia/TempoCNN vs server API (breaks ADR 0001); Click Track as fifth Stem vs separate concept.
 
 Detection runs exactly once on the Source Mix at decode time; re-detection on the Drums Stem after separation was rejected because an empirical pass on `audioslave_stone.mp3` showed the two agree (107.7 BPM, 503 vs 513 beats) while adding a second code path.
+
+The honesty rule above is pinned to a number so it can be quoted, not re-invented: the Click Track rail reads a tempo as certain only for a **lone candidate at confidence ≥ 0.99** (`isConfidentReading` in `StemPlayer.tsx`, whose label then says "solid reading"); every other outcome — multiple candidates, or a lone one under the bar — presents the ranked BPM candidates and makes the user pick the feel they hear. The bar sits deliberately near 1 because a confident-but-single Ellis-DP reading on a clean 4/4 rock track is the only case where presenting alternatives would be noise; everywhere else octave ambiguity is real and stays a user decision.

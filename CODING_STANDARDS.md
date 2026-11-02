@@ -44,3 +44,14 @@ Always use canonical domain terms defined in `GLOSSARY.md`.
 - Flow: OpenDesign run produces the artifact in its project → port into the existing React components; the token architecture (shadcn-style HSL CSS variables) and engine logic stay intact.
 - If a ticket's view is not covered by an existing OpenDesign artifact, run OpenDesign for that view first and record the run + preview URL on the ticket.
 - Tab Shell, Tab, and Transport vocabulary follows `GLOSSARY.md`; the shell decision is recorded in `docs/adr/0007-tab-shell-ui.md`.
+- If the OpenDesign MCP itself fails, follow the recovery procedure in `docs/agents/open-design-mcp.md`; an agent-authored look must be recorded on the ticket as such.
+
+## 7. Async Completion Asserted at the Deepest Resolving Seam
+
+- App-level jsdom tests must not await a completed export/ZIP: jszip's `generateAsync` scheduling never resolves inside the full-App test env (it stalls at "Packaging ZIP bundle..."). This is an environment fact, not a product bug — the same call completes at the component seams.
+- At the App seam, spy the bundler (`createStemBundleZip`) and assert its call arguments (format, Click Track bytes): what would be exported, byte-for-byte.
+- Assert a finished export only in `ExportDialog.test.tsx` / `bundleZip.test.ts`, where the call demonstrably resolves.
+
+## 8. Shared Test Readers
+
+- Shared test doubles and readers — e.g. the WAV-bytes -> click onsets decoder (`decodeWavOnsets`, `src/__tests__/wavOnsetsHelper.ts`) — live in one module under `src/__tests__/` and every seam that needs one imports it, instead of each test file keeping its own copy of the shape.

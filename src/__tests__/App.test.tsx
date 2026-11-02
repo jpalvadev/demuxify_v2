@@ -12,6 +12,8 @@ import * as audioDecoderModule from "../lib/audioDecoder";
 import { InferenceClient } from "../lib/inferenceClient";
 import * as toastModule from "../lib/toast";
 import * as bundleZip from "../lib/bundleZip";
+import { WorkerOutMessage } from "../workers/beatDetection.worker";
+import { decodeWavOnsets } from "./wavOnsetsHelper";
 
 // --- Tempo Detector Worker stub (ticket 06) ---------------------------------
 // The app only ever reaches the heavy BPM pass through the Web Worker seam, so
@@ -20,6 +22,11 @@ import * as bundleZip from "../lib/bundleZip";
 // chose). Completions are queued instead of fired on post, which is how a test
 // watches the Mix tab while a re-lock pass is still in flight and hands the
 // reply over when it wants.
+// Navigation pointer: the App feeds the ExportDialog props from App-level refs
+// (tempoAnalysis, clickTrackStateRef), so a StemPlayer-only click (rail
+// toggle, candidate pick) re-renders only that subtree and leaves those props
+// stale. Click a Tab button (e.g. "Export") before asserting the bundler's
+// call args.
 let tempoWorkerQueue: (() => void)[] = [];
 
 class StubTempoWorker {
@@ -33,22 +40,25 @@ class StubTempoWorker {
     // Short span so a completed export bundle stays cheap to encode: the
     // Click Track file the export tests read is cut on this grid.
     const beatCount = Math.round(2 / intervalSec);
+    // Typed against the worker's own WorkerOutMessage union, so typecheck
+    // polices drift between what the stub answers and what the real relay
+    // can send: a renamed field there stops these tests compiling instead
+    // of failing as a bare assertion at runtime.
+    const complete: WorkerOutMessage = {
+      type: "complete",
+      // The engine's ranking never changes: only the user's pick does.
+      candidates: [
+        { bpm: 107.7, confidence: 0.93 },
+        { bpm: 215.4, confidence: 0.61 },
+      ],
+      beatGrid: Float64Array.from(
+        Array.from({ length: beatCount }, (_, i) => i * intervalSec)
+      ),
+      analyzedBpm: bpm,
+      duration: 2,
+    };
     tempoWorkerQueue.push(() => {
-      this.onmessage?.({
-        data: {
-          type: "complete",
-          // The engine's ranking never changes: only the user's pick does.
-          candidates: [
-            { bpm: 107.7, confidence: 0.93 },
-            { bpm: 215.4, confidence: 0.61 },
-          ],
-          beatGrid: Float64Array.from(
-            Array.from({ length: beatCount }, (_, i) => i * intervalSec)
-          ),
-          analyzedBpm: bpm,
-          duration: 2,
-        },
-      } as MessageEvent);
+      this.onmessage?.({ data: complete } as MessageEvent);
     });
   }
 
@@ -60,51 +70,6 @@ const fireQueuedTempoCompletions = () => {
   tempoWorkerQueue = [];
   queued.forEach((deliver) => deliver());
 };
-
-// WAV bytes -> click onsets in seconds: walk the RIFF chunk list, read the
-// Int16 LE data chunk, cluster first crossings. Same reader the real-audio
-// seam uses, pointed at the Click Track file inside a completed Export
-// Bundle: what a user would hear if they played the export back.
-function decodeWavClickOnsets(bytes: Uint8Array, rate: number): number[] {
-  const onsets: number[] = [];
-  if (!bytes) return onsets;
-  let dataStart = -1;
-  let dataLen = 0;
-  for (let off = 12; off + 8 <= bytes.length;) {
-    const size =
-      bytes[off + 4] |
-      (bytes[off + 5] << 8) |
-      (bytes[off + 6] << 16) |
-      (bytes[off + 7] << 24);
-    const fourcc = String.fromCharCode(
-      bytes[off],
-      bytes[off + 1],
-      bytes[off + 2],
-      bytes[off + 3]
-    );
-    if (fourcc === "data") {
-      dataStart = off + 8;
-      dataLen = size;
-      break;
-    }
-    off += 8 + size + (size % 2);
-  }
-  if (dataStart < 0) return onsets;
-  let prev = false;
-  for (let s = 0; s * 2 + 1 < dataLen; s++) {
-    const raw = bytes[dataStart + s * 2] | (bytes[dataStart + s * 2 + 1] << 8);
-    const v = raw >= 0x8000 ? raw - 0x10000 : raw;
-    const nz = Math.abs(v) > 100;
-    if (nz && !prev) {
-      const t = s / rate;
-      if (onsets.length === 0 || t - onsets[onsets.length - 1] > 0.1) {
-        onsets.push(t);
-      }
-    }
-    prev = nz;
-  }
-  return onsets;
-}
 
 describe("App UI Shell", () => {
   const dummyBuffer = {
@@ -2135,10 +2100,7 @@ describe("App UI Shell", () => {
       expect(options.format).toBe("wav");
       expect(options.clickTrack).toBeInstanceOf(Uint8Array);
 
-      const onsets = decodeWavClickOnsets(
-        options.clickTrack as Uint8Array,
-        44100
-      );
+      const onsets = decodeWavOnsets(options.clickTrack as Uint8Array, 44100);
       // Every click sits on the 215.4 grid the rail was locked to (within
       // a couple of samples)...
       const chosenInterval = 60 / 215.4;
