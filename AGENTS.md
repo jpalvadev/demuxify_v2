@@ -38,7 +38,7 @@ When working on Windows, avoid cross-drive NTFS junctions to `node_modules` beca
 
 ### Big-file editing
 
-`src/App.tsx` and `src/components/StemPlayer.tsx` run 1,100+ lines; anchor every edit with `grep -n`/`sed -n` output. A large `read` slice is advisory until anchored.
+`src/App.tsx`, `src/components/StemPlayer.tsx` and `src/lib/stemPlayerEngine.ts` run 1,100+ lines; anchor every edit with `grep -n`/`sed -n` output. A large `read` slice is advisory until anchored.
 
 ### OpenDesign MCP — when a call fails
 
