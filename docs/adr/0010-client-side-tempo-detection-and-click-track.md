@@ -1,0 +1,7 @@
+# Client-side tempo detection and a Click Track that is not a Stem
+
+A Source Mix needs a Tempo Detector and a Beat-synchronized Click Track, but the app is fully client-side (ADR 0001) and every heavy pass already runs in a Web Worker on `Float32Array` buffers. We adopted `@audio/beat` (pure-JS Ellis-DP + comb-filter tracker, MIT, consumes those buffers directly at ~450× real-time) over `realtime-bpm-analyzer` (stream/DJ-oriented API shape), a hand-rolled tracker on our own `stft`/`fftRadix2` (re-implementing code that ships tested and benchmarked), and desktop-only Essentia/librosa (rejected outright; kept only as the verification anchor `scripts/check_bpm.py`). Separately, the **Click Track is deliberately NOT a Stem**: the four `StemName` identities are woven through session storage, Export Bundle packaging, and Custom Mixdown presets, and a fake fifth stem identity would contaminate all of them — the Click Track is a parallel concept that merely offers mute/volume like a Stem, exports only as its own separate file, and is never summed into any mixdown preset.
+
+Considered options: `@audio/beat` vs `realtime-bpm-analyzer` vs DIY tracker vs Essentia/TempoCNN vs server API (breaks ADR 0001); Click Track as fifth Stem vs separate concept.
+
+Detection runs exactly once on the Source Mix at decode time; re-detection on the Drums Stem after separation was rejected because an empirical pass on `audioslave_stone.mp3` showed the two agree (107.7 BPM, 503 vs 513 beats) while adding a second code path.

@@ -43,6 +43,7 @@ import {
   ChunkProgress,
   ChunkStartEvent,
 } from "./lib/inferenceClient";
+import { BeatClient, TempoAnalysisResult } from "./lib/beatClient";
 import { DownloadProgress } from "./lib/modelCache";
 import { StemName, STEM_NAMES } from "./lib/chunkOverlapAdd";
 import {
@@ -143,6 +144,12 @@ export const App: React.FC = () => {
     Float32Array[]
   > | null>(null);
 
+  // Tempo Detector (ADR-0010): ranked BPM candidates + Beat Grid for the
+  // Click Track. Domain-separate from the four StemName identities and never
+  // a Stem of its own.
+  const [tempoAnalysis, setTempoAnalysis] =
+    useState<TempoAnalysisResult | null>(null);
+
   // Session Recovery & Persistence State
   const [detectedSession, setDetectedSession] = useState<{
     title: string;
@@ -168,6 +175,9 @@ export const App: React.FC = () => {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const inferenceClientRef = useRef<InferenceClient | null>(null);
+  // Tempo Detector client ref (ADR-0010): cancelled and nulled when the
+  // Source Mix is cleared, like the Inference Engine client.
+  const beatClientRef = useRef<BeatClient | null>(null);
   const cachedSessionRef = useRef<DemuxifySession | null>(null);
   const autoSaverRef = useRef(createSessionAutoSaver(600));
 
@@ -240,6 +250,32 @@ export const App: React.FC = () => {
     document.documentElement.classList.add("dark");
   }, []);
 
+  // Tempo Detector (ADR-0010): fire-and-forget heavy BPM pass over the decoded
+  // Source Mix off the main thread. It never gates separation or playback;
+  // the ranked candidates land on the Separate tab status line when they
+  // arrive. The guard discards stale results if the Source Mix was cleared
+  // in the meantime.
+  const startTempoAnalysis = (decoded: DecodedSourceMix) => {
+    try {
+      const client = new BeatClient();
+      beatClientRef.current = client;
+      client
+        .analyze(decoded.buffer.getChannelData(0), decoded.buffer.sampleRate)
+        .then((result) => {
+          if (beatClientRef.current === client) {
+            setTempoAnalysis(result);
+          }
+        })
+        .catch(() => {
+          // Non-fatal: a failed or cancelled Tempo Detector pass must not
+          // surface anywhere else on the page.
+        });
+    } catch {
+      // Worker construction can fail in headless environments; the Tempo
+      // Detector is an optional enhancement, never a blocker.
+    }
+  };
+
   const processAudioFile = async (file: File) => {
     setSelectedFile(file);
     setIsDecoding(true);
@@ -247,12 +283,14 @@ export const App: React.FC = () => {
     setCurrentTime(0);
     setSeparationPhase("idle");
     setSeparatedStems(null);
+    setTempoAnalysis(null);
 
     try {
       const decoded = await decodeAudio(file);
       const peaks = computeWaveformPeaks(decoded.buffer);
       setDecodedSourceMix(decoded);
       setWaveformPeaks(peaks);
+      startTempoAnalysis(decoded);
     } catch (err) {
       const message =
         err instanceof Error
@@ -275,6 +313,10 @@ export const App: React.FC = () => {
     if (inferenceClientRef.current) {
       inferenceClientRef.current.cancel();
     }
+    if (beatClientRef.current) {
+      beatClientRef.current.cancel();
+      beatClientRef.current = null;
+    }
     autoSaverRef.current.cancel();
     cachedSessionRef.current = null;
     clearActiveSession().catch(() => {});
@@ -285,6 +327,7 @@ export const App: React.FC = () => {
     setDecodeError(null);
     setSeparationPhase("idle");
     setSeparatedStems(null);
+    setTempoAnalysis(null);
     setDownloadProgress(null);
     setChunkProgress(null);
     setChunkStart(null);
@@ -735,6 +778,29 @@ export const App: React.FC = () => {
                     onCancel={handleCancelSeparation}
                     onRetry={handleStartSeparation}
                   />
+
+                  {/* Tempo Detector status micro-line: agent-authored look
+                      (ticket 01 FALLBACK RECORD: the OpenDesign run was lost
+                      with the daemon, so this look comes from the agent and
+                      is recorded on ticket 01, not an OD artifact). Ranked
+                      candidates shown honestly: top reading plus
+                      alternatives, never one BPM presented as certain. */}
+                  {tempoAnalysis && (
+                    <p
+                      role="status"
+                      aria-label="Tempo Detector reading"
+                      className="-mt-1 font-mono text-xs tracking-wide text-muted-foreground"
+                      style={{ fontFamily: MONO_FONT_STACK }}
+                    >
+                      {`Tempo Detector: ${tempoAnalysis.candidates[0].bpm.toFixed(1)} BPM`}
+                      {tempoAnalysis.candidates.length > 1
+                        ? ` | alternatives ${tempoAnalysis.candidates
+                            .slice(1)
+                            .map((c) => `${c.bpm.toFixed(1)} BPM`)
+                            .join(" ")}`
+                        : ""}
+                    </p>
+                  )}
 
                   {/* Stems Separated Banner (Visible on completion) */}
                   {separationPhase === "completed" && separatedStems && (

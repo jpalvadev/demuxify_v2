@@ -15,6 +15,7 @@
     "prepare": "husky"
   },
   "dependencies": {
+    "@audio/beat": "^3.1.0",
     "@breezystack/lamejs": "^1.2.7",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",

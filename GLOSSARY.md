@@ -75,3 +75,19 @@ _Avoid_: Modal, popup, overlay, dialog, Listen tab
 **Transport**:
 The row of dedicated playback controls inside the Stem Player: a single Play/Pause toggle whose icon shows the action coming next, time readout, and Master Volume.
 _Avoid_: Separate Play and Pause buttons, seek-to-start button, pill button
+
+**Tempo Detector**:
+The estimate of a Source Mix's dominant tempo in beats per minute, reported as a top candidate plus ranked alternatives because a true pulse and its metric doubling are genuinely ambiguous, and user-correctable.
+_Avoid_: BPM counter, tempo meter, DJ analyzer, beat app
+
+**Beat Grid**:
+The estimated beat positions across the full timeline of a Source Mix, carrying where the beats actually fall (including slight natural fluctuation) rather than a flat pulse derived from the tempo number alone.
+_Avoid_: Tempo grid, metronome marks, quantized beats, BPM grid
+
+**Meter**:
+The notational grouping of beats that sets the Click Track's accent pattern (4/4, 3/4, 6/8, ...), with the downbeat accented by a deeper tone.
+_Avoid_: Time signature, feel, beat grouping
+
+**Click Track**:
+A synthesized metronome accompaniment locked to the Beat Grid, played alongside the Stems with its own mute and volume controls; it accompanies the Stems but is not one, and never one of the four Stems identities.
+_Avoid_: Metronome, fifth stem, drum loop, time track
