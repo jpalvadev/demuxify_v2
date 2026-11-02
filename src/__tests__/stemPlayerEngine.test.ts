@@ -6,86 +6,7 @@ import {
   synthesizeClickTrackChannel,
 } from "../lib/stemPlayerEngine";
 import { StemName } from "../lib/chunkOverlapAdd";
-
-function createMockAudioContext() {
-  let currentTime = 10.0;
-
-  const mockDestination = {
-    connect: vi.fn(),
-    disconnect: vi.fn(),
-  };
-
-  const createGain = vi.fn(() => {
-    const gainNode = {
-      gain: {
-        value: 1.0,
-        setValueAtTime: vi.fn((val: number) => {
-          gainNode.gain.value = val;
-        }),
-      },
-      connect: vi.fn(),
-      disconnect: vi.fn(),
-    };
-    return gainNode;
-  });
-
-  const createdSources: any[] = [];
-  const createBufferSource = vi.fn(() => {
-    const sourceNode = {
-      buffer: null as any,
-      playbackRate: {
-        value: 1.0,
-        setValueAtTime: vi.fn((rate: number, _when?: number) => {
-          sourceNode.playbackRate.value = rate;
-        }),
-      },
-      connect: vi.fn(),
-      disconnect: vi.fn(),
-      start: vi.fn(),
-      stop: vi.fn(),
-      onended: null as any,
-    };
-    createdSources.push(sourceNode);
-    return sourceNode;
-  });
-
-  const createBuffer = vi.fn(
-    (channels: number, length: number, sampleRate: number) => {
-      const channelArrays = Array.from(
-        { length: channels },
-        () => new Float32Array(length)
-      );
-      return {
-        numberOfChannels: channels,
-        length,
-        sampleRate,
-        duration: length / sampleRate,
-        getChannelData: vi.fn((ch: number) => channelArrays[ch]),
-        copyToChannel: vi.fn((src: Float32Array, ch: number) => {
-          channelArrays[ch].set(src);
-        }),
-      };
-    }
-  );
-
-  return {
-    get currentTime() {
-      return currentTime;
-    },
-    set currentTime(t: number) {
-      currentTime = t;
-    },
-    state: "running" as AudioContextState,
-    resume: vi.fn().mockResolvedValue(undefined),
-    suspend: vi.fn().mockResolvedValue(undefined),
-    close: vi.fn().mockResolvedValue(undefined),
-    destination: mockDestination,
-    createGain,
-    createBufferSource,
-    createBuffer,
-    createdSources,
-  };
-}
+import { createMockAudioContext } from "./audioContextMockFactory";
 
 // Click Track helpers (ticket 04): onsets and peak amplitude of a synthesized
 // click channel, read at the same external seam the user hears.
@@ -127,7 +48,7 @@ describe("StemPlayerEngine", () => {
   };
 
   beforeEach(() => {
-    mockCtx = createMockAudioContext();
+    mockCtx = createMockAudioContext(10.0);
   });
 
   describe("Audio Graph Construction and Routing", () => {
@@ -557,7 +478,7 @@ describe("StemPlayerEngine", () => {
     beforeEach(() => {
       createdWorkletNodes = [];
       mockWorkletCtx = {
-        ...createMockAudioContext(),
+        ...createMockAudioContext(10.0),
         audioWorklet: {
           addModule: vi.fn().mockResolvedValue(undefined),
         },

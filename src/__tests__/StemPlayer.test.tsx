@@ -14,55 +14,7 @@ import {
   ClickTrackMixerState,
 } from "../lib/stemPlayerEngine";
 import * as customMixdown from "../lib/customMixdown";
-
-// Mock Web Audio API
-function createMockAudioContext() {
-  let currentTime = 0;
-  return {
-    get currentTime() {
-      return currentTime;
-    },
-    set currentTime(t: number) {
-      currentTime = t;
-    },
-    state: "running" as AudioContextState,
-    resume: vi.fn().mockResolvedValue(undefined),
-    destination: { connect: vi.fn(), disconnect: vi.fn() },
-    createGain: vi.fn(() => ({
-      gain: {
-        value: 1.0,
-        setValueAtTime: vi.fn(function (this: any, val: number) {
-          this.value = val;
-        }),
-      },
-      connect: vi.fn(),
-      disconnect: vi.fn(),
-    })),
-    createBufferSource: vi.fn(() => ({
-      buffer: null,
-      connect: vi.fn(),
-      disconnect: vi.fn(),
-      start: vi.fn(),
-      stop: vi.fn(),
-      onended: null,
-    })),
-    createBuffer: vi.fn(
-      (channels: number, length: number, sampleRate: number) => {
-        const channelArrays = Array.from(
-          { length: channels },
-          () => new Float32Array(length)
-        );
-        return {
-          numberOfChannels: channels,
-          length,
-          sampleRate,
-          duration: length / sampleRate,
-          getChannelData: vi.fn((ch: number) => channelArrays[ch]),
-        };
-      }
-    ),
-  };
-}
+import { createMockAudioContext } from "./audioContextMockFactory";
 
 describe("StemPlayer UI Component", () => {
   let mockCtx: any;

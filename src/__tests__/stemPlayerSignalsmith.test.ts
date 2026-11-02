@@ -2,50 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { StemPlayerEngine } from "../lib/stemPlayerEngine";
 import { StemName } from "../lib/chunkOverlapAdd";
 import { MultiTrackStretchNode } from "../lib/signalsmithStretchAdapter";
-
-function createMockAudioContext() {
-  let currentTime = 10.0;
-  return {
-    get currentTime() {
-      return currentTime;
-    },
-    set currentTime(t: number) {
-      currentTime = t;
-    },
-    sampleRate: 44100,
-    state: "running" as AudioContextState,
-    resume: vi.fn().mockResolvedValue(undefined),
-    destination: { connect: vi.fn(), disconnect: vi.fn() },
-    createGain: vi.fn(() => ({
-      gain: { value: 1.0, setValueAtTime: vi.fn() },
-      connect: vi.fn(),
-      disconnect: vi.fn(),
-    })),
-    createBufferSource: vi.fn(() => ({
-      buffer: null,
-      playbackRate: { value: 1.0, setValueAtTime: vi.fn() },
-      connect: vi.fn(),
-      disconnect: vi.fn(),
-      start: vi.fn(),
-      stop: vi.fn(),
-    })),
-    createBuffer: vi.fn(
-      (channels: number, length: number, sampleRate: number) => {
-        const channelArrays = Array.from(
-          { length: channels },
-          () => new Float32Array(length)
-        );
-        return {
-          numberOfChannels: channels,
-          length,
-          sampleRate,
-          duration: length / sampleRate,
-          getChannelData: vi.fn((ch: number) => channelArrays[ch]),
-        };
-      }
-    ),
-  };
-}
+import { createMockAudioContext } from "./audioContextMockFactory";
 
 function createMockStretchAdapter(): MultiTrackStretchNode {
   let currentTempo = 1.0;
@@ -96,7 +53,7 @@ describe("Stem Player Multi-Track Signalsmith Stretch Integration", () => {
   };
 
   beforeEach(() => {
-    mockCtx = createMockAudioContext();
+    mockCtx = createMockAudioContext(10.0);
   });
 
   it("connects live playback through 4-stem Signalsmith Stretch processing nodes", async () => {
