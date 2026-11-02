@@ -4,7 +4,7 @@
 // and a Beat Grid of beat positions in seconds. The Click Track is NOT a Stem:
 // nothing here touches the StemName identities.
 import { combTempo, beatTrack } from "@audio/beat";
-import { pickDownbeatPhase } from "../lib/beatGridRepair";
+import { pickDownbeatPhase, repairBeatGrid } from "../lib/beatGridRepair";
 
 export interface TempoCandidate {
   bpm: number;
@@ -155,10 +155,17 @@ async function handleStart(
       DEFAULT_CLICK_TRACK_BEATS_PER_BAR
     );
 
+    // ADR-0011: the raw tracker grid is hybrid-snapped against the uniform
+    // pulse implied by the tracked tempo before anything downstream sees it —
+    // slips relocated, double gaps filled, genuine fluctuation kept (tolerance
+    // recorded in ADR-0011). Every consumer (playback, rail, export) reads the
+    // repaired grid, so the Click Track never audibly slides.
+    const repairedGrid = repairBeatGrid(trackResult.beats, trackResult.bpm);
+
     postMsg({
       type: "complete",
       candidates,
-      beatGrid: trackResult.beats,
+      beatGrid: repairedGrid,
       analyzedBpm: trackResult.bpm,
       duration: samples.length / fs,
       downbeatPhase,

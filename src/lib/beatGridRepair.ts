@@ -7,7 +7,7 @@
 //
 // Meter-agnostic by design: everything here takes a beats-per-bar count, which
 // the Click Track lane already parses out of its `ClickTrackMeter`, so this
-// module owns the phase arithmetic alone.
+// module owns the phase arithmetic and the hybrid snap repair alone.
 export function normalizeDownbeatPhase(
   phase: number,
   beatsPerBar: number
@@ -91,4 +91,70 @@ export function pickDownbeatPhase(
     }
   }
   return bestPhase;
+}
+
+// Snap tolerance for the hybrid repair (ADR-0011), recorded from the
+// verification runs of the real Source Mix against the librosa anchor (see
+// ADR 0011): librosa's own beat set swings up to 0.058 s away from the uniform
+// pulse (0.4992 s .. 0.6153 s intervals at 107.7 BPM) while the tracker's raw
+// grid stays within 0.014 s of it — 0.08 s keeps every real interval of the
+// reference track (genuine fluctuation survives) and still repairs slips and
+// double gaps. Not a blind number: ADR-0011 carries the derivation.
+export const SNAP_TOLERANCE_SEC = 0.08;
+
+// Hybrid snap repair of the Beat Grid (ADR-0011): the raw comb-tracker output
+// is not trusted as the audible truth (positions slip in quiet passages and
+// double beats in noisy ones), but a fully re-derived uniform grid would
+// flatten the human-feel fluctuation the Beat Grid is defined to carry. So:
+// chain the pulse lattice implied by the chosen tempo off the last EMITTED
+// beat; a tracked beat whose gap matches the nearest lattice count (k =
+// round(gap/pulse)) within the snap tolerance keeps its own position — that
+// preserves rubato runs — while gaps spanning k≥2 lattice counts get the
+// skipped pulses inserted; anything off the lattice beyond tolerance is a
+// slip and gets relocated onto the lattice. Non-monotone tracker noise is
+// dropped. The tolerance is not a blind number: see ADR-0011, derived from
+// verification runs of the real Source Mix against the librosa anchor.
+export function repairBeatGrid(
+  beats: Float64Array,
+  bpm: number,
+  toleranceSec: number = SNAP_TOLERANCE_SEC
+): Float64Array {
+  if (!beats || beats.length === 0 || !(bpm > 0) || !isFinite(bpm)) {
+    return beats && beats.length > 0 ? beats : new Float64Array(0);
+  }
+  const pulse = 60 / bpm;
+  if (!(toleranceSec > 0) || !isFinite(toleranceSec)) {
+    return beats;
+  }
+
+  const out: number[] = [];
+  let prev = Number.NEGATIVE_INFINITY;
+  for (let i = 0; i < beats.length; i++) {
+    const t = beats[i];
+    if (!isFinite(t) || t <= prev) continue;
+    if (out.length === 0) {
+      out.push(t);
+      prev = t;
+      continue;
+    }
+    const gap = t - prev;
+    const k = Math.max(1, Math.round(gap / pulse));
+    const offFromLattice = gap - k * pulse;
+    if (Math.abs(offFromLattice) <= toleranceSec) {
+      // Within tolerance of the lattice count: fill skipped pulses for k≥2
+      // counts (double gaps), then keep the tracked beat's own position.
+      for (let m = 1; m < k; m++) {
+        out.push(prev + m * pulse);
+      }
+      out.push(t);
+      prev = t;
+    } else {
+      // Slip: relocate onto the lattice chain.
+      for (let m = 1; m <= k; m++) {
+        out.push(prev + m * pulse);
+      }
+      prev = out[out.length - 1];
+    }
+  }
+  return Float64Array.from(out);
 }

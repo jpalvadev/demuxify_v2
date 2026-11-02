@@ -25,6 +25,9 @@ import {
   ClickTrackMeter,
   synthesizeClickTrackChannel,
 } from "../lib/stemPlayerEngine";
+// The repair guard is asserted with the SAME constant the worker applies, so
+// the seam cannot drift from the engine (ADR-0011 records its derivation).
+import { SNAP_TOLERANCE_SEC } from "../lib/beatGridRepair";
 
 describe("Real Audio Ingestion & Processing Pipeline (audioslave_stone.mp3)", () => {
   const candidatePaths = [
@@ -226,6 +229,20 @@ describe("Real Audio Ingestion & Processing Pipeline (audioslave_stone.mp3)", ()
       expect(Math.abs(median - expectedInterval)).toBeLessThanOrEqual(
         expectedInterval * 0.1
       );
+
+      // ADR-0011 (ticket 03): the grid above is the REPAIRED grid, and the
+      // repair guard invariant holds on it — every emitted gap sits within
+      // the recorded snap tolerance of the uniform pulse the tracked tempo
+      // implies, so the Click Track can never audibly slide. (Verification
+      // on the real Source Mix: all 529 raw intervals already sit within
+      // ±0.014 s of the 107.7 BPM pulse, so repair is a no-op here and the
+      // guard is the machine-checked ceiling slips could break through.)
+      const guardPulseSec = 60 / complete.analyzedBpm;
+      for (const gap of intervals) {
+        expect(Math.abs(gap - guardPulseSec)).toBeLessThanOrEqual(
+          SNAP_TOLERANCE_SEC
+        );
+      }
 
       // Beat-density extrapolation: this window's beat density, projected
       // onto the full 294.1 s Source Mix, stays within ±10% of the 503-beat
