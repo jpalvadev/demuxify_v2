@@ -1,3 +1,21 @@
+#!/usr/bin/env bash
+# Nothing staged → skip the whole check cycle: git itself will then refuse the
+# commit with its own message. Without this guard a lost `git add` (e.g. a
+# timed-out stage step) burns the full typecheck + suite run first.
+if [ -z "$(git diff --cached --name-only)" ]; then
+  echo "husky: nothing staged — skipping checks"
+  exit 0
+fi
+
+#!/usr/bin/env bash
+# Nothing staged → skip the whole check cycle: git itself will then refuse the
+# commit with its own message. Without this guard a lost `git add` burns a full
+# typecheck + suite run just to discover the staging slip.
+if [ -z "$(git diff --cached --name-only)" ]; then
+  echo "husky: nothing staged — skipping checks"
+  exit 0
+fi
+
 npx lint-staged
 npm run check:glossary
 npm run typecheck

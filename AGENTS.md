@@ -36,6 +36,10 @@ ONNX models and lightweight weights can be downloaded or provisioned using `scri
 
 When working on Windows, avoid cross-drive NTFS junctions to `node_modules` because native packages (such as Tailwind/PostCSS resolution like `@alloc/quick-lru`) can fail to resolve symlinks across boundaries. Prefer standard branch checkouts in the main repo or independent `npm install` runs.
 
+### Big-file editing
+
+`src/App.tsx` and `src/components/StemPlayer.tsx` run 1,100+ lines; anchor every edit with `grep -n`/`sed -n` output. A large `read` slice is advisory until anchored.
+
 ### OpenDesign MCP — when a call fails
 
 If OpenDesign MCP calls fail (daemon connection lost, cancelled run, or tool errors): follow the recovery procedure in `docs/agents/open-design-mcp.md` — reconnect recipe, one retry, then the agent-authored fallback that must be recorded on the ticket.
