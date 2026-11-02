@@ -616,4 +616,91 @@ describe("StemPlayer UI Component", () => {
       "Other Stem",
     ]);
   });
+
+  it("ranks the Tempo Detector honestly on the rail: top reading plus alternatives with confidence, never one BPM presented as certain", () => {
+    render(
+      <StemPlayer
+        stems={dummyStems}
+        sampleRate={sampleRate}
+        audioContext={mockCtx}
+        beatGrid={Float64Array.from([0.5, 1.0572789, 1.6145578])}
+        clickTrackBpm={107.7}
+        tempoCandidates={[
+          { bpm: 107.7, confidence: 0.93 },
+          { bpm: 215.4, confidence: 0.61 },
+          { bpm: 72, confidence: 0.34 },
+        ]}
+        // The shell always wires the picker: only the ranked alternatives
+        // are actionable, the tempo the Beat Grid is locked to is not.
+        onChooseTempoCandidate={() => {}}
+      />
+    );
+
+    // The locked reading keeps its readout...
+    expect(screen.getByTestId("click-track-bpm-label")).toHaveTextContent(
+      "107.7 BPM"
+    );
+    // ...but the rail names the ranking rather than a certainty: a pulse and
+    // its metric doubling are indistinguishable, so the user picks the feel.
+    expect(
+      screen.getByTestId("click-track-confidence-label")
+    ).toHaveTextContent("3 readings ranked");
+
+    const picker = screen.getByTestId("click-track-candidate-picker");
+    const chips = within(picker).getAllByRole("button");
+    expect(chips).toHaveLength(3);
+    expect(chips.map((chip) => (chip.textContent ?? "").trim())).toEqual([
+      "107.7 BPM 93%",
+      "215.4 BPM 61%",
+      "72.0 BPM 34%",
+    ]);
+
+    // The Beat Grid is already locked to the top reading: that chip is
+    // informational, the alternatives are actionable.
+    expect(chips[0]).toHaveAttribute("aria-pressed", "true");
+    expect(chips[0]).toHaveAttribute("disabled");
+    expect(chips[1].getAttribute("disabled")).toBeNull();
+    expect(chips[1]).toHaveAttribute(
+      "aria-label",
+      "Re-lock Beat Grid to 215.4 BPM"
+    );
+  });
+
+  it("hands the rail's candidate picker to the app: choosing an alternative asks for a re-lock at that tempo", async () => {
+    const user = userEvent.setup();
+    const requested: number[] = [];
+
+    render(
+      <StemPlayer
+        stems={dummyStems}
+        sampleRate={sampleRate}
+        audioContext={mockCtx}
+        beatGrid={Float64Array.from([0.5, 1.0572789, 1.6145578])}
+        clickTrackBpm={107.7}
+        tempoCandidates={[
+          { bpm: 107.7, confidence: 0.93 },
+          { bpm: 215.4, confidence: 0.61 },
+        ]}
+        onChooseTempoCandidate={(bpm) => {
+          requested.push(bpm);
+        }}
+      />
+    );
+
+    // Only the ranked alternative is picked: nothing but the locked tempo.
+    await user.click(
+      screen.getByRole("button", {
+        name: /re-lock beat grid to 215\.4 bpm/i,
+      })
+    );
+    expect(requested).toEqual([215.4]);
+
+    // Picking the tempo the Beat Grid is already locked to asks for nothing.
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /beat grid locked to 107\.7 bpm/i,
+      })
+    );
+    expect(requested).toEqual([215.4]);
+  });
 });

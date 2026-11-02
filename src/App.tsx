@@ -257,20 +257,22 @@ export const App: React.FC = () => {
   }, []);
 
   // Tempo Detector (ADR-0010): fire-and-forget heavy BPM pass over the decoded
-  // Source Mix off the main thread. It never gates separation or playback;
-  // the ranked candidates land on the Separate tab status line when they
-  // arrive. The guard discards stale results if the Source Mix was cleared
-  // in the meantime.
-  const startTempoAnalysis = (buffer: AudioBuffer) => {
+  // Source Mix off the main thread. It never gates separation or playback; the
+  // ranked candidates land on the Separate tab status line when they arrive.
+  // The guard discards stale results if the Source Mix was cleared meanwhile.
+  // Ticket 06: the same routine re-runs the pass with a user-selected candidate
+  // as the re-lock hint, so the Beat Grid swaps to the chosen feel.
+  const startTempoAnalysis = (buffer: AudioBuffer, hintBpm?: number) => {
     try {
       const client = new BeatClient();
       beatClientRef.current = client;
       client
-        .analyze(buffer.getChannelData(0), buffer.sampleRate)
+        .analyze(buffer.getChannelData(0), buffer.sampleRate, hintBpm)
         .then((result) => {
           if (beatClientRef.current === client) {
             setTempoAnalysis(result);
             tempoResultRef.current = result;
+            attachTempoResultToSession(result);
           }
         })
         .catch(() => {
@@ -281,6 +283,20 @@ export const App: React.FC = () => {
       // Worker construction can fail in headless environments; the Tempo
       // Detector is an optional enhancement, never a blocker.
     }
+  };
+
+  // A re-locked Beat Grid replaces the one the Session carries, so the auto-
+  // saver keeps writing the chosen tempo and its grid (ticket 03 persistence
+  // keeps working after every candidate switch).
+  const attachTempoResultToSession = (result: TempoAnalysisResult) => {
+    const session = cachedSessionRef.current;
+    if (!session) return;
+    const updatedSession: DemuxifySession = {
+      ...session,
+      tempo: result,
+    };
+    cachedSessionRef.current = updatedSession;
+    autoSaverRef.current.debounceSave(updatedSession);
   };
 
   const processAudioFile = async (file: File) => {
@@ -475,6 +491,21 @@ export const App: React.FC = () => {
 
   const handleExportDialogStateChange = (state: ExportDialogState) => {
     setExportDialogState(state);
+  };
+
+  // Re-lock (ticket 06): the Mix-tab rail's picker chose a Tempo Detector
+  // candidate. The pass re-runs off the main thread with that tempo as the
+  // hint — the same heavy-pass machinery as at decode, so the UI stays
+  // responsive mid-relock — and the new Beat Grid replaces the old one only
+  // when it arrives, which keeps clicks on the current grid until then.
+  const handleChooseTempoCandidate = (bpm: number) => {
+    if (!decodedSourceMix) return;
+    if (beatClientRef.current) {
+      // Abandon an analysis still in flight: one Tempo Detector pass at a
+      // time, so a re-lock never competes with the pass it replaces.
+      beatClientRef.current.cancel();
+    }
+    startTempoAnalysis(decodedSourceMix.buffer, bpm);
   };
 
   const handleFileInputChange = (e: ChangeEvent<HTMLInputElement>) => {
@@ -919,6 +950,11 @@ export const App: React.FC = () => {
                   clickTrackBpm={
                     tempoAnalysis ? tempoAnalysis.analyzedBpm : null
                   }
+                  // Ticket 06: the ranked candidates drive the rail's honest
+                  // readout (top + alternatives with confidence) and its
+                  // picker, which re-locks the Beat Grid off the main thread.
+                  tempoCandidates={tempoAnalysis?.candidates}
+                  onChooseTempoCandidate={handleChooseTempoCandidate}
                   onClickTrackState={(state) => {
                     clickTrackStateRef.current = state;
                   }}

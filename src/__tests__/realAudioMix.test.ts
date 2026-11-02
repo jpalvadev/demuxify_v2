@@ -498,4 +498,95 @@ describe("Real Audio Ingestion & Processing Pipeline (audioslave_stone.mp3)", ()
       Math.abs(stretchedMedian * stretch - decodedMedian) <= decodedMedian * 0.1
     ).toBe(true);
   });
+
+  it("re-locks end-to-end on real audio: choosing the metric-doubling candidate moves the clicks to the other metric level (median interval ~0.557 s → ~0.279 s)", async () => {
+    const rate = 44100;
+    const durationSec = 12;
+    const total = Math.round(durationSec * rate);
+
+    // Accepted deterministic 107.7 BPM pulse surrogate (CODING_STANDARDS §4
+    // test double; scripts/check_bpm.py ground truth on the reference
+    // Source Mix: 107.7 BPM, median beat interval ~0.557 s).
+    const samples = new Float32Array(total);
+    const period = (60 / 107.7) * rate;
+    const tapLen = Math.round(0.012 * rate);
+    for (let b = 1; b * period < total - rate * 0.05; b++) {
+      const start = Math.round(b * period);
+      for (let i = 0; i < tapLen && start + i < total; i++) {
+        const env = Math.exp((-8 * i) / tapLen);
+        samples[start + i] +=
+          Math.sin((2 * Math.PI * 220 * i) / rate) * env * 0.9;
+      }
+    }
+
+    // The rail's picker chose the doubling; the pass re-runs with it as hint.
+    const postedMessages: WorkerOutMessage[] = [];
+    await handleWorkerMessage(
+      {
+        type: "start",
+        samples,
+        sampleRate: rate,
+        hintBpm: 215.4,
+      },
+      (m) => {
+        postedMessages.push(m);
+      }
+    );
+    const complete = postedMessages.find((m) => m.type === "complete");
+    if (!complete || complete.type !== "complete") return;
+
+    // The grid is locked to the doubling, and the honest ranking still shows
+    // the pulse it came from: the user chose a feel, the engine did not.
+    expect(Math.abs(complete.analyzedBpm - 215.4) / 215.4).toBeLessThanOrEqual(
+      0.05
+    );
+    expect(
+      complete.candidates.some((c) => Math.abs(c.bpm - 107.7) / 107.7 <= 0.05)
+    ).toBe(true);
+
+    const grid = complete.beatGrid;
+    const meter: ClickTrackMeter = "4/4";
+    const channel = synthesizeClickTrackChannel(grid, meter, rate, durationSec);
+    // The click channel always covers the whole Source Mix; a re-locked grid
+    // can carry one more beat past the window and the channel keeps it.
+    expect(channel.length).toBeGreaterThanOrEqual(total);
+
+    // Onset clustering on the synthesized click channel.
+    const onsets: number[] = [];
+    for (let i = 0; i < channel.length; i++) {
+      const nz = Math.abs(channel[i]) > 1e-6;
+      const prev = i === 0 ? false : Math.abs(channel[i - 1]) > 1e-6;
+      if (nz && !prev) {
+        const t = i / rate;
+        if (onsets.length === 0 || t - onsets[onsets.length - 1] > 0.1) {
+          onsets.push(t);
+        }
+      }
+    }
+
+    // One click per re-locked grid position, landing on the grid.
+    expect(onsets).toHaveLength(grid.length);
+    for (let k = 0; k < grid.length; k++) {
+      expect(Math.abs(onsets[k] - grid[k])).toBeLessThan(3 / rate);
+    }
+
+    // The clicks audibly moved to the other metric level: their median
+    // interval sits at the doubling (~0.279 s), half the anchor interval.
+    const gaps: number[] = [];
+    for (let k = 0; k + 1 < onsets.length; k++) {
+      gaps.push(onsets[k + 1] - onsets[k]);
+    }
+    gaps.sort();
+    const median = gaps[Math.floor(gaps.length / 2)];
+    const anchorInterval = 60 / 107.7;
+    const doubledInterval = anchorInterval / 2;
+    expect(Math.abs(median - doubledInterval)).toBeLessThanOrEqual(
+      doubledInterval * 0.1
+    );
+
+    // The un-hinted reading of the same window is a 22-beat grid
+    // (scripts/check_bpm.py surrogate constants): the re-lock roughly doubles
+    // the click density.
+    expect(onsets.length).toBeGreaterThan(30);
+  });
 });

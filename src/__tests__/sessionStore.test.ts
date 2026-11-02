@@ -161,6 +161,45 @@ describe("sessionStore", () => {
     }
   });
 
+  it("round-trips a re-locked Session: the feel the Beat Grid is locked to survives even when it is not the engine's top reading", async () => {
+    const doublingGrid = new Float64Array([0.279, 0.557, 0.836, 1.115]);
+    const mockSession = createMockSession({
+      tempo: {
+        candidates: [
+          { bpm: 107.7, confidence: 0.93 },
+          { bpm: 215.4, confidence: 0.61 },
+        ],
+        // The user picked the metric doubling; the engine still ranks 107.7
+        // top, so the ranking and the chosen feel must survive separately.
+        chosenTempoBpm: 215.4,
+        beatGrid: doublingGrid,
+        analyzedBpm: 215.4,
+        duration: 294.1,
+      },
+    });
+
+    await saveActiveSession(mockSession);
+
+    const loaded = await loadActiveSession();
+    expect(loaded).not.toBeNull();
+    if (!loaded) return;
+
+    expect(loaded.tempo).not.toBeNull();
+    if (loaded.tempo) {
+      expect(loaded.tempo.candidates).toEqual([
+        { bpm: 107.7, confidence: 0.93 },
+        { bpm: 215.4, confidence: 0.61 },
+      ]);
+      expect(loaded.tempo.chosenTempoBpm).toBe(215.4);
+      expect(loaded.tempo.analyzedBpm).toBe(215.4);
+      expect(loaded.tempo.duration).toBe(294.1);
+      expect(loaded.tempo.beatGrid).toHaveLength(doublingGrid.length);
+      for (let i = 0; i < doublingGrid.length; i++) {
+        expect(loaded.tempo.beatGrid[i]).toBe(doublingGrid[i]);
+      }
+    }
+  });
+
   it("loads sessions written before the Tempo Detector shipped without tempo state", async () => {
     // Backwards compatibility: the state is optional on read, so a legacy
     // Session simply loads with no tempo field and Session Recovery

@@ -1021,5 +1021,63 @@ describe("StemPlayerEngine", () => {
         peakNear(channel, beatGridSec[2], sampleRate)
       );
     });
+
+    it("swapping the Beat Grid re-synthesizes the lane the moment it arrives: no stale clicks, mixer and playhead untouched", async () => {
+      const engine = new StemPlayerEngine(dummyStems, {
+        audioContext: mockCtx as any,
+        sampleRate,
+        beatGrid: beatGridSec,
+      });
+      engine.setClickTrackEnabled(true);
+      engine.setClickTrackVolume(0.7);
+      await engine.play();
+      expect(mockCtx.createBuffer).toHaveBeenCalledTimes(5);
+      expect(mockCtx.createdSources).toHaveLength(5);
+
+      // The re-locked Beat Grid from the user's candidate pick: the metric
+      // doubling, with beats where the tracker reports they fall. 0.7786 s
+      // sits mid-interval of the old grid, a stale-grid giveaway.
+      const doublingGrid = new Float64Array([
+        0.5, 0.7786395, 1.0572789, 1.3359184, 1.6145578, 1.8931973, 2.1718367,
+        2.4504762, 2.7291156,
+      ]);
+
+      engine.setBeatGrid(doublingGrid);
+
+      // The channel rebuilt in place, and the lane source playing when the
+      // grid arrived was retired and replaced: the heard clicks are the
+      // new grid's, never the old grid's.
+      expect(mockCtx.createBuffer).toHaveBeenCalledTimes(6);
+      expect(engine.getBeatGrid()).toEqual(doublingGrid);
+      expect(mockCtx.createdSources).toHaveLength(6);
+      expect(engine.getActiveSources()).toHaveLength(5);
+      const oldClickSource = mockCtx.createdSources[4];
+      expect(oldClickSource.stop).toHaveBeenCalledTimes(1);
+      for (let i = 0; i < 4; i++) {
+        expect(mockCtx.createdSources[i].stop).not.toHaveBeenCalled();
+      }
+
+      // Clicks follow the re-locked grid exactly: one per grid position,
+      // including the mid-interval beat the old channel was silent at.
+      const heard = mockCtx.createdSources[5].buffer.getChannelData(0);
+      const onsets = clickOnsets(heard, sampleRate);
+      expect(onsets).toHaveLength(doublingGrid.length);
+      for (let k = 0; k < doublingGrid.length; k++) {
+        expect(Math.abs(onsets[k] - doublingGrid[k])).toBeLessThan(
+          (2 / sampleRate) * 10
+        );
+      }
+      expect(peakNear(heard, 0.7786395, sampleRate)).toBeGreaterThan(0);
+
+      // The swap is not a lane reset: mixer settings and the playhead stay
+      // where they were.
+      expect(engine.getClickTrackState()).toEqual({
+        enabled: true,
+        muted: false,
+        volume: 0.7,
+        meter: "4/4",
+      });
+      expect(engine.getCurrentTime()).toBe(0);
+    });
   });
 });

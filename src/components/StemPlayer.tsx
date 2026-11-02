@@ -26,6 +26,9 @@ import { ExportDialog } from "./ExportDialog";
 import { WaveformPeaks } from "../lib/waveformPeaks";
 import { cn } from "../lib/utils";
 import { DISPLAY_FONT_STACK, MONO_FONT_STACK } from "../lib/typography";
+// Readout only: the Tempo Detector's ranked candidate shape (ticket 06). Type-
+// only import, so the player never pulls the beat-detection worker at runtime.
+import type { TempoCandidate } from "../workers/beatDetection.worker";
 
 // Tab Shell (ADR-0007/0008): live mixer + time-stretch state bridge so the
 // Export panel can be mounted at the app level instead of inside the player.
@@ -85,6 +88,13 @@ export interface StemPlayerProps {
   // Readout only: the BPM the Beat Grid was locked at (chosen candidate).
   clickTrackBpm?: number | null;
   onClickTrackState?: (state: ClickTrackMixerState) => void;
+  // Ticket 06: the ranked Tempo Detector readings behind the Beat Grid, so the
+  // rail can show the top candidate plus alternatives with confidence and offer
+  // the picker that re-locks. Domain-separate: candidates are not Stems.
+  tempoCandidates?: TempoCandidate[] | null;
+  // The rail's picker: the app re-runs the Tempo Detector with the chosen
+  // tempo as hint, then swaps the Beat Grid when the re-lock arrives.
+  onChooseTempoCandidate?: (bpm: number) => void;
 }
 
 function formatTime(totalSeconds: number): string {
@@ -105,6 +115,22 @@ const CLICK_TRACK_DEFAULT: ClickTrackMixerState = {
   volume: 1.0,
   meter: "4/4",
 };
+
+// Tempo Detector readout helpers (ticket 06). The engine only ever ranks: a
+// reading is confident only when a single candidate owns it, so an octave-
+// related alternative (a pulse and its doubling are indistinguishable) keeps
+// the rail honest — it says so and offers the picker instead of a bare BPM.
+const isConfidentReading = (candidates: TempoCandidate[]): boolean =>
+  candidates.length === 1 && candidates[0].confidence >= 0.99;
+
+const formatConfidence = (confidence: number): string =>
+  `${Math.round(Math.max(0, Math.min(1, confidence)) * 100)}%`;
+
+// The Beat Grid is locked to a candidate when that candidate is the chosen
+// tempo; beatTrack's phase-aligned bpm can sit a hair off its input, so the
+// comparison is tolerant rather than exact.
+const isLockedCandidate = (bpm: number, lockedBpm: number | null): boolean =>
+  lockedBpm !== null && Math.abs(bpm - lockedBpm) < 0.05;
 
 export const StemPlayer: React.FC<StemPlayerProps> = ({
   stems,
@@ -127,6 +153,8 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
   initialClickTrack,
   clickTrackBpm,
   onClickTrackState,
+  tempoCandidates,
+  onChooseTempoCandidate,
 }) => {
   const engineRef = useRef<StemPlayerEngine | null>(null);
 
@@ -658,6 +686,68 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
             Meter {clickTrack.meter}
           </span>
         </div>
+
+        {/* Candidates readout (ticket 06): the Tempo Detector ranks a top
+            reading plus ranked alternatives, each with its confidence, and a
+            pulse and its metric doubling are genuinely indistinguishable — so
+            nothing here claims one BPM as certain. The chips are the picker:
+            picking one asks the app to re-run the Tempo Detector with that
+            tempo as hint, which re-locks the Beat Grid. Domain-separate:
+            candidates are never Stems. */}
+        {tempoCandidates && tempoCandidates.length > 0 && (
+          <div
+            data-testid="click-track-tempo-readout"
+            className="flex flex-col gap-1.5 shrink-0 sm:w-46"
+          >
+            <span
+              data-testid="click-track-confidence-label"
+              className="text-[11px] font-mono text-muted-foreground"
+            >
+              {isConfidentReading(tempoCandidates)
+                ? `solid reading · confidence ${formatConfidence(tempoCandidates[0].confidence)}`
+                : `${tempoCandidates.length} readings ranked · pick the feel you hear`}
+            </span>
+            <div
+              data-testid="click-track-candidate-picker"
+              className="grid grid-cols-2 gap-1"
+            >
+              {tempoCandidates.map((candidate) => {
+                const locked = isLockedCandidate(
+                  candidate.bpm,
+                  clickTrackBpm ?? null
+                );
+                const bpmLabel = `${candidate.bpm.toFixed(1)} BPM`;
+                return (
+                  <button
+                    key={bpmLabel}
+                    type="button"
+                    aria-label={
+                      locked
+                        ? `Beat Grid locked to ${bpmLabel}`
+                        : `Re-lock Beat Grid to ${bpmLabel}`
+                    }
+                    aria-pressed={locked}
+                    title={bpmLabel}
+                    disabled={locked || !onChooseTempoCandidate}
+                    onClick={() => {
+                      if (!locked) {
+                        onChooseTempoCandidate?.(candidate.bpm);
+                      }
+                    }}
+                    className={cn(
+                      "px-2 py-1 rounded-none border text-[11px] font-mono font-bold transition-all flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed",
+                      locked
+                        ? "border-primary/70 bg-primary/25 text-primary cursor-default"
+                        : "border-border/70 bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground"
+                    )}
+                  >
+                    {`${bpmLabel} ${formatConfidence(candidate.confidence)}`}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Mixer controls: enable switch (off by default), mute, volume — like a
             lane, with no rate control of its own (Time-Stretch owns the rate). */}

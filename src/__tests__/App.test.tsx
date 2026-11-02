@@ -11,6 +11,100 @@ import * as webgpuModule from "../lib/webgpu";
 import * as audioDecoderModule from "../lib/audioDecoder";
 import { InferenceClient } from "../lib/inferenceClient";
 import * as toastModule from "../lib/toast";
+import * as bundleZip from "../lib/bundleZip";
+
+// --- Tempo Detector Worker stub (ticket 06) ---------------------------------
+// The app only ever reaches the heavy BPM pass through the Web Worker seam, so
+// the re-lock tests swap this stub in: it answers a start message with a Beat
+// Grid at the requested feel (the hint is the candidate the rail's picker
+// chose). Completions are queued instead of fired on post, which is how a test
+// watches the Mix tab while a re-lock pass is still in flight and hands the
+// reply over when it wants.
+let tempoWorkerQueue: (() => void)[] = [];
+
+class StubTempoWorker {
+  onmessage: ((event: MessageEvent) => void) | null = null;
+  onerror: ((event: ErrorEvent) => void) | null = null;
+
+  postMessage(message: any) {
+    if (!message || message.type !== "start") return;
+    const bpm = message.hintBpm ?? 107.7;
+    const intervalSec = 60 / bpm;
+    // Short span so a completed export bundle stays cheap to encode: the
+    // Click Track file the export tests read is cut on this grid.
+    const beatCount = Math.round(2 / intervalSec);
+    tempoWorkerQueue.push(() => {
+      this.onmessage?.({
+        data: {
+          type: "complete",
+          // The engine's ranking never changes: only the user's pick does.
+          candidates: [
+            { bpm: 107.7, confidence: 0.93 },
+            { bpm: 215.4, confidence: 0.61 },
+          ],
+          beatGrid: Float64Array.from(
+            Array.from({ length: beatCount }, (_, i) => i * intervalSec)
+          ),
+          analyzedBpm: bpm,
+          duration: 2,
+        },
+      } as MessageEvent);
+    });
+  }
+
+  terminate() {}
+}
+
+const fireQueuedTempoCompletions = () => {
+  const queued = tempoWorkerQueue;
+  tempoWorkerQueue = [];
+  queued.forEach((deliver) => deliver());
+};
+
+// WAV bytes -> click onsets in seconds: walk the RIFF chunk list, read the
+// Int16 LE data chunk, cluster first crossings. Same reader the real-audio
+// seam uses, pointed at the Click Track file inside a completed Export
+// Bundle: what a user would hear if they played the export back.
+function decodeWavClickOnsets(bytes: Uint8Array, rate: number): number[] {
+  const onsets: number[] = [];
+  if (!bytes) return onsets;
+  let dataStart = -1;
+  let dataLen = 0;
+  for (let off = 12; off + 8 <= bytes.length;) {
+    const size =
+      bytes[off + 4] |
+      (bytes[off + 5] << 8) |
+      (bytes[off + 6] << 16) |
+      (bytes[off + 7] << 24);
+    const fourcc = String.fromCharCode(
+      bytes[off],
+      bytes[off + 1],
+      bytes[off + 2],
+      bytes[off + 3]
+    );
+    if (fourcc === "data") {
+      dataStart = off + 8;
+      dataLen = size;
+      break;
+    }
+    off += 8 + size + (size % 2);
+  }
+  if (dataStart < 0) return onsets;
+  let prev = false;
+  for (let s = 0; s * 2 + 1 < dataLen; s++) {
+    const raw = bytes[dataStart + s * 2] | (bytes[dataStart + s * 2 + 1] << 8);
+    const v = raw >= 0x8000 ? raw - 0x10000 : raw;
+    const nz = Math.abs(v) > 100;
+    if (nz && !prev) {
+      const t = s / rate;
+      if (onsets.length === 0 || t - onsets[onsets.length - 1] > 0.1) {
+        onsets.push(t);
+      }
+    }
+    prev = nz;
+  }
+  return onsets;
+}
 
 describe("App UI Shell", () => {
   const dummyBuffer = {
@@ -1248,6 +1342,27 @@ describe("App UI Shell", () => {
     });
   };
 
+  // Tempo Detector (ticket 06): separation plus the queued decode-time BPM
+  // pass delivered, so the live Mix Tab's rail shows its ranked readings.
+  const separateAndDetectTempo = async () => {
+    vi.spyOn(webgpuModule, "detectWebGPUCapability").mockResolvedValue({
+      supported: true,
+      isFallback: false,
+    });
+    completeSeparationMocks();
+    tempoWorkerQueue = [];
+
+    render(<App />);
+    await loadAndSeparate();
+
+    fireQueuedTempoCompletions();
+    await waitFor(() => {
+      expect(
+        screen.getByTestId("click-track-tempo-readout")
+      ).toBeInTheDocument();
+    });
+  };
+
   it("activates the Tab rail: clicking a rail Tab button moves the stage panel", async () => {
     vi.spyOn(webgpuModule, "detectWebGPUCapability").mockResolvedValue({
       supported: true,
@@ -1827,5 +1942,223 @@ describe("App UI Shell", () => {
     expect(
       screen.getByText(/powered by client neural inference/i)
     ).toBeInTheDocument();
+  });
+
+  it("re-locks the Beat Grid from the Mix-tab candidate picker: the user's pick of the metric doubling replaces the grid and the rail follows it", async () => {
+    vi.stubGlobal("Worker", StubTempoWorker);
+    try {
+      await separateAndDetectTempo();
+
+      // The Beat Grid starts locked to the engine's top reading, and the
+      // rail says honestly that it ranked two readings.
+      expect(screen.getByTestId("click-track-bpm-label")).toHaveTextContent(
+        "107.7 BPM"
+      );
+      expect(
+        screen.getByTestId("click-track-confidence-label")
+      ).toHaveTextContent("2 readings ranked");
+
+      // The rail's picker asks for the metric doubling as a re-lock hint.
+      fireEvent.click(
+        screen.getByRole("button", {
+          name: /^re-lock beat grid to 215\.4 bpm$/i,
+        })
+      );
+      fireQueuedTempoCompletions();
+
+      // The new Beat Grid replaces the old one: the rail now reads the chosen
+      // feel, and the Session keeps working off that same result.
+      await waitFor(() => {
+        expect(screen.getByTestId("click-track-bpm-label")).toHaveTextContent(
+          "215.4 BPM"
+        );
+      });
+
+      // The lock moved: the doubling is now informational and the pulse
+      // became the actionable alternative.
+      const chips = within(
+        screen.getByTestId("click-track-candidate-picker")
+      ).getAllByRole("button");
+      expect(chips).toHaveLength(2);
+      const locked = chips.filter(
+        (chip) => chip.getAttribute("aria-pressed") === "true"
+      );
+      expect(locked).toHaveLength(1);
+      expect(locked[0]).toHaveAttribute(
+        "aria-label",
+        "Beat Grid locked to 215.4 BPM"
+      );
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("keeps the Mix Tab live while a re-lock pass is in flight: the old Beat Grid stays until the new one arrives, and re-picking mid-flight replaces the pass", async () => {
+    vi.stubGlobal("Worker", StubTempoWorker);
+    try {
+      await separateAndDetectTempo();
+
+      fireEvent.click(
+        screen.getByRole("button", {
+          name: /^re-lock beat grid to 215\.4 bpm$/i,
+        })
+      );
+
+      // Mid-pass: nothing half-applied. The rail still reads the old grid,
+      // the Tab Shell is intact, and the Transport still drives the shared
+      // engine, so the heavy pass never blocks the Mix Tab.
+      expect(screen.getByTestId("click-track-bpm-label")).toHaveTextContent(
+        "107.7 BPM"
+      );
+      expect(screen.getAllByRole("navigation")).toHaveLength(1);
+      expect(
+        screen
+          .getAllByRole("button")
+          .filter((entry) => entry.getAttribute("aria-current") === "true")
+      ).toHaveLength(1);
+      const mixToggle = within(
+        screen.getByRole("region", { name: /mix tab/i })
+      ).getByRole("button", { name: /^play\/pause$/i });
+      expect(mixToggle).toHaveAttribute("aria-pressed", "false");
+      fireEvent.click(mixToggle);
+      await waitFor(() => {
+        expect(mixToggle).toHaveAttribute("aria-pressed", "true");
+      });
+      fireEvent.click(mixToggle);
+      await waitFor(() => {
+        expect(mixToggle).toHaveAttribute("aria-pressed", "false");
+      });
+
+      // Re-picking while the pass is in flight abandons it and starts a fresh
+      // one: one Tempo Detector pass at a time.
+      fireEvent.click(
+        screen.getByRole("button", {
+          name: /^re-lock beat grid to 215\.4 bpm$/i,
+        })
+      );
+
+      // Delivering both queued replies leaves the rail on the last pick: the
+      // abandoned pass is discarded, never resurrected as a stale grid.
+      fireQueuedTempoCompletions();
+      await waitFor(() => {
+        expect(screen.getByTestId("click-track-bpm-label")).toHaveTextContent(
+          "215.4 BPM"
+        );
+      });
+      expect(
+        screen.getByTestId("click-track-confidence-label")
+      ).toHaveTextContent("2 readings ranked");
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("switches the metric level repeatedly: every pick re-locks the Beat Grid and the rail's locked reading tracks the last choice", async () => {
+    vi.stubGlobal("Worker", StubTempoWorker);
+    try {
+      await separateAndDetectTempo();
+
+      const lockedTo = (bpm: string) =>
+        expect(screen.getByTestId("click-track-bpm-label")).toHaveTextContent(
+          `${bpm} BPM`
+        );
+      const actionable = (label: string) =>
+        expect(
+          screen.queryByRole("button", {
+            name: new RegExp(`^re-lock beat grid to ${label}$`, "i"),
+          })
+        ).toBeInTheDocument();
+
+      lockedTo("107.7");
+      actionable("215.4 BPM");
+
+      // Down the octave, back up, down again: each pick is a fresh pass and
+      // the rail follows it.
+      fireEvent.click(
+        screen.getByRole("button", {
+          name: /^re-lock beat grid to 215\.4 bpm$/i,
+        })
+      );
+      fireQueuedTempoCompletions();
+      await waitFor(() => lockedTo("215.4"));
+      actionable("107.7 BPM");
+
+      fireEvent.click(
+        screen.getByRole("button", {
+          name: /^re-lock beat grid to 107\.7 bpm$/i,
+        })
+      );
+      fireQueuedTempoCompletions();
+      await waitFor(() => lockedTo("107.7"));
+      actionable("215.4 BPM");
+
+      fireEvent.click(
+        screen.getByRole("button", {
+          name: /^re-lock beat grid to 215\.4 bpm$/i,
+        })
+      );
+      fireQueuedTempoCompletions();
+      await waitFor(() => lockedTo("215.4"));
+      actionable("107.7 BPM");
+
+      // The exported file matches the chosen grid: with the Click Track
+      // lane on, the Export Bundle handed to the bundler carries a Click
+      // Track file cut on the last-locked Beat Grid. Finishing the ZIP and
+      // triggering the download is pinned at the Export Dialog and bundle
+      // seams; at the App seam, the contract is the bytes handed down.
+      fireEvent.click(screen.getByRole("switch", { name: /^click track$/i }));
+      await clickTabButton("Export");
+
+      const bundleSpy = vi.spyOn(bundleZip, "createStemBundleZip");
+      const exportPanel = await waitFor(() =>
+        within(screen.getByRole("region", { name: /export tab/i })).getByRole(
+          "region",
+          { name: /export audio stems/i }
+        )
+      );
+      fireEvent.click(
+        within(exportPanel).getByRole("radio", {
+          name: /full export bundle/i,
+        })
+      );
+      fireEvent.click(
+        within(exportPanel).getByRole("button", { name: /export & download/i })
+      );
+      // The bundler is reached exactly once, with the Click Track bytes
+      // already encoded: those are the bytes its file would hold.
+      await waitFor(() => {
+        expect(bundleSpy).toHaveBeenCalledTimes(1);
+      });
+
+      expect(bundleSpy).toHaveBeenCalledTimes(1);
+      const options = bundleSpy.mock.calls[0][1] as Record<string, unknown>;
+      expect(options.format).toBe("wav");
+      expect(options.clickTrack).toBeInstanceOf(Uint8Array);
+
+      const onsets = decodeWavClickOnsets(
+        options.clickTrack as Uint8Array,
+        44100
+      );
+      // Every click sits on the 215.4 grid the rail was locked to (within
+      // a couple of samples)...
+      const chosenInterval = 60 / 215.4;
+      const chosenBeats = Math.round(2 / chosenInterval);
+      expect(onsets).toHaveLength(chosenBeats);
+      for (let k = 0; k < chosenBeats; k++) {
+        expect(Math.abs(onsets[k] - k * chosenInterval)).toBeLessThan(
+          3 / 44100
+        );
+      }
+      // ...and one lands where the top reading's grid was silent: 1.5 times
+      // its interval is not one of its positions, so the file is not the
+      // stale 107.7 clicks.
+      expect(
+        onsets.some((t) => Math.abs(t - 1.5 * (60 / 107.7)) < 3 / 44100)
+      ).toBe(true);
+
+      bundleSpy.mockRestore();
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

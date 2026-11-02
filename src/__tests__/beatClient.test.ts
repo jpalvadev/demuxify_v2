@@ -56,6 +56,8 @@ describe("Tempo Detector Client Pipeline (beat client & worker relay)", () => {
     expect(result.beatGrid).toEqual(beatGrid);
     expect(result.analyzedBpm).toBe(107.7);
     expect(result.duration).toBe(1.0);
+    // With no re-lock hint, the Beat Grid is locked to the top-ranked reading.
+    expect(result.chosenTempoBpm).toBe(107.7);
     expect(client.isBusy()).toBe(false);
   });
 
@@ -72,6 +74,8 @@ describe("Tempo Detector Client Pipeline (beat client & worker relay)", () => {
       hintBpm: 215.4,
     });
 
+    // The doubling grid the re-lock is expected to produce (half intervals).
+    const doublingGrid = Float64Array.from([0.279, 0.557, 0.836]);
     mockWorker.onmessage?.({
       data: {
         type: "complete",
@@ -79,7 +83,7 @@ describe("Tempo Detector Client Pipeline (beat client & worker relay)", () => {
           { bpm: 215.4, confidence: 0.4 },
           { bpm: 107.7, confidence: 0.9 },
         ],
-        beatGrid: Float64Array.from([0.279, 0.557, 0.836]),
+        beatGrid: doublingGrid,
         analyzedBpm: 215.4,
         duration: 1.0,
       },
@@ -89,6 +93,16 @@ describe("Tempo Detector Client Pipeline (beat client & worker relay)", () => {
     // Ranked order stays engine-ranked; nothing is presented as certain.
     expect(result.candidates.map((c) => c.bpm)).toContain(107.7);
     expect(result.analyzedBpm).toBe(215.4);
+    // The user's pick names the tempo the Beat Grid is locked to, even when a
+    // different reading ranks higher on confidence (octave ambiguity is the
+    // user's decision).
+    expect(result.chosenTempoBpm).toBe(215.4);
+    // The grid that arrives is the doubling grid: click intervals halved.
+    expect(
+      doublingGrid.map((beat, i) =>
+        i === 0 ? 0 : beat - doublingGrid[i - 1]
+      )[1]
+    ).toBeCloseTo(0.278, 3);
     expect(client.isBusy()).toBe(false);
   });
 

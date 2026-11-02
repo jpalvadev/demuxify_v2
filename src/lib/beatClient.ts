@@ -17,6 +17,10 @@ export interface TempoAnalysisResult {
   beatGrid: Float64Array;
   analyzedBpm: number;
   duration: number;
+  // The candidate the Beat Grid is locked to (ticket 06): the hint the user
+  // picked on a re-lock, otherwise the top-ranked reading. Persisted with the
+  // Session so Session Recovery resumes clicks at the chosen feel.
+  chosenTempoBpm?: number;
 }
 
 export class BeatClient {
@@ -25,6 +29,9 @@ export class BeatClient {
   private currentAnalysisResolve: ((val: TempoAnalysisResult) => void) | null =
     null;
   private currentAnalysisReject: ((err: Error) => void) | null = null;
+  // Re-lock hint (ticket 06): the candidate the user chose for this pass, so
+  // the completed result can name the tempo the Beat Grid got locked to.
+  private currentHintBpm: number | undefined = undefined;
 
   constructor(worker?: Worker) {
     if (worker) {
@@ -67,6 +74,9 @@ export class BeatClient {
               beatGrid: data.beatGrid,
               analyzedBpm: data.analyzedBpm,
               duration: data.duration,
+              // The user's pick (re-lock hint) is the tempo the Beat Grid is
+              // locked to; with no hint, the top-ranked reading is.
+              chosenTempoBpm: this.currentHintBpm ?? data.analyzedBpm,
             });
             this.cleanupAnalysis();
           }
@@ -142,6 +152,7 @@ export class BeatClient {
     );
 
     this.isProcessing = true;
+    this.currentHintBpm = hintBpm;
 
     return new Promise((resolve, reject) => {
       this.currentAnalysisResolve = resolve;
