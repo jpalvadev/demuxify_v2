@@ -247,18 +247,19 @@ describe("sessionStore", () => {
     // No backwards compatibility (ADR-0011 Amendment): the Click Track has no
     // Downbeat Phase or Meter field anymore, so nothing reads or re-guesses
     // one — a resumed Session simply gets the lane as it is stored now.
+    const resumedClickTrack: ClickTrackMixerState = {
+      enabled: true,
+      muted: false,
+      volume: 0.5,
+    };
     const mockSession = createMockSession({
-      clickTrack: { enabled: true, muted: false, volume: 0.5 },
+      clickTrack: resumedClickTrack,
     });
     await saveActiveSession(mockSession);
     const loaded = await loadActiveSession();
     expect(loaded).not.toBeNull();
     if (loaded) {
-      expect(loaded.clickTrack).toEqual({
-        enabled: true,
-        muted: false,
-        volume: 0.5,
-      });
+      expect(loaded.clickTrack).toEqual(resumedClickTrack);
     }
   });
 

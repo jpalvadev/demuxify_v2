@@ -1,8 +1,8 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { InferenceClient } from '../lib/inferenceClient';
-import { STEM_NAMES, StemName } from '../lib/chunkOverlapAdd';
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { ChunkProgress, InferenceClient } from "../lib/inferenceClient";
+import { STEM_NAMES, StemName } from "../lib/chunkOverlapAdd";
 
-describe('Inference Client & Engine Pipeline', () => {
+describe("Inference Client & Engine Pipeline", () => {
   let mockWorker: {
     postMessage: ReturnType<typeof vi.fn>;
     terminate: ReturnType<typeof vi.fn>;
@@ -23,25 +23,25 @@ describe('Inference Client & Engine Pipeline', () => {
     vi.restoreAllMocks();
   });
 
-  it('initializes the model and relays download progress events', async () => {
+  it("initializes the model and relays download progress events", async () => {
     const client = new InferenceClient(mockWorker as unknown as Worker);
 
     const downloadEvents: any[] = [];
     const initPromise = client.init({
-      modelUrl: 'https://example.com/model.onnx',
+      modelUrl: "https://example.com/model.onnx",
       onDownloadProgress: (p) => downloadEvents.push(p),
     });
 
     expect(mockWorker.postMessage).toHaveBeenCalledWith({
-      type: 'init',
-      modelUrl: 'https://example.com/model.onnx',
+      type: "init",
+      modelUrl: "https://example.com/model.onnx",
       useMock: false,
     });
 
     // Simulate worker emitting download progress
     mockWorker.onmessage?.({
       data: {
-        type: 'download_progress',
+        type: "download_progress",
         loadedBytes: 50,
         totalBytes: 100,
         progress: 0.5,
@@ -51,31 +51,34 @@ describe('Inference Client & Engine Pipeline', () => {
     // Simulate worker finishing init
     mockWorker.onmessage?.({
       data: {
-        type: 'init_complete',
-        backend: 'webgpu',
+        type: "init_complete",
+        backend: "webgpu",
       },
     } as MessageEvent);
 
     const result = await initPromise;
-    expect(result.backend).toBe('webgpu');
+    expect(result.backend).toBe("webgpu");
     expect(downloadEvents).toEqual([
       { loadedBytes: 50, totalBytes: 100, progress: 0.5 },
     ]);
   });
 
-  it('processes separation with chunk progress reporting and returns 4 stems', async () => {
+  it("processes separation with chunk progress reporting and returns 4 stems", async () => {
     const client = new InferenceClient(mockWorker as unknown as Worker);
 
     const chunkEvents: any[] = [];
     const totalSamples = 44100;
-    const audio = [new Float32Array(totalSamples), new Float32Array(totalSamples)];
+    const audio = [
+      new Float32Array(totalSamples),
+      new Float32Array(totalSamples),
+    ];
 
     const separationPromise = client.separate(audio, 44100, {
       onChunkProgress: (p) => chunkEvents.push(p),
     });
 
     expect(mockWorker.postMessage).toHaveBeenCalledWith({
-      type: 'start',
+      type: "start",
       audio,
       sampleRate: 44100,
       options: undefined,
@@ -84,7 +87,7 @@ describe('Inference Client & Engine Pipeline', () => {
     // Simulate worker chunk progress
     mockWorker.onmessage?.({
       data: {
-        type: 'chunk_progress',
+        type: "chunk_progress",
         chunkIndex: 0,
         totalChunks: 2,
         progress: 0.5,
@@ -94,13 +97,14 @@ describe('Inference Client & Engine Pipeline', () => {
     } as MessageEvent);
 
     expect(chunkEvents.length).toBe(1);
-    expect(chunkEvents[0]).toEqual({
+    const expectedChunkEvent: ChunkProgress = {
       chunkIndex: 0,
       totalChunks: 2,
       progress: 0.5,
       elapsedMs: 1200,
       etaMs: 1200,
-    });
+    };
+    expect(chunkEvents[0]).toEqual(expectedChunkEvent);
 
     // Simulate worker completion with 4 stems
     const mockStems: Record<StemName, Float32Array[]> = {
@@ -112,7 +116,7 @@ describe('Inference Client & Engine Pipeline', () => {
 
     mockWorker.onmessage?.({
       data: {
-        type: 'complete',
+        type: "complete",
         stems: mockStems,
         duration: 1.0,
       },
@@ -126,7 +130,7 @@ describe('Inference Client & Engine Pipeline', () => {
     }
   });
 
-  it('cancels ongoing separation and rejects pending separation promise with cancellation', async () => {
+  it("cancels ongoing separation and rejects pending separation promise with cancellation", async () => {
     const client = new InferenceClient(mockWorker as unknown as Worker);
 
     const audio = [new Float32Array(1000), new Float32Array(1000)];
@@ -134,12 +138,12 @@ describe('Inference Client & Engine Pipeline', () => {
 
     // Call cancel
     client.cancel();
-    expect(mockWorker.postMessage).toHaveBeenCalledWith({ type: 'cancel' });
+    expect(mockWorker.postMessage).toHaveBeenCalledWith({ type: "cancel" });
 
     // Worker acknowledges cancellation
     mockWorker.onmessage?.({
       data: {
-        type: 'cancelled',
+        type: "cancelled",
       },
     } as MessageEvent);
 
@@ -147,7 +151,7 @@ describe('Inference Client & Engine Pipeline', () => {
     expect(client.isBusy()).toBe(false);
   });
 
-  it('handles worker errors during separation', async () => {
+  it("handles worker errors during separation", async () => {
     const client = new InferenceClient(mockWorker as unknown as Worker);
 
     const audio = [new Float32Array(1000), new Float32Array(1000)];
@@ -155,12 +159,12 @@ describe('Inference Client & Engine Pipeline', () => {
 
     mockWorker.onmessage?.({
       data: {
-        type: 'error',
-        error: 'Out of WebGPU memory',
+        type: "error",
+        error: "Out of WebGPU memory",
       },
     } as MessageEvent);
 
-    await expect(separationPromise).rejects.toThrow('Out of WebGPU memory');
+    await expect(separationPromise).rejects.toThrow("Out of WebGPU memory");
     expect(client.isBusy()).toBe(false);
   });
 });

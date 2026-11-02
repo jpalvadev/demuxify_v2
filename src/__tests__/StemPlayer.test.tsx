@@ -520,11 +520,12 @@ describe("StemPlayer UI Component", () => {
     expect(enableSwitch).toHaveAttribute("aria-checked", "false");
 
     // The rail's initial state is reported out: off, un-muted, full volume.
-    expect(reported[0]).toEqual({
+    const initialRailState: ClickTrackMixerState = {
       enabled: false,
       muted: false,
       volume: 1,
-    });
+    };
+    expect(reported[0]).toEqual(initialRailState);
   });
 
   it("lights the Click Track rail once the Beat Grid exists: BPM readout, live toggle, reported state", () => {
@@ -549,11 +550,12 @@ describe("StemPlayer UI Component", () => {
     expect(liveSwitch.getAttribute("disabled")).toBeNull();
     fireEvent.click(liveSwitch);
     expect(liveSwitch).toHaveAttribute("aria-checked", "true");
-    expect(reported[reported.length - 1]).toEqual({
+    const enabledRailState: ClickTrackMixerState = {
       enabled: true,
       muted: false,
       volume: 1,
-    });
+    };
+    expect(reported[reported.length - 1]).toEqual(enabledRailState);
 
     // The rail is never one of the Stems: the four identities stay intact.
     const stemGroups = screen.getAllByRole("group", { name: /stem$/i });

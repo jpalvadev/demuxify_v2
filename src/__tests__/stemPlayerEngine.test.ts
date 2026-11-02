@@ -767,11 +767,12 @@ describe("StemPlayerEngine", () => {
       });
 
       const lane: ClickTrackMixerState = engine.getClickTrackState();
-      expect(lane).toEqual({
+      const expectedLaneOff: ClickTrackMixerState = {
         enabled: false,
         muted: false,
         volume: 1.0,
-      });
+      };
+      expect(lane).toEqual(expectedLaneOff);
       expect(engine.getClickGainNode()).toBeNull();
       // Lane off: no click gain node and no click channel materialized.
       expect(mockCtx.createGain).toHaveBeenCalledTimes(5);
@@ -1006,11 +1007,12 @@ describe("StemPlayerEngine", () => {
 
       // The swap is not a lane reset: mixer settings and the playhead stay
       // where they were.
-      expect(engine.getClickTrackState()).toEqual({
+      const expectedLaneAfterSwap: ClickTrackMixerState = {
         enabled: true,
         muted: false,
         volume: 0.7,
-      });
+      };
+      expect(engine.getClickTrackState()).toEqual(expectedLaneAfterSwap);
       expect(engine.getCurrentTime()).toBe(0);
     });
   });

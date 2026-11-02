@@ -110,21 +110,12 @@ describe("Model Cache", () => {
 
     expect(new Uint8Array(weights)).toEqual(dummyData);
     expect(progressUpdates.length).toBe(3);
-    expect(progressUpdates[0]).toEqual({
-      loadedBytes: 2,
-      totalBytes: 8,
-      progress: 0.25,
-    });
-    expect(progressUpdates[1]).toEqual({
-      loadedBytes: 5,
-      totalBytes: 8,
-      progress: 0.625,
-    });
-    expect(progressUpdates[2]).toEqual({
-      loadedBytes: 8,
-      totalBytes: 8,
-      progress: 1,
-    });
+    const expectedUpdates: DownloadProgress[] = [
+      { loadedBytes: 2, totalBytes: 8, progress: 0.25 },
+      { loadedBytes: 5, totalBytes: 8, progress: 0.625 },
+      { loadedBytes: 8, totalBytes: 8, progress: 1 },
+    ];
+    expect(progressUpdates).toEqual(expectedUpdates);
 
     // Verify it saved to cache
     expect(mockCache.put).toHaveBeenCalledWith(

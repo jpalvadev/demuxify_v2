@@ -1,0 +1,24 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "openscad": {
+      "type": "local",
+      "command": [
+        "C:\\Programacion\\mcps\\OpenSCAD-MCP-Server\\.venv\\Scripts\\openscad-mcp.exe",
+        "--output-dir",
+        "C:\\Programacion\\mcps\\OpenSCAD-MCP-Server\\output"
+      ],
+      "environment": {
+        "OPENSCAD_EXECUTABLE": "C:\\Program Files\\OpenSCAD\\openscad.exe"
+      },
+      "enabled": false
+    },
+    "konnect": {
+      "type": "local",
+      "command": [
+        "C:\\Users\\Lorenzo06\\Documents\\KiCad\\10.0\\3rdparty\\plugins\\com_github_mixelpixx_konnect\\bin\\konnect.exe"
+      ],
+      "enabled": false
+    }
+  }
+}

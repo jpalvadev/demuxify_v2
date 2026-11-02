@@ -9,7 +9,7 @@ Always use canonical domain terms defined in `GLOSSARY.md`.
 - **Stem**: An isolated extracted audio track (Vocals, Drums, Bass, Other). Avoid _Track_, _channel_, _component_, _layer_.
 - **Source Mix**: The original unseparated audio recording. Avoid _Input file_, _song_, _audio file_.
 - **Stem Player**: The multi-track playback interface. Avoid _Mixer_, _audio controls_, _music player_.
-- **Source Mix Title**: Use `sourceMixTitle`, never `songTitle`.
+- **Source Mix Title**: Use `sourceMixTitle`, never _songTitle_ (a forbidden term — see `npm run check:glossary`).
 - Run `npm run check:glossary` to mechanically verify that no forbidden terms enter `src/`.
 
 ## 2. Audio Context Management
@@ -35,7 +35,7 @@ Always use canonical domain terms defined in `GLOSSARY.md`.
 
 - All model profiles, asset URLs (`.onnx`), cache partition keys (`demuxify-*-cache`), execution backends, and UI presentation labels must reside solely in `src/lib/modelConfig.ts`.
 - Never hardcode cache names, model asset filenames, or profile tags across consumer components, client classes, or workers.
-- Consumers should always query `resolveModelProfile(id)`, `MODEL_PROFILES`, or `DEFAULT_MODEL_PROFILE`.
+- Consumers should always query `resolveModelProfile(id)`, `MODEL_PROFILES`, or `DEFAULT_DESKTOP_MODEL_ID`.
 - Verified by `npm run check:glossary` static analysis.
 
 ## 6. UI View Design via OpenDesign MCP (ADR 0007)
@@ -55,3 +55,11 @@ Always use canonical domain terms defined in `GLOSSARY.md`.
 ## 8. Shared Test Readers
 
 - Shared test doubles and readers — e.g. the WAV-bytes -> click onsets decoder (`decodeWavOnsets`, `src/__tests__/wavOnsetsHelper.ts`) — live in one module under `src/__tests__/` and every seam that needs one imports it, instead of each test file keeping its own copy of the shape.
+- Expectation fixtures must be TYPED constants, not multi-line object literals passed straight to `toEqual`/`toMatch`: hoist them (`const expectedLane: ClickTrackMixerState = { ... }`) so `typecheck` sees drift and vitest failures stay readable. Verified by `npm run check:test-fixtures`.
+
+## 9. Affordance Retirement Turns DOM Assertions into Absence Assertions, Surviving Readouts Stay Pinned
+
+- When a UI affordance is retired (e.g. the Click Track rail's −/+ pair, Meter selector and phase readouts, per the ADR-0011 Amendment), every test that pinned its DOM is rewritten as an ABSENCE assertion: `queryByTestId`/`queryAllByRole` expected `null`/empty, never just deleting the test — a silent deletion blinds the suite to the affordance coming back.
+- Readouts that survive the retirement (BPM label, lane on/off, mute, volume) keep their pinned DOM assertions; a retirement must not weaken what the suite sees around it.
+- `getAllByRole` THROWS when empty — absence checks must use the `query*` variants.
+- Before touching any rail control, grep `src/__tests__` for its `data-testid`: test files pin these attributes across the suite (see `docs/agents/navigation.md`).
