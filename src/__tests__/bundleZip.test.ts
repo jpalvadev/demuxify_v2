@@ -3,6 +3,7 @@ import JSZip from "jszip";
 import {
   createStemBundleZip,
   formatStemFileName,
+  formatClickTrackFileName,
   sanitizeSourceMixTitle,
 } from "../lib/bundleZip";
 import { STEM_NAMES, StemName } from "../lib/chunkOverlapAdd";
@@ -32,6 +33,15 @@ describe("bundleZip", () => {
       expect(formatStemFileName("track", "bass", "wav")).toBe("track_bass.wav");
       expect(formatStemFileName("track", "other", "mp3")).toBe(
         "track_other.mp3"
+      );
+    });
+
+    it("names the Click Track file after its own domain, never as a StemName", () => {
+      expect(formatClickTrackFileName("audioslave_stone.mp3", "wav")).toBe(
+        "audioslave_stone_click_track.wav"
+      );
+      expect(formatClickTrackFileName("RockTrack", "mp3")).toBe(
+        "RockTrack_click_track.mp3"
       );
     });
   });
@@ -138,6 +148,60 @@ describe("bundleZip", () => {
       await expect(createStemBundleZip(incomplete)).rejects.toThrow(
         /missing stem/i
       );
+    });
+
+    it("adds exactly one Click Track file when the lane payload is provided", async () => {
+      const mockStems: Record<StemName, Uint8Array> = {
+        vocals: new Uint8Array([1, 2, 3]),
+        drums: new Uint8Array([4, 5, 6]),
+        bass: new Uint8Array([7, 8, 9]),
+        other: new Uint8Array([10, 11, 12]),
+      };
+      const clickBytes = new Uint8Array([200, 201, 202, 203]);
+
+      const zipBlob = await createStemBundleZip(mockStems, {
+        sourceMixTitle: "audioslave_stone.mp3",
+        format: "wav",
+        clickTrack: clickBytes,
+      });
+
+      const buffer = await zipBlob.arrayBuffer();
+      const unzipped = await JSZip.loadAsync(buffer);
+      const fileNames = Object.keys(unzipped.files);
+
+      // 4 Stems + exactly one Click Track file, named after its own domain.
+      expect(fileNames).toHaveLength(5);
+      const clickName = formatClickTrackFileName("audioslave_stone.mp3", "wav");
+      expect(fileNames).toContain(clickName);
+      for (const stem of STEM_NAMES) {
+        expect(fileNames).toContain(`audioslave_stone_${stem}.wav`);
+      }
+
+      const content = await unzipped.file(clickName)?.async("uint8array");
+      expect(content).toEqual(clickBytes);
+    });
+
+    it("keeps the bundle byte-for-byte as before when the Click Track is disabled", async () => {
+      const mockStems: Record<StemName, Uint8Array> = {
+        vocals: new Uint8Array([1, 2, 3]),
+        drums: new Uint8Array([4, 5, 6]),
+        bass: new Uint8Array([7, 8, 9]),
+        other: new Uint8Array([10, 11, 12]),
+      };
+
+      // Same inputs as the base bundle test, no clickTrack payload (the
+      // lane's enabled-but-unexported path never reaches this seam: the
+      // caller omits the option when the lane is off).
+      const zipBlob = await createStemBundleZip(mockStems, {
+        sourceMixTitle: "audioslave_stone.mp3",
+        format: "wav",
+      });
+
+      const buffer = await zipBlob.arrayBuffer();
+      const unzipped = await JSZip.loadAsync(buffer);
+      const fileNames = Object.keys(unzipped.files);
+      expect(fileNames).toHaveLength(4);
+      expect(fileNames.filter((name) => /click/i.test(name))).toHaveLength(0);
     });
   });
 });

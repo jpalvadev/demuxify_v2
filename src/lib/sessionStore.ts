@@ -1,6 +1,7 @@
 import { StemName, STEM_NAMES } from "./chunkOverlapAdd";
 import { ModelId } from "./modelConfig";
 import type { TempoCandidate } from "../workers/beatDetection.worker";
+import type { ClickTrackMixerState } from "./stemPlayerEngine";
 
 export class StorageQuotaError extends Error {
   constructor(
@@ -48,6 +49,11 @@ export interface DemuxifySession {
   // four StemName identities and the mixer settings. Sessions written
   // before the Tempo Detector shipped simply omit it.
   tempo?: SessionTempoState;
+  // Click Track lane settings (ADR-0010, ticket 05): parallel to the Stem
+  // mixer contract, never part of it. Optional: sessions saved before the
+  // lane shipped (or with the lane never enabled) simply omit it and resume
+  // with the rail off by default.
+  clickTrack?: ClickTrackMixerState;
 }
 
 // Tempo Detector state persisted with a Session (ADR-0010): ranked BPM
@@ -69,6 +75,7 @@ interface StoredSessionRecord {
   metadata: SessionMetadata;
   mixer: SessionMixerState;
   tempo?: SessionTempoState;
+  clickTrack?: ClickTrackMixerState;
   sourceMixChannelCount: number;
   sourceMixLength: number;
   stemsLengths: Record<StemName, { channelCount: number; length: number }>;
@@ -267,6 +274,22 @@ function isValidMixer(mixer: any): mixer is SessionMixerState {
   return true;
 }
 
+function isValidClickTrack(val: any): val is ClickTrackMixerState {
+  if (!val || typeof val !== "object") return false;
+  const meterOk =
+    val.meter === "2/4" ||
+    val.meter === "3/4" ||
+    val.meter === "4/4" ||
+    val.meter === "6/8";
+  return (
+    typeof val.enabled === "boolean" &&
+    typeof val.muted === "boolean" &&
+    typeof val.volume === "number" &&
+    !isNaN(val.volume) &&
+    meterOk
+  );
+}
+
 export async function saveActiveSession(
   session: DemuxifySession
 ): Promise<void> {
@@ -343,6 +366,14 @@ export async function saveActiveSession(
             beatGrid: session.tempo.beatGrid,
             analyzedBpm: session.tempo.analyzedBpm,
             duration: session.tempo.duration,
+          }
+        : undefined,
+      clickTrack: session.clickTrack
+        ? {
+            enabled: session.clickTrack.enabled,
+            muted: session.clickTrack.muted,
+            volume: session.clickTrack.volume,
+            meter: session.clickTrack.meter,
           }
         : undefined,
       sourceMixChannelCount: session.sourceMix.channels.length,
@@ -557,6 +588,12 @@ export async function loadActiveSession(): Promise<DemuxifySession | null> {
       // Optional on read: sessions written before the Tempo Detector shipped
       // simply load without it (ticket 03 backwards-compat box).
       tempo: record.tempo ?? undefined,
+      // Same on the Click Track lane settings (ticket 05): absent, legacy, or
+      // malformed records load without it, and the rail resumes off by
+      // default.
+      clickTrack: isValidClickTrack(record.clickTrack)
+        ? record.clickTrack
+        : undefined,
     };
   } catch {
     db.close();

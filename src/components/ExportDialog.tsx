@@ -15,7 +15,12 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { StemName, STEM_NAMES } from "../lib/chunkOverlapAdd";
-import { StemMixerStates, TimeStretchState } from "../lib/stemPlayerEngine";
+import {
+  StemMixerStates,
+  TimeStretchState,
+  ClickTrackMixerState,
+  synthesizeClickTrackChannel,
+} from "../lib/stemPlayerEngine";
 import { encodeWav, createWavBlob } from "../lib/wavEncoder";
 import {
   encodeMp3,
@@ -26,6 +31,7 @@ import {
 import {
   createStemBundleZip,
   formatStemFileName,
+  formatClickTrackFileName,
   sanitizeSourceMixTitle,
 } from "../lib/bundleZip";
 import { mixAudioStems, formatMixdownFileName } from "../lib/customMixdown";
@@ -48,6 +54,13 @@ export interface ExportDialogProps {
   activeTempo?: number;
   activePitch?: number;
   activeFormantPreservation?: boolean;
+  // ADR-0010 Click Track lane (ticket 05): passive inputs, never controls —
+  // the dialog hosts no Click Track affordance of its own. When the lane is
+  // enabled and a Beat Grid exists, the bundle mode gains one extra Click
+  // Track file in the Stems' format; single-file and Custom Mixdown modes
+  // never see it.
+  clickTrackBeatGrid?: Float64Array;
+  clickTrackSettings?: ClickTrackMixerState;
 }
 
 export type ExportMode = "single" | "bundle" | "mixdown";
@@ -151,6 +164,8 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
   activeTempo: propTempo,
   activePitch: propPitch,
   activeFormantPreservation: propFormant,
+  clickTrackBeatGrid,
+  clickTrackSettings,
 }) => {
   const activeTempo = activeTimeStretch?.tempo ?? propTempo;
   const activePitch = activeTimeStretch?.pitch ?? propPitch;
@@ -410,10 +425,57 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
           wasCancelled();
           return;
         }
+
+        // ADR-0010 (ticket 05): a live Click Track lane adds exactly one
+        // Click Track file to the bundle, encoded through the very same WAV/
+        // MP3 encoders as the Stems. The Beat Grid is scaled by the active
+        // Time-Stretch factor so clicks align with stretched Stems in a DAW.
+        let clickTrackBytes: Uint8Array | undefined;
+        const clickLaneLive = Boolean(
+          clickTrackSettings?.enabled && clickTrackBeatGrid?.length
+        );
+        if (clickLaneLive && clickTrackBeatGrid && clickTrackSettings) {
+          setStatusMessage(
+            `Encoding ${formatClickTrackFileName(sourceMixTitle, format)}...`
+          );
+          const stretchFactor =
+            applyAdjustments && hasActiveAdjustments && activeTempo
+              ? activeTempo
+              : 1.0;
+          const clickGrid = Float64Array.from(
+            Array.from(clickTrackBeatGrid).map((t) => t / stretchFactor)
+          );
+          const exportChannel = extractChannels(exportStems[STEM_NAMES[0]])[0];
+          const clickDurationSec =
+            (exportChannel?.length ?? 0) / (sampleRate || 44100);
+          const clickChannels = [
+            synthesizeClickTrackChannel(
+              clickGrid,
+              clickTrackSettings.meter,
+              sampleRate,
+              clickDurationSec
+            ),
+          ];
+          clickTrackBytes =
+            format === "wav"
+              ? encodeWav(clickChannels, { sampleRate, bitDepth })
+              : await encodeMp3(clickChannels, {
+                  sampleRate,
+                  bitrate,
+                  onProgress: (p) => setProgress(Math.round(75 + p * 20)),
+                });
+          setProgress(95);
+          if (cancelExportRef.current) {
+            wasCancelled();
+            return;
+          }
+        }
+
         setStatusMessage("Packaging ZIP bundle...");
         const zipBlob = await createStemBundleZip(encodedStems, {
           sourceMixTitle,
           format,
+          clickTrack: clickTrackBytes,
           onProgress: (zipPct) => {
             setProgress(Math.round(75 + zipPct * 0.25));
           },
@@ -501,6 +563,8 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
     activeTempo,
     activePitch,
     activeFormantPreservation,
+    clickTrackBeatGrid,
+    clickTrackSettings,
   ]);
 
   if (!isOpen) return null;

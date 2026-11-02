@@ -9,6 +9,7 @@ import {
   StorageQuotaError,
 } from "../lib/sessionStore";
 import { StemName } from "../lib/chunkOverlapAdd";
+import type { ClickTrackMixerState } from "../lib/stemPlayerEngine";
 
 function createMockSession(
   overrides?: Partial<DemuxifySession>
@@ -172,6 +173,36 @@ describe("sessionStore", () => {
     expect(loaded).not.toBeNull();
     if (!loaded) return;
     expect(loaded.tempo).toBeUndefined();
+  });
+
+  it("round-trips Click Track lane settings and leaves legacy sessions without them", async () => {
+    // Ticket 05: Click Track settings persist with the Session, parallel to
+    // the Stem mixer contract — the four StemName identities and their mixer
+    // settings above are untouched by this field.
+    const clickTrack: ClickTrackMixerState = {
+      enabled: true,
+      muted: false,
+      volume: 0.6,
+      meter: "6/8",
+    };
+    const mockSession = createMockSession({ clickTrack });
+
+    await saveActiveSession(mockSession);
+
+    const loaded = await loadActiveSession();
+    expect(loaded).not.toBeNull();
+    if (!loaded) return;
+
+    expect(loaded.clickTrack).toEqual(clickTrack);
+
+    // Sessions saved without the lane (never enabled, or pre-lane) load
+    // without the field: the rail resumes off by default.
+    const legacySession = createMockSession();
+    await saveActiveSession(legacySession);
+    const legacy = await loadActiveSession();
+    expect(legacy).not.toBeNull();
+    if (!legacy) return;
+    expect(legacy.clickTrack).toBeUndefined();
   });
 
   it("clears active session safely and releases storage", async () => {

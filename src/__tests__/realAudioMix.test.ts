@@ -11,7 +11,11 @@ import {
   STEM_NAMES,
 } from "../lib/chunkOverlapAdd";
 import { encodeWav } from "../lib/wavEncoder";
-import { createStemBundleZip } from "../lib/bundleZip";
+import {
+  createStemBundleZip,
+  formatClickTrackFileName,
+} from "../lib/bundleZip";
+import JSZip from "jszip";
 import {
   handleWorkerMessage,
   WorkerOutMessage,
@@ -330,5 +334,168 @@ describe("Real Audio Ingestion & Processing Pipeline (audioslave_stone.mp3)", ()
     expect(
       Math.abs(onsets[worstGridIdx] - worstGridIdx * flatInterval)
     ).toBeGreaterThan(0.01);
+  });
+
+  it("ships an enabled Click Track as exactly one extra Export Bundle member whose decoded clicks follow the Beat Grid, scaled by the export Time-Stretch", async () => {
+    const rate = 44100;
+    const durationSec = 12;
+    const total = Math.round(durationSec * rate);
+
+    // Accepted deterministic 107.7 BPM pulse surrogate (CODING_STANDARDS §4
+    // test double; scripts/check_bpm.py ground truth: 107.7 BPM, median
+    // beat interval ~0.557 s).
+    const samples = new Float32Array(total);
+    const period = (60 / 107.7) * rate;
+    const tapLen = Math.round(0.012 * rate);
+    for (let b = 1; b * period < total - rate * 0.05; b++) {
+      const start = Math.round(b * period);
+      for (let i = 0; i < tapLen && start + i < total; i++) {
+        const env = Math.exp((-8 * i) / tapLen);
+        samples[start + i] +=
+          Math.sin((2 * Math.PI * 220 * i) / rate) * env * 0.9;
+      }
+    }
+
+    const postedMessages: WorkerOutMessage[] = [];
+    await handleWorkerMessage(
+      { type: "start", samples, sampleRate: rate },
+      (m) => {
+        postedMessages.push(m);
+      }
+    );
+    const complete = postedMessages.find((m) => m.type === "complete");
+    if (!complete || complete.type !== "complete") return;
+    const grid = complete.beatGrid;
+
+    // Mock Stems as WAV bytes: the bundle contract only ever packages them.
+    const stemBytes = {} as Record<StemName, Uint8Array>;
+    const mockStemWav = encodeWav([new Float32Array(rate)], rate, 16);
+    for (const stem of STEM_NAMES) {
+      stemBytes[stem] = mockStemWav;
+    }
+
+    // Decode helper: WAV bytes -> click onsets in seconds. Walk the RIFF
+    // chunk list, read the Int16 LE data chunk, cluster first crossings.
+    const decodeWavOnsets = (bytes: Uint8Array): number[] => {
+      const onsets: number[] = [];
+      if (!bytes) return onsets;
+      let dataStart = -1;
+      let dataLen = 0;
+      for (let off = 12; off + 8 <= bytes.length;) {
+        const size =
+          bytes[off + 4] |
+          (bytes[off + 5] << 8) |
+          (bytes[off + 6] << 16) |
+          (bytes[off + 7] << 24);
+        const fourcc = String.fromCharCode(
+          bytes[off],
+          bytes[off + 1],
+          bytes[off + 2],
+          bytes[off + 3]
+        );
+        if (fourcc === "data") {
+          dataStart = off + 8;
+          dataLen = size;
+          break;
+        }
+        off += 8 + size + (size % 2);
+      }
+      if (dataStart < 0) return onsets;
+      let prev = false;
+      for (let s = 0; s * 2 + 1 < dataLen; s++) {
+        const raw =
+          bytes[dataStart + s * 2] | (bytes[dataStart + s * 2 + 1] << 8);
+        const v = raw >= 0x8000 ? raw - 0x10000 : raw;
+        const nz = Math.abs(v) > 100;
+        if (nz && !prev) {
+          const t = s / rate;
+          if (onsets.length === 0 || t - onsets[onsets.length - 1] > 0.1) {
+            onsets.push(t);
+          }
+        }
+        prev = nz;
+      }
+      return onsets;
+    };
+
+    const medianInterval = (ts: number[]): number => {
+      const gaps: number[] = [];
+      for (let i = 0; i + 1 < ts.length; i++) {
+        gaps.push(ts[i + 1] - ts[i]);
+      }
+      gaps.sort();
+      return gaps[Math.floor(gaps.length / 2)];
+    };
+
+    const meter: ClickTrackMeter = "4/4";
+    const clickName = formatClickTrackFileName("audioslave_stone.mp3", "wav");
+
+    // --- unstretched: clicks land 1:1 on the Beat Grid itself ---
+    const channel = synthesizeClickTrackChannel(grid, meter, rate, durationSec);
+    const clickWav = encodeWav([channel], rate, 16);
+
+    const zipBlob = await createStemBundleZip(stemBytes, {
+      sourceMixTitle: "audioslave_stone.mp3",
+      format: "wav",
+      clickTrack: clickWav,
+    });
+    const zip = await JSZip.loadAsync(await zipBlob.arrayBuffer());
+    const names = Object.keys(zip.files);
+    expect(names).toHaveLength(5);
+    expect(names.filter((n) => /click_track/i.test(n))).toHaveLength(1);
+    expect(names).toContain(clickName);
+
+    const clickBytes = await zip.file(clickName)?.async("uint8array");
+    expect(clickBytes).not.toBeNull();
+    if (!clickBytes) return;
+    const onsets = decodeWavOnsets(clickBytes);
+    expect(onsets).toHaveLength(grid.length);
+    for (let k = 0; k < grid.length; k++) {
+      expect(Math.abs(onsets[k] - grid[k])).toBeLessThan(3 / rate);
+    }
+    const anchorInterval = 60 / 107.7;
+    const decodedMedian = medianInterval(onsets);
+    expect(
+      Math.abs(decodedMedian - anchorInterval) <= anchorInterval * 0.1
+    ).toBe(true);
+
+    // --- stretched (Time-Stretch factor 2): the Export seam scales the
+    // Beat Grid by the active stretch, so decoded clicks arrive doubled ---
+    const stretch = 2.0;
+    const stretchedGrid = Float64Array.from(
+      Array.from(grid).map((t) => t / stretch)
+    );
+    const stretchedChannel = synthesizeClickTrackChannel(
+      stretchedGrid,
+      meter,
+      rate,
+      durationSec
+    );
+    const stretchedWav = encodeWav([stretchedChannel], rate, 16);
+
+    const stretchedZip = await createStemBundleZip(stemBytes, {
+      sourceMixTitle: "audioslave_stone.mp3",
+      format: "wav",
+      clickTrack: stretchedWav,
+    });
+    const stretchedUnzipped = await JSZip.loadAsync(
+      await stretchedZip.arrayBuffer()
+    );
+    const stretchedBytes = await stretchedUnzipped
+      .file(clickName)
+      ?.async("uint8array");
+    expect(stretchedBytes).not.toBeNull();
+    if (!stretchedBytes) return;
+    const stretchedOnsets = decodeWavOnsets(stretchedBytes);
+    expect(stretchedOnsets).toHaveLength(stretchedGrid.length);
+    for (let k = 0; k < stretchedGrid.length; k++) {
+      expect(Math.abs(stretchedOnsets[k] - stretchedGrid[k])).toBeLessThan(
+        3 / rate
+      );
+    }
+    const stretchedMedian = medianInterval(stretchedOnsets);
+    expect(
+      Math.abs(stretchedMedian * stretch - decodedMedian) <= decodedMedian * 0.1
+    ).toBe(true);
   });
 });

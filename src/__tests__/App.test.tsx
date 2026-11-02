@@ -702,6 +702,15 @@ describe("App UI Shell", () => {
         analyzedBpm: 107.7,
         duration: 284,
       },
+      // Ticket 05: the Click Track lane settings persist with the Session too,
+      // parallel to the Stem mixer contract — the rail must resume switched ON
+      // with the saved Meter.
+      clickTrack: {
+        enabled: true,
+        muted: false,
+        volume: 0.6,
+        meter: "6/8",
+      },
     });
 
     render(<App />);
@@ -732,17 +741,19 @@ describe("App UI Shell", () => {
     ).toBeInTheDocument();
 
     // Ticket 04: the recovered Beat Grid feeds the Mix tab's Click Track rail,
-    // so the rail resumes at the same locked tempo — still off by default.
+    // so the rail resumes at the same locked tempo.
     expect(screen.getByTestId("click-track-bpm-label")).toHaveTextContent(
       "107.7 BPM"
     );
+    // Ticket 05: the rail resumes exactly as the saved Session left it — ON,
+    // with the saved Meter (6/8, not the 4/4 default).
     expect(screen.getByTestId("click-track-meter-label")).toHaveTextContent(
-      "Meter 4/4"
+      "Meter 6/8"
     );
     const resumedRailSwitch = screen.getByRole("switch", {
       name: /^click track$/i,
     });
-    expect(resumedRailSwitch).toHaveAttribute("aria-checked", "false");
+    expect(resumedRailSwitch).toHaveAttribute("aria-checked", "true");
 
     await sessionStore.clearActiveSession();
   });

@@ -4,6 +4,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { ExportDialog } from "../components/ExportDialog";
 import { StemName } from "../lib/chunkOverlapAdd";
 import { StemMixerStates } from "../lib/stemPlayerEngine";
+import type { ClickTrackMixerState } from "../lib/stemPlayerEngine";
+import * as bundleZip from "../lib/bundleZip";
 import * as customMixdown from "../lib/customMixdown";
 
 describe("ExportDialog", () => {
@@ -478,6 +480,183 @@ describe("ExportDialog", () => {
     expect(handleExportComplete).toHaveBeenCalledWith(
       "audioslave_stone_stems.zip"
     );
+  });
+
+  it("carries a live Click Track lane as its own WAV file in the Export Bundle", async () => {
+    const user = userEvent.setup();
+
+    // ~1.8 s of Stems so the 107.7 BPM Beat Grid fits inside the export.
+    const len = 80000;
+    const stems: Record<StemName, Float32Array[]> = {
+      vocals: [new Float32Array(len)],
+      drums: [new Float32Array(len)],
+      bass: [new Float32Array(len)],
+      other: [new Float32Array(len)],
+    };
+    const beatGrid = Float64Array.from([0.5, 1.0572789, 1.6145578]);
+    const enabled: ClickTrackMixerState = {
+      enabled: true,
+      muted: false,
+      volume: 0.7,
+      meter: "4/4",
+    };
+
+    const bundleSpy = vi.spyOn(bundleZip, "createStemBundleZip");
+
+    render(
+      <ExportDialog
+        isOpen={true}
+        onClose={vi.fn()}
+        stems={stems}
+        sampleRate={44100}
+        sourceMixTitle="audioslave_stone.mp3"
+        clickTrackBeatGrid={beatGrid}
+        clickTrackSettings={enabled}
+      />
+    );
+
+    await user.click(
+      screen.getByRole("radio", { name: /full export bundle/i })
+    );
+    await user.click(
+      screen.getByRole("button", { name: /export & download/i })
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText(/export complete/i)).toBeInTheDocument();
+    });
+
+    expect(bundleSpy).toHaveBeenCalledTimes(1);
+    const options = bundleSpy.mock.calls[0][1] as Record<string, unknown>;
+    expect(options.format).toBe("wav");
+    // Exactly one extra bundle member: encoded Click Track bytes ride
+    // alongside the four Stems, never inside the Stems set.
+    expect(options.clickTrack).toBeInstanceOf(Uint8Array);
+
+    bundleSpy.mockRestore();
+  });
+
+  it("encodes the Click Track file as MP3 when the Stems export format is MP3", async () => {
+    const user = userEvent.setup();
+
+    const shortLen = 4096;
+    const stems: Record<StemName, Float32Array[]> = {
+      vocals: [new Float32Array(shortLen)],
+      drums: [new Float32Array(shortLen)],
+      bass: [new Float32Array(shortLen)],
+      other: [new Float32Array(shortLen)],
+    };
+    // Beat Grid inside the 0.093 s export window.
+    const beatGrid = Float64Array.from([0.01, 0.03, 0.05, 0.07]);
+
+    const bundleSpy = vi.spyOn(bundleZip, "createStemBundleZip");
+
+    render(
+      <ExportDialog
+        isOpen={true}
+        onClose={vi.fn()}
+        stems={stems}
+        sampleRate={44100}
+        sourceMixTitle="RockTrack"
+        clickTrackBeatGrid={beatGrid}
+        clickTrackSettings={{
+          enabled: true,
+          muted: false,
+          volume: 1,
+          meter: "2/4",
+        }}
+      />
+    );
+
+    await user.click(screen.getByRole("radio", { name: /^mp3/i }));
+    await user.click(
+      screen.getByRole("radio", { name: /full export bundle/i })
+    );
+    await user.click(
+      screen.getByRole("button", { name: /export & download/i })
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText(/export complete/i)).toBeInTheDocument();
+    });
+
+    expect(bundleSpy).toHaveBeenCalledTimes(1);
+    const options = bundleSpy.mock.calls[0][1] as Record<string, unknown>;
+    // Format follows the Stems' export choice: MP3 Stems get an MP3 click
+    // file, encoded through the existing encodeMp3 path.
+    expect(options.format).toBe("mp3");
+    expect(options.clickTrack).toBeInstanceOf(Uint8Array);
+    bundleSpy.mockRestore();
+  });
+
+  it("leaves the Export Bundle unchanged when the Click Track lane is off or absent", async () => {
+    const user = userEvent.setup();
+    const spy = vi.spyOn(bundleZip, "createStemBundleZip");
+
+    render(
+      <ExportDialog
+        isOpen={true}
+        onClose={vi.fn()}
+        stems={mockStems}
+        sourceMixTitle="audioslave_stone.mp3"
+      />
+    );
+
+    await user.click(
+      screen.getByRole("radio", { name: /full export bundle/i })
+    );
+    await user.click(
+      screen.getByRole("button", { name: /export & download/i })
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText(/export complete/i)).toBeInTheDocument();
+    });
+
+    expect(spy).toHaveBeenCalledTimes(1);
+    const options = spy.mock.calls[0][1] as Record<string, unknown>;
+    expect(options.clickTrack).toBeUndefined();
+    spy.mockRestore();
+  });
+
+  it("hosts no Click Track affordance: the concept stays out of the dialog and its mixdown picker", async () => {
+    const user = userEvent.setup();
+    const enabled: ClickTrackMixerState = {
+      enabled: true,
+      muted: false,
+      volume: 1,
+      meter: "4/4",
+    };
+    render(
+      <ExportDialog
+        isOpen={true}
+        onClose={vi.fn()}
+        stems={mockStems}
+        sourceMixTitle="audioslave_stone.mp3"
+        clickTrackBeatGrid={Float64Array.from([0.5, 1.0572789])}
+        clickTrackSettings={enabled}
+      />
+    );
+
+    // Even with the lane live and a Beat Grid in hand, the dialog gains no
+    // Click Track control of any kind.
+    expect(screen.queryByText(/click track/i)).toBeNull();
+    for (const role of ["radio", "button", "slider", "switch"]) {
+      expect(screen.queryByRole(role, { name: /click track/i })).toBeNull();
+    }
+
+    // Switch into Custom Mixdown mode: its preset picker is karaoke,
+    // acapella, minus-drums, reset — never a Click Track affordance.
+    await user.click(screen.getByRole("radio", { name: /custom mixdown/i }));
+    const presetButtons = screen.getAllByRole("button", {
+      name: /karaoke|acapella|minus drums|reset/i,
+    });
+    expect(presetButtons).toHaveLength(4);
+    expect(
+      presetButtons.filter((b) =>
+        /click|track|metronome/i.test(b.textContent ?? "")
+      )
+    ).toHaveLength(0);
   });
 
   it("displays error alert if stem export fails", async () => {

@@ -402,6 +402,10 @@ export const App: React.FC = () => {
       if (!session.tempo) {
         startTempoAnalysis(buffer);
       }
+      // Ticket 05: the recovered Session also carries its Click Track lane
+      // settings, so the Mix Tab's rail resumes exactly where it was left
+      // (off by default for Sessions that never enabled it).
+      clickTrackStateRef.current = session.clickTrack ?? null;
       if (isMobile) {
         setSelectedModelId(DEFAULT_MOBILE_MODEL_ID);
       } else if (session.metadata.modelProfileId) {
@@ -450,6 +454,10 @@ export const App: React.FC = () => {
     if (!cachedSessionRef.current) return;
     const updatedSession: DemuxifySession = {
       ...cachedSessionRef.current,
+      // Mirror the live Click Track rail (ADR-0010 ticket 05): the lane is
+      // domain-separate from the Stem mixer contract below.
+      clickTrack:
+        clickTrackStateRef.current ?? cachedSessionRef.current.clickTrack,
       mixer: {
         ...cachedSessionRef.current.mixer,
         stems: mixer.stems,
@@ -569,6 +577,7 @@ export const App: React.FC = () => {
         stems: result.stems,
         mixer: initialMixerState,
         tempo: tempoResultRef.current ?? undefined,
+        clickTrack: clickTrackStateRef.current ?? undefined,
       };
 
       cachedSessionRef.current = sessionToSave;
@@ -913,6 +922,7 @@ export const App: React.FC = () => {
                   onClickTrackState={(state) => {
                     clickTrackStateRef.current = state;
                   }}
+                  initialClickTrack={clickTrackStateRef.current ?? undefined}
                 />
               </>
             ) : (
@@ -954,6 +964,8 @@ export const App: React.FC = () => {
                     initialMixerStates={exportDialogState?.mixerStates}
                     initialMasterVolume={exportDialogState?.masterVolume}
                     activeTimeStretch={exportDialogState?.timeStretch}
+                    clickTrackBeatGrid={tempoAnalysis?.beatGrid}
+                    clickTrackSettings={clickTrackStateRef.current ?? undefined}
                   />
                 </div>
               </>

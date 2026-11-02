@@ -7,6 +7,12 @@ export interface CreateStemBundleOptions {
   modelProfileId?: string;
   modelProfileName?: string;
   onProgress?: (percent: number) => void;
+  // ADR-0010 Click Track lane: when the lane is enabled at export time, the
+  // bundle gains exactly one extra Click Track file (already encoded WAV/MP3
+  // bytes by the caller, same format as the Stems). Domain-separate: it is
+  // never folded into the Stems set or the manifest's stem list, and when
+  // absent the bundle is byte-for-byte as before.
+  clickTrack?: Uint8Array | Blob;
 }
 
 /**
@@ -35,7 +41,20 @@ export function formatStemFileName(
 }
 
 /**
- * Packages all 4 Stems (Vocals, Drums, Bass, Other) into a single ZIP archive.
+ * Formats the Click Track filename: `<SourceMixTitle>_click_track.<ext>`.
+ * Separate from formatStemFileName: the Click Track is never a StemName.
+ */
+export function formatClickTrackFileName(
+  sourceMixTitle: string,
+  ext: "wav" | "mp3"
+): string {
+  const base = sanitizeSourceMixTitle(sourceMixTitle);
+  return `${base}_click_track.${ext}`;
+}
+
+/**
+ * Packages all 4 Stems (Vocals, Drums, Bass, Other) into a single ZIP archive,
+ * plus one optional Click Track file when the Click Track lane was enabled.
  */
 export async function createStemBundleZip(
   stemFiles: Record<StemName, Uint8Array | Blob>,
@@ -58,6 +77,12 @@ export async function createStemBundleZip(
     const fileName = formatStemFileName(title, stem, format);
     const data = stemFiles[stem];
     zip.file(fileName, data);
+  }
+
+  // One Click Track file only when the lane was enabled at export time; the
+  // Stems packaging contract above is untouched either way.
+  if (options?.clickTrack) {
+    zip.file(formatClickTrackFileName(title, format), options.clickTrack);
   }
 
   if (options?.modelProfileId || options?.modelProfileName) {
