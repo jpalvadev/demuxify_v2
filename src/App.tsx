@@ -178,6 +178,9 @@ export const App: React.FC = () => {
   // Tempo Detector client ref (ADR-0010): cancelled and nulled when the
   // Source Mix is cleared, like the Inference Engine client.
   const beatClientRef = useRef<BeatClient | null>(null);
+  // Last completed Tempo Detector result: attached to the Session snapshot
+  // when it saves (ticket 03) and restored on Session Recovery.
+  const tempoResultRef = useRef<TempoAnalysisResult | null>(null);
   const cachedSessionRef = useRef<DemuxifySession | null>(null);
   const autoSaverRef = useRef(createSessionAutoSaver(600));
 
@@ -255,15 +258,16 @@ export const App: React.FC = () => {
   // the ranked candidates land on the Separate tab status line when they
   // arrive. The guard discards stale results if the Source Mix was cleared
   // in the meantime.
-  const startTempoAnalysis = (decoded: DecodedSourceMix) => {
+  const startTempoAnalysis = (buffer: AudioBuffer) => {
     try {
       const client = new BeatClient();
       beatClientRef.current = client;
       client
-        .analyze(decoded.buffer.getChannelData(0), decoded.buffer.sampleRate)
+        .analyze(buffer.getChannelData(0), buffer.sampleRate)
         .then((result) => {
           if (beatClientRef.current === client) {
             setTempoAnalysis(result);
+            tempoResultRef.current = result;
           }
         })
         .catch(() => {
@@ -284,13 +288,14 @@ export const App: React.FC = () => {
     setSeparationPhase("idle");
     setSeparatedStems(null);
     setTempoAnalysis(null);
+    tempoResultRef.current = null;
 
     try {
       const decoded = await decodeAudio(file);
       const peaks = computeWaveformPeaks(decoded.buffer);
       setDecodedSourceMix(decoded);
       setWaveformPeaks(peaks);
-      startTempoAnalysis(decoded);
+      startTempoAnalysis(decoded.buffer);
     } catch (err) {
       const message =
         err instanceof Error
@@ -317,6 +322,7 @@ export const App: React.FC = () => {
       beatClientRef.current.cancel();
       beatClientRef.current = null;
     }
+    tempoResultRef.current = null;
     autoSaverRef.current.cancel();
     cachedSessionRef.current = null;
     clearActiveSession().catch(() => {});
@@ -328,6 +334,7 @@ export const App: React.FC = () => {
     setSeparationPhase("idle");
     setSeparatedStems(null);
     setTempoAnalysis(null);
+    tempoResultRef.current = null;
     setDownloadProgress(null);
     setChunkProgress(null);
     setChunkStart(null);
@@ -383,6 +390,15 @@ export const App: React.FC = () => {
       setWaveformPeaks(peaks);
       setSeparatedStems(session.stems);
       setRestoredMixerState(session.mixer);
+      // Session Recovery (ticket 03): the recovered Session carries its
+      // Tempo Detector result, so the Separate-tab readout resumes
+      // identical. Sessions without one re-run the detector on the
+      // restored Source Mix instead.
+      setTempoAnalysis(session.tempo ?? null);
+      tempoResultRef.current = session.tempo ?? null;
+      if (!session.tempo) {
+        startTempoAnalysis(buffer);
+      }
       if (isMobile) {
         setSelectedModelId(DEFAULT_MOBILE_MODEL_ID);
       } else if (session.metadata.modelProfileId) {
@@ -549,6 +565,7 @@ export const App: React.FC = () => {
         },
         stems: result.stems,
         mixer: initialMixerState,
+        tempo: tempoResultRef.current ?? undefined,
       };
 
       cachedSessionRef.current = sessionToSave;

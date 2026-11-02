@@ -1,5 +1,6 @@
 import { StemName, STEM_NAMES } from "./chunkOverlapAdd";
 import { ModelId } from "./modelConfig";
+import type { TempoCandidate } from "../workers/beatDetection.worker";
 
 export class StorageQuotaError extends Error {
   constructor(
@@ -43,6 +44,22 @@ export interface DemuxifySession {
   };
   stems: Record<StemName, Float32Array[]>;
   mixer: SessionMixerState;
+  // Tempo Detector state (ADR-0010): optional, domain-separate from the
+  // four StemName identities and the mixer settings. Sessions written
+  // before the Tempo Detector shipped simply omit it.
+  tempo?: SessionTempoState;
+}
+
+// Tempo Detector state persisted with a Session (ADR-0010): ranked BPM
+// candidates + the user-chosen tempo (re-lock) + the Beat Grid of beat
+// positions in seconds. Kept out of SessionMixerState on purpose: the Click
+// Track is domain-separate and never one of the four StemName identities.
+export interface SessionTempoState {
+  candidates: TempoCandidate[];
+  chosenTempoBpm?: number;
+  beatGrid: Float64Array;
+  analyzedBpm: number;
+  duration: number;
 }
 
 interface StoredSessionRecord {
@@ -51,6 +68,7 @@ interface StoredSessionRecord {
   storageType: "indexeddb" | "opfs";
   metadata: SessionMetadata;
   mixer: SessionMixerState;
+  tempo?: SessionTempoState;
   sourceMixChannelCount: number;
   sourceMixLength: number;
   stemsLengths: Record<StemName, { channelCount: number; length: number }>;
@@ -318,6 +336,15 @@ export async function saveActiveSession(
         pitchSemitones: session.mixer.pitchSemitones ?? 0,
         tempoRatio: session.mixer.tempoRatio ?? 1.0,
       },
+      tempo: session.tempo
+        ? {
+            candidates: session.tempo.candidates.map((c) => ({ ...c })),
+            chosenTempoBpm: session.tempo.chosenTempoBpm,
+            beatGrid: session.tempo.beatGrid,
+            analyzedBpm: session.tempo.analyzedBpm,
+            duration: session.tempo.duration,
+          }
+        : undefined,
       sourceMixChannelCount: session.sourceMix.channels.length,
       sourceMixLength: session.sourceMix.channels[0]?.length ?? 0,
       stemsLengths,
@@ -527,6 +554,9 @@ export async function loadActiveSession(): Promise<DemuxifySession | null> {
       },
       stems,
       mixer: record.mixer,
+      // Optional on read: sessions written before the Tempo Detector shipped
+      // simply load without it (ticket 03 backwards-compat box).
+      tempo: record.tempo ?? undefined,
     };
   } catch {
     db.close();

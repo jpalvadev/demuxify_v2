@@ -652,6 +652,88 @@ describe("App UI Shell", () => {
     await sessionStore.clearActiveSession();
   });
 
+  it("resumes a recovered Session with an identical Separate-tab Tempo Detector readout", async () => {
+    vi.spyOn(webgpuModule, "detectWebGPUCapability").mockResolvedValue({
+      supported: true,
+      isFallback: false,
+    });
+
+    const sessionStore = await import("../lib/sessionStore");
+    await sessionStore.saveActiveSession({
+      metadata: {
+        id: "tempo-resume-session-test",
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        title: "Stone",
+        filename: "stone.mp3",
+        duration: 284,
+        sampleRate: 44100,
+      },
+      sourceMix: {
+        channels: [new Float32Array(500), new Float32Array(500)],
+      },
+      stems: {
+        vocals: [new Float32Array(500), new Float32Array(500)],
+        drums: [new Float32Array(500), new Float32Array(500)],
+        bass: [new Float32Array(500), new Float32Array(500)],
+        other: [new Float32Array(500), new Float32Array(500)],
+      },
+      mixer: {
+        stems: {
+          vocals: { volume: 0.6, muted: false, solo: false },
+          drums: { volume: 0.8, muted: true, solo: false },
+          bass: { volume: 1.0, muted: false, solo: true },
+          other: { volume: 0.5, muted: false, solo: false },
+        },
+        masterVolume: 0.9,
+        currentTime: 42,
+        pitchSemitones: 0,
+        tempoRatio: 1.0,
+      },
+      // Tempo Detector state survives the store round-trip (ticket 03); the
+      // recovered Session must show the exact same Separate-tab readout.
+      tempo: {
+        candidates: [
+          { bpm: 107.7, confidence: 0.93 },
+          { bpm: 215.4, confidence: 0.61 },
+        ],
+        chosenTempoBpm: 107.7,
+        beatGrid: new Float64Array([0.557, 1.114, 1.671]),
+        analyzedBpm: 107.7,
+        duration: 284,
+      },
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: /resume session/i })
+      ).toBeInTheDocument();
+    });
+
+    const resumeBtn = screen.getByRole("button", { name: /resume session/i });
+    fireEvent.click(resumeBtn);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("region", { name: /stem player/i })
+      ).toBeInTheDocument();
+    });
+
+    // Ticket 03: the recovered Session carries its Tempo Detector result, so
+    // the readout resumes identical (ranked candidates survive the store
+    // round-trip). The readout lives on the (inactive) Separate panel, which
+    // stays in the DOM per the Tab Shell invariant (ADR-0008).
+    expect(
+      screen.getByText(
+        /^Tempo Detector: 107\.7 BPM \| alternatives 215\.4 BPM$/
+      )
+    ).toBeInTheDocument();
+
+    await sessionStore.clearActiveSession();
+  });
+
   it("discards saved session and returns to clean dropzone when Discard is clicked", async () => {
     vi.spyOn(webgpuModule, "detectWebGPUCapability").mockResolvedValue({
       supported: true,
