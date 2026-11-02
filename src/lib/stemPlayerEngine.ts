@@ -24,6 +24,56 @@ export interface TimeStretchState {
   formantPreservation?: boolean;
 }
 
+// Click Track (ADR-0010): a domain-separate lane, never a Stem. The
+// StemName union (vocals/drums/bass/other) is not widened here and
+// nowhere else. State is parallel to StemMixerState but has no solo and
+// deliberately no rate control of its own: it follows Time-Stretch.
+export type ClickTrackMeter = "2/4" | "3/4" | "4/4" | "6/8";
+
+export interface ClickTrackMixerState {
+  enabled: boolean; // defaults to off: opening the Mix tab never surprises
+  muted: boolean;
+  volume: number; // 0.0 to 1.0, like a Stem lane
+  meter: ClickTrackMeter;
+}
+
+// Synthesized clicks (no sampled assets): short exponentially-decaying bursts
+// at Beat Grid positions in seconds, deeper/lower on downbeats per the
+// Meter's bar grouping. Deterministic from (Beat Grid, Meter). Shared with
+// the Export Bundle seam so exported clicks match playback exactly.
+export function synthesizeClickTrackChannel(
+  beatGridSec: Float64Array,
+  meter: ClickTrackMeter,
+  sampleRate: number,
+  durationSec?: number
+): Float32Array {
+  const beatsPerBar = parseInt(meter.split("/")[0], 10) || 4;
+  let gridEndSec = 0;
+  for (let i = 0; i < beatGridSec.length; i++) {
+    if (beatGridSec[i] > gridEndSec) gridEndSec = beatGridSec[i];
+  }
+  const lengthSec = Math.max(durationSec ?? 0, gridEndSec + 0.06);
+  const out = new Float32Array(Math.round(lengthSec * sampleRate));
+
+  const tapLength = Math.round(0.06 * sampleRate);
+  for (let k = 0; k < beatGridSec.length; k++) {
+    const t = beatGridSec[k];
+    if (t < 0) continue;
+    const start = Math.round(t * sampleRate);
+    if (start >= out.length) continue;
+    const isDownbeat = k % beatsPerBar === 0;
+    const hz = isDownbeat ? 92 : 640;
+    const amp = isDownbeat ? 1.0 : 0.55;
+    const burst = Math.min(tapLength, out.length - start);
+    for (let i = 0; i < burst; i++) {
+      const env = Math.exp((-7 * i) / burst);
+      out[start + i] +=
+        amp * env * Math.sin((2 * Math.PI * hz * i) / sampleRate);
+    }
+  }
+  return out;
+}
+
 export interface StemPlayerEngineOptions {
   audioContext?: AudioContext;
   sampleRate?: number;
@@ -34,6 +84,9 @@ export interface StemPlayerEngineOptions {
   disableWorklet?: boolean;
   formantPreservation?: boolean;
   stretchAdapter?: MultiTrackStretchNode;
+  // Click Track lane (ADR-0010): Beat Grid in seconds + lane state.
+  beatGrid?: Float64Array;
+  initialClickTrack?: ClickTrackMixerState;
 }
 
 export type PositionListener = (timeSec: number) => void;
@@ -83,6 +136,20 @@ export class StemPlayerEngine {
   private workletInitPromise: Promise<void> | null = null;
   private isDisposed: boolean = false;
 
+  // Click Track lane (ADR-0010): domain-separate from the StemName identities,
+  // synthesized from the Beat Grid, no independent rate control (story 12).
+  private sampleRate: number = 44100;
+  private clickTrackState: ClickTrackMixerState = {
+    enabled: false,
+    muted: false,
+    volume: 1.0,
+    meter: "4/4",
+  };
+  private beatGrid: Float64Array | null = null;
+  private clickBuffer: AudioBuffer | null = null;
+  private clickGainNode: GainNode | null = null;
+  private clickSource: AudioBufferSourceNode | null = null;
+
   constructor(
     stems: Record<StemName, Float32Array[] | AudioBuffer>,
     options?: StemPlayerEngineOptions
@@ -97,6 +164,7 @@ export class StemPlayerEngine {
     }
 
     const sampleRate = options?.sampleRate ?? 44100;
+    this.sampleRate = sampleRate;
 
     // Build Master Gain Node
     this.masterGainNode = this.audioContext.createGain();
@@ -163,6 +231,22 @@ export class StemPlayerEngine {
     this.applyGainMatrix();
     this.formantPreservation = options?.formantPreservation ?? true;
 
+    // Click Track lane init: only materializes audio-graph nodes when the
+    // lane is enabled, so headless/off-lane engines stay untouched.
+    if (options?.initialClickTrack) {
+      this.clickTrackState = {
+        enabled: options.initialClickTrack.enabled,
+        muted: options.initialClickTrack.muted,
+        volume: Math.max(0, Math.min(1, options.initialClickTrack.volume)),
+        meter: options.initialClickTrack.meter,
+      };
+    }
+    if (options?.beatGrid) {
+      this.beatGrid = options.beatGrid;
+      this.regenerateClickBuffer();
+    }
+    this.applyClickGain();
+
     if (options?.stretchAdapter) {
       this.stretchAdapter = options.stretchAdapter;
       this.useWorklet = !options.stretchAdapter.isFallback;
@@ -203,6 +287,7 @@ export class StemPlayerEngine {
             this.stretchAdapter.start(this.audioContext.currentTime, curTime);
             this.playStartContextTime = this.audioContext.currentTime;
             this.currentOffset = curTime;
+            this.restartClickSource(this.audioContext.currentTime, curTime);
           } else if (this.currentOffset > 0) {
             this.stretchAdapter.seek(this.currentOffset);
           }
@@ -298,6 +383,7 @@ export class StemPlayerEngine {
         this.workletNode.port.postMessage({ type: "play" });
         this.playStartContextTime = this.audioContext.currentTime;
         this.currentOffset = curTime;
+        this.restartClickSource(this.audioContext.currentTime, curTime);
       } else if (this.currentOffset > 0) {
         this.workletNode.port.postMessage({
           type: "seek",
@@ -400,6 +486,152 @@ export class StemPlayerEngine {
     this.setStemSolo(stem, !this.stemStates[stem].solo);
   }
 
+  // --- Click Track lane (ADR-0010) -----------------------------------------
+  // Domain-separate: never a StemName identity, never part of the gain matrix
+  // solo logic; enabling/disabling cannot touch the four Stems' playback.
+
+  public getClickTrackState(): ClickTrackMixerState {
+    return { ...this.clickTrackState };
+  }
+
+  public getBeatGrid(): Float64Array | null {
+    return this.beatGrid;
+  }
+
+  public getClickGainNode(): GainNode | null {
+    return this.clickGainNode;
+  }
+
+  public setBeatGrid(beatGridSec: Float64Array | null): void {
+    this.beatGrid = beatGridSec;
+    this.regenerateClickBuffer();
+    if (this.playing) {
+      this.restartClickSource(
+        this.audioContext.currentTime,
+        this.currentOffset
+      );
+    }
+  }
+
+  public setClickTrackEnabled(enabled: boolean): void {
+    if (this.clickTrackState.enabled === enabled) return;
+    this.clickTrackState.enabled = enabled;
+    this.applyClickGain();
+    if (enabled) {
+      this.regenerateClickBuffer();
+      if (this.playing) {
+        this.restartClickSource(
+          this.audioContext.currentTime,
+          this.currentOffset
+        );
+      }
+    } else {
+      this.stopClickSource();
+    }
+  }
+
+  public toggleClickTrack(): void {
+    this.setClickTrackEnabled(!this.clickTrackState.enabled);
+  }
+
+  public setClickTrackMuted(muted: boolean): void {
+    this.clickTrackState.muted = muted;
+    this.applyClickGain();
+  }
+
+  public toggleClickTrackMute(): void {
+    this.setClickTrackMuted(!this.clickTrackState.muted);
+  }
+
+  public setClickTrackVolume(volume: number): void {
+    this.clickTrackState.volume = Math.max(0, Math.min(1, volume));
+    this.applyClickGain();
+  }
+
+  public setClickTrackMeter(meter: ClickTrackMeter): void {
+    if (this.clickTrackState.meter === meter) return;
+    // Regenerated on Meter change only (never on volume/mute).
+    this.clickTrackState.meter = meter;
+    this.regenerateClickBuffer();
+    if (this.playing) {
+      this.restartClickSource(
+        this.audioContext.currentTime,
+        this.currentOffset
+      );
+    }
+  }
+
+  private applyClickGain(): void {
+    if (this.clickGainNode === null) {
+      // Lazy: nodes only materialize once the lane is enabled, keeping the
+      // default Stem graph (and its test counts) untouched.
+      if (!this.clickTrackState.enabled) return;
+      this.clickGainNode = this.audioContext.createGain();
+      this.clickGainNode.connect(this.masterGainNode);
+    }
+    const effectiveGain =
+      this.clickTrackState.enabled && !this.clickTrackState.muted
+        ? this.clickTrackState.volume
+        : 0;
+    this.clickGainNode.gain.setValueAtTime(
+      effectiveGain,
+      this.audioContext.currentTime
+    );
+  }
+
+  private regenerateClickBuffer(): void {
+    // Lazy: the click channel only materializes while the lane is enabled, so a
+    // disabled lane never allocates a full-length channel over the Source Mix.
+    if (!this.beatGrid || !this.clickTrackState.enabled) {
+      this.clickBuffer = null;
+      return;
+    }
+    const samples = synthesizeClickTrackChannel(
+      this.beatGrid,
+      this.clickTrackState.meter,
+      this.sampleRate,
+      this.duration
+    );
+    const buffer = this.audioContext.createBuffer(
+      1,
+      samples.length,
+      this.sampleRate
+    );
+    buffer.getChannelData(0).set(samples);
+    this.clickBuffer = buffer;
+  }
+
+  private restartClickSource(startTime: number, offset: number): void {
+    this.stopClickSource();
+    if (!this.clickTrackState.enabled || !this.clickBuffer) return;
+    this.applyClickGain();
+
+    const source = this.audioContext.createBufferSource();
+    source.buffer = this.clickBuffer;
+    if (source.playbackRate) {
+      source.playbackRate.setValueAtTime(this.tempo, startTime);
+    }
+    source.connect(this.clickGainNode ?? this.masterGainNode);
+    source.start(startTime, offset);
+    this.clickSource = source;
+    this.activeSources.push(source);
+  }
+
+  private stopClickSource(): void {
+    if (!this.clickSource) return;
+    try {
+      this.clickSource.stop();
+      this.clickSource.disconnect();
+    } catch {
+      // Source may already be stopped
+    }
+    // The lane source leaves the active set with the lane: the Stems' entries
+    // are untouched, so getActiveSources() never grows a stale click entry.
+    const at = this.activeSources.indexOf(this.clickSource);
+    if (at !== -1) this.activeSources.splice(at, 1);
+    this.clickSource = null;
+  }
+
   private applyGainMatrix(): void {
     const hasAnySolo = STEM_NAMES.some((stem) => this.stemStates[stem].solo);
 
@@ -470,6 +702,10 @@ export class StemPlayerEngine {
       this.startFallbackSources(offset, startTime);
     }
 
+    // Click lane starts on the same timeline as the Stems: same offset, same
+    // rate (playbackRate = tempo), no independent speed control.
+    this.restartClickSource(startTime, offset);
+
     this.playing = true;
     this.startPositionLoop();
     this.notifyPosition();
@@ -523,6 +759,10 @@ export class StemPlayerEngine {
       this.startFallbackSources(clampedTime, startTime);
     }
 
+    if (this.playing) {
+      this.restartClickSource(startTime, clampedTime);
+    }
+
     this.notifyPosition();
   }
 
@@ -565,6 +805,9 @@ export class StemPlayerEngine {
       }
     }
     this.activeSources = [];
+    // Click lane sources are stopped with the same sweep (ADR-0010 lockstep);
+    // the field is cleared so a later restart never double-stops.
+    this.clickSource = null;
   }
 
   private startPositionLoop(): void {
@@ -668,6 +911,22 @@ export class StemPlayerEngine {
     } else if (this.useWorklet && this.workletNode) {
       this.workletNode.port.postMessage({ type: "setTempo", tempo: clamped });
     }
+
+    // Click Track Time-Stretch lock (ADR-0010 story 12): the lane follows the
+    // shared tempo in every mode. In worklet modes the Stems re-rate inside
+    // the pipeline, so the click source is re-rated the same way; in basic
+    // mode the activeSources playbackRate sweep above already covered it.
+    if (
+      this.playing &&
+      this.clickSource !== null &&
+      this.getStretchMode() !== "basic"
+    ) {
+      this.restartClickSource(
+        this.audioContext.currentTime,
+        this.currentOffset
+      );
+    }
+
     this.notifyTimeStretch();
   }
 
@@ -822,6 +1081,18 @@ export class StemPlayerEngine {
         // Node might already be disconnected
       }
     }
+
+    // Click Track lane: released like a lane but never part of the Stem graph.
+    this.stopClickSource();
+    if (this.clickGainNode) {
+      try {
+        this.clickGainNode.disconnect();
+      } catch {
+        // Node might already be disconnected
+      }
+      this.clickGainNode = null;
+    }
+    this.clickBuffer = null;
 
     try {
       this.masterGainNode.disconnect();

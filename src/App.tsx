@@ -54,7 +54,7 @@ import {
   DemuxifySession,
   SessionMixerState,
 } from "./lib/sessionStore";
-import { StemMixerStates } from "./lib/stemPlayerEngine";
+import { StemMixerStates, ClickTrackMixerState } from "./lib/stemPlayerEngine";
 import { DISPLAY_FONT_STACK, MONO_FONT_STACK } from "./lib/typography";
 
 // Bold pairing (ticket 10): the bundled display face paints the focal Tab banners and
@@ -181,6 +181,9 @@ export const App: React.FC = () => {
   // Last completed Tempo Detector result: attached to the Session snapshot
   // when it saves (ticket 03) and restored on Session Recovery.
   const tempoResultRef = useRef<TempoAnalysisResult | null>(null);
+  // Live Click Track rail state (ADR-0010): fed out of the Stem Player so the
+  // Session snapshot can persist it (ticket 05). Never part of the Stem mixer.
+  const clickTrackStateRef = useRef<ClickTrackMixerState | null>(null);
   const cachedSessionRef = useRef<DemuxifySession | null>(null);
   const autoSaverRef = useRef(createSessionAutoSaver(600));
 
@@ -899,6 +902,17 @@ export const App: React.FC = () => {
                     transportActionsRef.current = controls;
                   }}
                   masterWaveformHosted
+                  // Click Track rail (ADR-0010, ticket 04): the Beat Grid comes
+                  // straight off the Tempo Detector, and the rail reports its own
+                  // state out to the app. Domain-separate: the four StemName
+                  // identities and the mixer contract are untouched.
+                  beatGrid={tempoAnalysis?.beatGrid}
+                  clickTrackBpm={
+                    tempoAnalysis ? tempoAnalysis.analyzedBpm : null
+                  }
+                  onClickTrackState={(state) => {
+                    clickTrackStateRef.current = state;
+                  }}
                 />
               </>
             ) : (

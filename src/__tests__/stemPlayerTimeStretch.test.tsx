@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, within } from "@testing-library/react";
 import { StemPlayer } from "../components/StemPlayer";
 import { StemName } from "../lib/chunkOverlapAdd";
 
@@ -372,5 +372,77 @@ describe("StemPlayer Time-Stretch & Pitch Controls", () => {
 
     // Duration display must remain anchored to 00:05 (never shortened to 00:02)
     expect(screen.getByText("00:05")).toBeInTheDocument();
+  });
+
+  it("renders the Click Track rail in the Mix player: off by default, Meter selector, one volume fader and no rate control of its own", () => {
+    const beatGrid = Float64Array.from([
+      0.5, 1.0572789, 1.6145578, 2.1718367, 2.7291156,
+    ]);
+
+    render(
+      <StemPlayer
+        stems={dummyStems}
+        sampleRate={sampleRate}
+        audioContext={mockCtx}
+        beatGrid={beatGrid}
+        clickTrackBpm={107.7}
+      />
+    );
+
+    expect(screen.getByTestId("click-track-rail")).toBeInTheDocument();
+
+    // The rail is domain-separate: it is a lane of its own, never one of the
+    // four Stems.
+    const rail = screen.getByTestId("click-track-rail");
+    expect(rail).toHaveAccessibleName("Click Track");
+    expect(within(rail).queryAllByRole("group")).toHaveLength(0);
+    expect(screen.getAllByRole("group", { name: /stem$/i })).toHaveLength(4);
+
+    // Off by default: opening the Mix tab never drops a metronome over the Stems.
+    const enableSwitch = screen.getByRole("switch", { name: /^click track$/i });
+    expect(enableSwitch).toHaveAttribute("aria-checked", "false");
+
+    // Beat Grid readout shows the tempo the grid was locked at.
+    expect(screen.getByTestId("click-track-bpm-label")).toHaveTextContent(
+      "107.7 BPM"
+    );
+    expect(screen.getByTestId("click-track-meter-label")).toHaveTextContent(
+      "Meter 4/4"
+    );
+
+    // Meter selector: the four allowed values, exactly one pressed.
+    const meters = screen.getAllByRole("button", {
+      name: /^meter [2346]\/[48]$/i,
+    });
+    expect(meters).toHaveLength(4);
+    const pressed = meters.filter(
+      (b) => b.getAttribute("aria-pressed") === "true"
+    );
+    expect(pressed).toHaveLength(1);
+    expect(pressed[0]).toHaveAccessibleName("Meter 4/4");
+
+    // Selecting a Meter re-accentuates the bar.
+    const meter68 = screen.getByRole("button", { name: /^meter 6\/8$/i });
+    fireEvent.click(meter68);
+    expect(screen.getByTestId("click-track-meter-label")).toHaveTextContent(
+      "Meter 6/8"
+    );
+    expect(meter68).toHaveAttribute("aria-pressed", "true");
+
+    // Switching the lane on.
+    fireEvent.click(enableSwitch);
+    expect(enableSwitch).toHaveAttribute("aria-checked", "true");
+
+    // One and only one Click Track slider: the volume fader. The lane has no
+    // rate control of its own — Time-Stretch owns the rate (ADR-0010 story 12).
+    expect(
+      screen.getAllByRole("slider", { name: /click track/i })
+    ).toHaveLength(1);
+    expect(
+      screen.queryByRole("slider", { name: /click track.*(rate|speed|tempo)/i })
+    ).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: /click track.*(rate|speed|step)/i })
+    ).toBeNull();
   });
 });

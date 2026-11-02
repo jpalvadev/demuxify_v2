@@ -731,6 +731,19 @@ describe("App UI Shell", () => {
       )
     ).toBeInTheDocument();
 
+    // Ticket 04: the recovered Beat Grid feeds the Mix tab's Click Track rail,
+    // so the rail resumes at the same locked tempo — still off by default.
+    expect(screen.getByTestId("click-track-bpm-label")).toHaveTextContent(
+      "107.7 BPM"
+    );
+    expect(screen.getByTestId("click-track-meter-label")).toHaveTextContent(
+      "Meter 4/4"
+    );
+    const resumedRailSwitch = screen.getByRole("switch", {
+      name: /^click track$/i,
+    });
+    expect(resumedRailSwitch).toHaveAttribute("aria-checked", "false");
+
     await sessionStore.clearActiveSession();
   });
 
@@ -1052,6 +1065,10 @@ describe("App UI Shell", () => {
       expect(within(entry).getByText(/no Stems yet/i)).toBeInTheDocument();
     }
 
+    // Ticket 04: the Click Track rail lives inside the Mix player, so while the
+    // Mix Tab is grayscaled there is no rail and nothing to click against.
+    expect(screen.queryByTestId("click-track-rail")).toBeNull();
+
     // Drive the state machine to completion
     const file = new File(["audio"], "song_master.mp3", {
       type: "audio/mp3",
@@ -1080,6 +1097,13 @@ describe("App UI Shell", () => {
 
     // Gating mask lifts once separated Stems exist
     expect(screen.queryByText(/no Stems yet/i)).not.toBeInTheDocument();
+
+    // Mix is live: the rail exists and reports its own state (ADR-0010 ticket
+    // 04). Nothing here joins the Stem mixer contract.
+    expect(screen.getByTestId("click-track-rail")).toBeInTheDocument();
+    expect(
+      screen.getByRole("switch", { name: /^click track$/i })
+    ).toHaveAttribute("aria-checked", "false");
   });
 
   it("keeps the shell chrome contract: clipped stage and fixed 112px rail cells", async () => {

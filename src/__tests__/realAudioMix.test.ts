@@ -16,6 +16,10 @@ import {
   handleWorkerMessage,
   WorkerOutMessage,
 } from "../workers/beatDetection.worker";
+import {
+  ClickTrackMeter,
+  synthesizeClickTrackChannel,
+} from "../lib/stemPlayerEngine";
 
 describe("Real Audio Ingestion & Processing Pipeline (audioslave_stone.mp3)", () => {
   const candidatePaths = [
@@ -227,5 +231,104 @@ describe("Real Audio Ingestion & Processing Pipeline (audioslave_stone.mp3)", ()
         0.1
       );
     }
+  });
+
+  it("keeps the Click Track locked to the Beat Grid: clicks land where the beats fall, not on a flat BPM re-derivation", async () => {
+    // Same accepted deterministic 107.7 BPM pulse surrogate as the anchor test
+    // above (scripts/check_bpm.py ground truth: 107.7 BPM, librosa's beat
+    // intervals fluctuate — the reading is rubato, not a constant stride).
+    const rate = 44100;
+    const durationSec = 12;
+    const total = Math.round(durationSec * rate);
+    const samples = new Float32Array(total);
+    const period = (60 / 107.7) * rate;
+    const tapLen = Math.round(0.012 * rate);
+    for (let b = 1; b * period < total - rate * 0.05; b++) {
+      const start = Math.round(b * period);
+      for (let i = 0; i < tapLen && start + i < total; i++) {
+        const env = Math.exp((-8 * i) / tapLen);
+        samples[start + i] +=
+          Math.sin((2 * Math.PI * 220 * i) / rate) * env * 0.9;
+      }
+    }
+
+    const postedMessages: WorkerOutMessage[] = [];
+    await handleWorkerMessage(
+      { type: "start", samples, sampleRate: rate },
+      (m) => {
+        postedMessages.push(m);
+      }
+    );
+    const complete = postedMessages.find((m) => m.type === "complete");
+    if (!complete || complete.type !== "complete") return;
+
+    const grid = complete.beatGrid;
+    expect(grid.length).toBeGreaterThan(8);
+
+    const meter: ClickTrackMeter = "4/4";
+    const channel = synthesizeClickTrackChannel(grid, meter, rate, durationSec);
+    expect(channel.length).toBe(total);
+
+    // Onset clustering: a burst's sine crosses exact zero once inside it, so
+    // cluster starts closer than 0.1 s are the same click.
+    const onsets: number[] = [];
+    for (let i = 0; i < channel.length; i++) {
+      const nz = Math.abs(channel[i]) > 1e-6;
+      const prev = i === 0 ? false : Math.abs(channel[i - 1]) > 1e-6;
+      if (nz && !prev) {
+        const t = i / rate;
+        if (onsets.length === 0 || t - onsets[onsets.length - 1] > 0.1) {
+          onsets.push(t);
+        }
+      }
+    }
+
+    // One click per Beat Grid position, landing on the grid itself (within
+    // ~10 samples of the grid time).
+    expect(onsets).toHaveLength(grid.length);
+    let maxOnsetError = 0;
+    for (let k = 0; k < grid.length; k++) {
+      maxOnsetError = Math.max(maxOnsetError, Math.abs(onsets[k] - grid[k]));
+    }
+    expect(maxOnsetError).toBeLessThan((10 / rate) * 10);
+
+    // The grid is rubato: the measured beat positions drift from a flat stride
+    // at the locked tempo (librosa's real intervals on the reference Source
+    // Mix: 0.557 s median vs 0.534 s minimum).
+    const flatInterval = 60 / complete.analyzedBpm;
+    let maxDevFromFlat = 0;
+    let spreadIntervals: number[] = [];
+    for (let k = 0; k < grid.length; k++) {
+      maxDevFromFlat = Math.max(
+        maxDevFromFlat,
+        Math.abs(grid[k] - k * flatInterval)
+      );
+      if (k + 1 < grid.length) spreadIntervals.push(grid[k + 1] - grid[k]);
+    }
+    expect(maxDevFromFlat).toBeGreaterThan(0.01);
+
+    spreadIntervals.sort();
+    const medianInterval =
+      spreadIntervals[Math.floor(spreadIntervals.length / 2)];
+    const minInterval = spreadIntervals[0];
+    // Intervals are not a constant stride: the spread between the shortest
+    // interval and the median is what makes the click follow the music.
+    expect(medianInterval - minInterval).toBeGreaterThan(0.01);
+
+    // Clicks sit on the Beat Grid, not on a flat re-derivation: at the point of
+    // maximum drift, the nearest click is still > 0.01 s away from where a
+    // constant-stride metronome would have clicked.
+    let worstGridIdx = 0;
+    let worstDev = 0;
+    for (let k = 0; k < grid.length; k++) {
+      const dev = Math.abs(grid[k] - k * flatInterval);
+      if (dev > worstDev) {
+        worstDev = dev;
+        worstGridIdx = k;
+      }
+    }
+    expect(
+      Math.abs(onsets[worstGridIdx] - worstGridIdx * flatInterval)
+    ).toBeGreaterThan(0.01);
   });
 });

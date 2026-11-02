@@ -4,6 +4,7 @@ import {
   Pause,
   RotateCcw,
   Volume2,
+  VolumeX,
   Layers,
   Download,
   Gauge,
@@ -16,6 +17,8 @@ import {
   StemPlayerEngine,
   StemMixerStates,
   TimeStretchState,
+  ClickTrackMeter,
+  ClickTrackMixerState,
 } from "../lib/stemPlayerEngine";
 import { StemStrip } from "./StemStrip";
 import { MasterWaveform } from "./MasterWaveform";
@@ -74,6 +77,14 @@ export interface StemPlayerProps {
   // Tab Shell (ADR-0007): the shell hosts the shared Master Waveform spine in
   // Listen and Mix, so the player's own overview waveform stays hidden.
   masterWaveformHosted?: boolean;
+  // Click Track lane (ADR-0010, ticket 04): the Beat Grid (beat positions in
+  // seconds) from the Tempo Detector plus the rail's initial settings. The lane
+  // is domain-separate from Stem — it never joins the StemName identities.
+  beatGrid?: Float64Array | null;
+  initialClickTrack?: ClickTrackMixerState;
+  // Readout only: the BPM the Beat Grid was locked at (chosen candidate).
+  clickTrackBpm?: number | null;
+  onClickTrackState?: (state: ClickTrackMixerState) => void;
 }
 
 function formatTime(totalSeconds: number): string {
@@ -82,6 +93,18 @@ function formatTime(totalSeconds: number): string {
   const seconds = Math.floor(totalSeconds % 60);
   return `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
 }
+
+// Click Track rail (ADR-0010, ticket 04): the four allowed Meter values in
+// display order, and the lane's neutral default — off, so opening the Mix tab
+// never surprises the user with a metronome over the Stems.
+const CLICK_TRACK_METERS: ClickTrackMeter[] = ["2/4", "3/4", "4/4", "6/8"];
+
+const CLICK_TRACK_DEFAULT: ClickTrackMixerState = {
+  enabled: false,
+  muted: false,
+  volume: 1.0,
+  meter: "4/4",
+};
 
 export const StemPlayer: React.FC<StemPlayerProps> = ({
   stems,
@@ -100,6 +123,10 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
   onExportDialogState,
   onTransportControls,
   masterWaveformHosted,
+  beatGrid,
+  initialClickTrack,
+  clickTrackBpm,
+  onClickTrackState,
 }) => {
   const engineRef = useRef<StemPlayerEngine | null>(null);
 
@@ -119,6 +146,10 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
   const [tempo, setTempo] = useState(1.0);
   const [pitch, setPitch] = useState(0);
   const [formantPreservation, setFormantPreservation] = useState(true);
+  // Click Track lane state lives here (not in the mixer states): domain-separate.
+  const [clickTrack, setClickTrack] = useState<ClickTrackMixerState>(
+    initialClickTrack ?? CLICK_TRACK_DEFAULT
+  );
 
   // Initialize engine
   useEffect(() => {
@@ -129,6 +160,7 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
       initialMixerStates,
       initialMasterVolume,
       initialCurrentTime,
+      initialClickTrack,
     });
     engineRef.current = engine;
 
@@ -150,6 +182,8 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
     setTempo(engine.getTempo());
     setPitch(engine.getPitch());
     setFormantPreservation(engine.isFormantPreservationEnabled());
+    setClickTrack(engine.getClickTrackState());
+    onClickTrackState?.(engine.getClickTrackState());
 
     const unsubPos = engine.subscribePosition((time) => {
       setCurrentTime(time);
@@ -176,6 +210,17 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
       engineRef.current = null;
     };
   }, [stems, sampleRate, providedDuration, audioContext]);
+
+  // Beat Grid (ADR-0010, ticket 04/06): the grid is swapped in place, so re-
+  // locking it after a candidate choice keeps the mixer settings and the
+  // playhead exactly where they were. A lane with no grid has no clicks.
+  useEffect(() => {
+    const engine = engineRef.current;
+    if (!engine) return;
+    engine.setBeatGrid(beatGrid ?? null);
+    setClickTrack(engine.getClickTrackState());
+    onClickTrackState?.(engine.getClickTrackState());
+  }, [beatGrid]);
 
   // Spacebar Hotkey listener for Play/Pause
   useEffect(() => {
@@ -403,6 +448,47 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
     emitExportDialogState();
   }, []);
 
+  // --- Click Track rail handlers (ADR-0010, ticket 04) ---------------------
+  // Domain-separate from the Stem mixer contract: the rail reports its own
+  // state to the app (Session persistence), and nothing here touches mixerStates.
+  const handleToggleClickTrack = useCallback(() => {
+    const engine = engineRef.current;
+    if (!engine) return;
+    engine.toggleClickTrack();
+    setClickTrack(engine.getClickTrackState());
+    onClickTrackState?.(engine.getClickTrackState());
+  }, [onClickTrackState]);
+
+  const handleToggleClickTrackMute = useCallback(() => {
+    const engine = engineRef.current;
+    if (!engine) return;
+    engine.toggleClickTrackMute();
+    setClickTrack(engine.getClickTrackState());
+    onClickTrackState?.(engine.getClickTrackState());
+  }, [onClickTrackState]);
+
+  const handleSetClickTrackVolume = useCallback(
+    (volume: number) => {
+      const engine = engineRef.current;
+      if (!engine) return;
+      engine.setClickTrackVolume(volume);
+      setClickTrack(engine.getClickTrackState());
+      onClickTrackState?.(engine.getClickTrackState());
+    },
+    [onClickTrackState]
+  );
+
+  const handleSetClickTrackMeter = useCallback(
+    (meter: ClickTrackMeter) => {
+      const engine = engineRef.current;
+      if (!engine) return;
+      engine.setClickTrackMeter(meter);
+      setClickTrack(engine.getClickTrackState());
+      onClickTrackState?.(engine.getClickTrackState());
+    },
+    [onClickTrackState]
+  );
+
   // Determine silencing for visual feedback
   const hasAnySolo = STEM_NAMES.some((s) => mixerStates[s]?.solo);
 
@@ -518,6 +604,146 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
             <span className="text-xs font-mono text-muted-foreground w-7 text-right">
               {Math.round(masterVolume * 100)}%
             </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Click Track rail (ADR-0010, ticket 04): sits beside the Transport, and
+          because it lives inside the Stem Player it only exists once the Mix is
+          live. Look is agent-authored — the ticket-01 OpenDesign run died (see
+          its FALLBACK RECORD) — and stays on the same HSL token architecture as
+          the rest of the Tab Shell. The lane is domain-separate: never a Stem. */}
+      <div
+        role="group"
+        aria-label="Click Track"
+        data-testid="click-track-rail"
+        className={cn(
+          "flex flex-col sm:flex-row items-stretch sm:items-center gap-3 rounded-none border border-primary/30 bg-secondary/40 p-3 transition-colors shadow-xs",
+          clickTrack.enabled
+            ? "border-primary/60 bg-secondary/70"
+            : "opacity-80"
+        )}
+      >
+        {/* Lane badge: same chip treatment as the Stem strips, distinct label. */}
+        <div className="flex items-center gap-2 sm:w-34 shrink-0">
+          <div
+            className={cn(
+              "flex items-center gap-2 rounded-none border px-2.5 py-1 text-xs font-semibold shadow-xs",
+              "border-primary/40 bg-primary/10 text-primary"
+            )}
+          >
+            <Music className="h-3.5 w-3.5 shrink-0" />
+            <span>Click Track</span>
+          </div>
+        </div>
+
+        {/* Beat Grid readout: the tempo the grid was locked at, and the Meter.
+            Mono micro-line, same as the Transport readouts. */}
+        <div
+          data-testid="click-track-grid-label"
+          className="flex flex-col gap-1 text-[11px] font-mono text-muted-foreground shrink-0 sm:w-40"
+        >
+          <span
+            data-testid="click-track-bpm-label"
+            className="text-xs font-bold text-foreground"
+          >
+            {clickTrackBpm !== null && clickTrackBpm !== undefined
+              ? `${clickTrackBpm.toFixed(1)} BPM`
+              : "No Beat Grid"}
+          </span>
+          <span
+            data-testid="click-track-meter-label"
+            className="text-muted-foreground"
+          >
+            Meter {clickTrack.meter}
+          </span>
+        </div>
+
+        {/* Mixer controls: enable switch (off by default), mute, volume — like a
+            lane, with no rate control of its own (Time-Stretch owns the rate). */}
+        <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0">
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              role="switch"
+              aria-label="Click Track"
+              aria-checked={clickTrack.enabled}
+              title="Click Track on/off (Beat Grid metronome)"
+              disabled={!beatGrid || beatGrid?.length === 0}
+              onClick={handleToggleClickTrack}
+              className={cn(
+                "h-8 w-8 rounded-none border text-xs font-bold transition-all flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed",
+                clickTrack.enabled
+                  ? "border-primary/70 bg-primary text-primary-foreground shadow-xs font-black"
+                  : "border-border/70 bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground"
+              )}
+            >
+              ♪
+            </button>
+            <button
+              type="button"
+              aria-label="Mute Click Track"
+              aria-pressed={clickTrack.muted}
+              title="Mute Click Track"
+              onClick={handleToggleClickTrackMute}
+              className={cn(
+                "h-8 w-8 rounded-none border text-xs font-bold transition-all flex items-center justify-center",
+                clickTrack.muted
+                  ? "border-destructive/60 bg-destructive text-destructive-foreground shadow-xs"
+                  : "border-border/70 bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground"
+              )}
+            >
+              M
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2 w-32 sm:w-36">
+            {clickTrack.muted ? (
+              <VolumeX className="h-4 w-4 text-muted-foreground/60 shrink-0" />
+            ) : (
+              <Volume2 className="h-4 w-4 text-muted-foreground shrink-0" />
+            )}
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.01}
+              value={clickTrack.volume}
+              onChange={(e) =>
+                handleSetClickTrackVolume(parseFloat(e.target.value))
+              }
+              aria-label="Click Track Volume"
+              className="w-full accent-primary cursor-pointer h-1.5 bg-secondary rounded-none appearance-none"
+            />
+            <span className="text-[11px] font-mono text-muted-foreground w-7 text-right">
+              {Math.round(clickTrack.volume * 100)}%
+            </span>
+          </div>
+
+          {/* Meter selector: bars group the way the music does; the downbeat
+              accent is regenerated on Meter change only. */}
+          <div
+            data-testid="click-track-meter-selector"
+            className="flex items-center gap-1.5 shrink-0"
+          >
+            {CLICK_TRACK_METERS.map((meter) => (
+              <button
+                key={meter}
+                type="button"
+                aria-label={`Meter ${meter}`}
+                aria-pressed={clickTrack.meter === meter}
+                title={`Meter ${meter}`}
+                onClick={() => handleSetClickTrackMeter(meter)}
+                className={cn(
+                  "px-2 py-1 rounded-none border text-[11px] font-mono font-bold transition-all flex items-center justify-center",
+                  clickTrack.meter === meter
+                    ? "border-primary/70 bg-primary/20 text-primary shadow-xs"
+                    : "border-border/70 bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground"
+                )}
+              >
+                {meter}
+              </button>
+            ))}
           </div>
         </div>
       </div>

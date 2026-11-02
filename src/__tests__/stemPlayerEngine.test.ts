@@ -1,5 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { StemPlayerEngine } from "../lib/stemPlayerEngine";
+import {
+  StemPlayerEngine,
+  ClickTrackMeter,
+  ClickTrackMixerState,
+  synthesizeClickTrackChannel,
+} from "../lib/stemPlayerEngine";
 import { StemName } from "../lib/chunkOverlapAdd";
 
 function createMockAudioContext() {
@@ -28,6 +33,12 @@ function createMockAudioContext() {
   const createBufferSource = vi.fn(() => {
     const sourceNode = {
       buffer: null as any,
+      playbackRate: {
+        value: 1.0,
+        setValueAtTime: vi.fn((rate: number, _when?: number) => {
+          sourceNode.playbackRate.value = rate;
+        }),
+      },
       connect: vi.fn(),
       disconnect: vi.fn(),
       start: vi.fn(),
@@ -74,6 +85,33 @@ function createMockAudioContext() {
     createBuffer,
     createdSources,
   };
+}
+
+// Click Track helpers (ticket 04): onsets and peak amplitude of a synthesized
+// click channel, read at the same external seam the user hears.
+function clickOnsets(channel: Float32Array, rate: number): number[] {
+  const onsets: number[] = [];
+  for (let i = 0; i < channel.length; i++) {
+    const nz = Math.abs(channel[i]) > 1e-9;
+    const prev = i === 0 ? false : Math.abs(channel[i - 1]) > 1e-9;
+    if (nz && !prev) {
+      const t = i / rate;
+      // The sine crosses exact zero inside a burst; one cluster == one click.
+      if (onsets.length === 0 || t - onsets[onsets.length - 1] > 0.1) {
+        onsets.push(t);
+      }
+    }
+  }
+  return onsets;
+}
+
+function peakNear(channel: Float32Array, atSec: number, rate: number): number {
+  const center = Math.round(atSec * rate);
+  const from = Math.max(0, center - 2);
+  const to = Math.min(channel.length, center + Math.round(0.06 * rate));
+  let peak = 0;
+  for (let i = from; i < to; i++) peak = Math.max(peak, Math.abs(channel[i]));
+  return peak;
 }
 
 describe("StemPlayerEngine", () => {
@@ -791,6 +829,197 @@ describe("StemPlayerEngine", () => {
       for (const s of finalSources) {
         expect(s.stop).not.toHaveBeenCalled();
       }
+    });
+  });
+
+  describe("Click Track Lane: domain-separate synthesized rail", () => {
+    // A rubato Beat Grid: intervals fluctuate, exactly as the Tempo Detector
+    // reports beat positions where the beats actually fall.
+    const beatGridSec = new Float64Array([
+      0.5, 1.0572789, 1.6145578, 2.1718367, 2.7291156,
+    ]);
+
+    it("defaults the lane off and keeps the audio graph at 4 Stems + master", async () => {
+      const engine = new StemPlayerEngine(dummyStems, {
+        audioContext: mockCtx as any,
+        sampleRate,
+        beatGrid: beatGridSec,
+      });
+
+      const lane: ClickTrackMixerState = engine.getClickTrackState();
+      expect(lane).toEqual({
+        enabled: false,
+        muted: false,
+        volume: 1.0,
+        meter: "4/4",
+      });
+      expect(engine.getClickGainNode()).toBeNull();
+      // Lane off: no click gain node and no click channel materialized.
+      expect(mockCtx.createGain).toHaveBeenCalledTimes(5);
+      expect(mockCtx.createBuffer).toHaveBeenCalledTimes(4);
+
+      await engine.play();
+      expect(mockCtx.createdSources).toHaveLength(4);
+      expect(engine.getActiveSources()).toHaveLength(4);
+    });
+
+    it("turns the lane on without touching the four Stems' playback", async () => {
+      const engine = new StemPlayerEngine(dummyStems, {
+        audioContext: mockCtx as any,
+        sampleRate,
+        beatGrid: beatGridSec,
+      });
+      engine.setStemVolume("drums", 0.5);
+
+      engine.toggleClickTrack();
+      // One gain node added (4 Stems + master + click), one channel synthesized.
+      expect(mockCtx.createGain).toHaveBeenCalledTimes(6);
+      expect(mockCtx.createBuffer).toHaveBeenCalledTimes(5);
+      const clickGain = engine.getClickGainNode();
+      if (!clickGain) return;
+      expect(clickGain.connect).toHaveBeenCalledWith(
+        engine.getMasterGainNode()
+      );
+
+      await engine.play();
+      // 4 Stem sources plus the click lane; the Stems' gain is untouched.
+      expect(mockCtx.createdSources).toHaveLength(5);
+      expect(engine.getActiveSources()).toHaveLength(5);
+      expect(engine.getStemGainNode("drums").gain.value).toBe(0.5);
+
+      engine.toggleClickTrack();
+      // Only the click lane source is stopped: the Stems keep playing.
+      const clickSource = mockCtx.createdSources[4];
+      expect(clickSource.stop).toHaveBeenCalledTimes(1);
+      expect(clickSource.disconnect).toHaveBeenCalledTimes(1);
+      for (let i = 0; i < 4; i++) {
+        expect(mockCtx.createdSources[i].stop).not.toHaveBeenCalled();
+      }
+      expect(engine.getActiveSources()).toHaveLength(4);
+    });
+
+    it("mutes and volumes the lane exactly like a Stem lane", () => {
+      const engine = new StemPlayerEngine(dummyStems, {
+        audioContext: mockCtx as any,
+        sampleRate,
+        beatGrid: beatGridSec,
+      });
+      engine.setClickTrackEnabled(true);
+      const clickGain = engine.getClickGainNode();
+      if (!clickGain) return;
+      expect(clickGain.gain.value).toBe(1.0);
+
+      engine.setClickTrackVolume(0.4);
+      expect(clickGain.gain.value).toBeCloseTo(0.4, 6);
+      engine.toggleClickTrackMute();
+      expect(clickGain.gain.value).toBe(0);
+      engine.toggleClickTrackMute();
+      expect(clickGain.gain.value).toBeCloseTo(0.4, 6);
+      engine.setClickTrackVolume(1.5); // clamped like a Stem lane
+      expect(clickGain.gain.value).toBe(1.0);
+    });
+
+    it("regenerates the click channel on Meter change only", async () => {
+      const engine = new StemPlayerEngine(dummyStems, {
+        audioContext: mockCtx as any,
+        sampleRate,
+        beatGrid: beatGridSec,
+      });
+      engine.setClickTrackEnabled(true);
+      await engine.play();
+      expect(mockCtx.createBuffer).toHaveBeenCalledTimes(5);
+
+      // Volume, mute, and a transport seek never rebuild the channel.
+      engine.setClickTrackVolume(0.7);
+      engine.toggleClickTrackMute();
+      engine.toggleClickTrackMute();
+      expect(mockCtx.createBuffer).toHaveBeenCalledTimes(5);
+
+      engine.setClickTrackMeter("6/8");
+      expect(mockCtx.createBuffer).toHaveBeenCalledTimes(6);
+      expect(engine.getClickTrackState().meter).toBe("6/8");
+      engine.setClickTrackMeter("6/8"); // same Meter: no regeneration
+      expect(mockCtx.createBuffer).toHaveBeenCalledTimes(6);
+    });
+
+    it("follows Time-Stretch: the click shares the Stems' rate, with no rate of its own", async () => {
+      const engine = new StemPlayerEngine(dummyStems, {
+        audioContext: mockCtx as any,
+        sampleRate,
+        beatGrid: beatGridSec,
+      });
+      engine.setClickTrackEnabled(true);
+      await engine.play();
+
+      const clickSource = mockCtx.createdSources[4];
+      expect(clickSource.playbackRate.value).toBe(1.0);
+
+      engine.setTempo(1.5);
+      // Stems and Click Track alike sit at the shared factor: the lane follows
+      // Time-Stretch in lockstep, it is not rated on its own.
+      for (const source of mockCtx.createdSources) {
+        expect(source.playbackRate.value).toBe(1.5);
+      }
+      expect(clickSource.playbackRate.setValueAtTime).toHaveBeenCalledWith(
+        1.5,
+        expect.anything()
+      );
+
+      // Scrubbing mid-stretch recreates the lane on the same rate.
+      engine.seek(2.0);
+      expect(mockCtx.createdSources).toHaveLength(10);
+      expect(engine.getActiveSources()).toHaveLength(5);
+      expect(mockCtx.createdSources[9].playbackRate.value).toBe(1.5);
+      for (let i = 0; i < 5; i++) {
+        expect(mockCtx.createdSources[i].stop).toHaveBeenCalled();
+      }
+    });
+
+    it("synthesizes deterministic bursts on the Beat Grid, accented per Meter", () => {
+      const fourFour: ClickTrackMeter = "4/4";
+      const channel = synthesizeClickTrackChannel(
+        beatGridSec,
+        fourFour,
+        sampleRate,
+        3
+      );
+      const again = synthesizeClickTrackChannel(
+        beatGridSec,
+        fourFour,
+        sampleRate,
+        3
+      );
+      expect(channel.length).toBe(Math.round(3 * sampleRate));
+      for (let i = 0; i < channel.length; i++) {
+        expect(channel[i]).toBe(again[i]);
+      }
+
+      // One click per Beat Grid position, landing on the grid itself (within a
+      // sample), not on a flat BPM re-derivation.
+      const onsets = clickOnsets(channel, sampleRate);
+      expect(onsets).toHaveLength(beatGridSec.length);
+      for (let k = 0; k < beatGridSec.length; k++) {
+        expect(Math.abs(onsets[k] - beatGridSec[k])).toBeLessThan(
+          (2 / sampleRate) * 10
+        );
+      }
+
+      // Downbeats are deeper and louder than the other beats of the bar.
+      expect(peakNear(channel, beatGridSec[0], sampleRate)).toBeGreaterThan(
+        peakNear(channel, beatGridSec[1], sampleRate)
+      );
+
+      // Meter regroups the accent: beat 3 is a downbeat in 2/4 but not in 4/4.
+      const twoFour: ClickTrackMeter = "2/4";
+      const inTwoFour = synthesizeClickTrackChannel(
+        beatGridSec,
+        twoFour,
+        sampleRate,
+        3
+      );
+      expect(peakNear(inTwoFour, beatGridSec[2], sampleRate)).toBeGreaterThan(
+        peakNear(channel, beatGridSec[2], sampleRate)
+      );
     });
   });
 });

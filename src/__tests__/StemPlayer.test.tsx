@@ -9,7 +9,10 @@ import {
 import userEvent from "@testing-library/user-event";
 import { StemPlayer } from "../components/StemPlayer";
 import { StemName } from "../lib/chunkOverlapAdd";
-import { StemPlayerEngine } from "../lib/stemPlayerEngine";
+import {
+  StemPlayerEngine,
+  ClickTrackMixerState,
+} from "../lib/stemPlayerEngine";
 import * as customMixdown from "../lib/customMixdown";
 
 // Mock Web Audio API
@@ -530,5 +533,87 @@ describe("StemPlayer UI Component", () => {
     });
 
     mixAudioStemsSpy.mockRestore();
+  });
+
+  it("hosts the Click Track rail inside the Mix player: domain-separate, off by default, reported out to the app", () => {
+    // The rail reports its own state out to the app (Session persistence seam,
+    // ticket 05): nothing here joins the Stem mixer contract.
+    const reported: ClickTrackMixerState[] = [];
+    const collect = (state: ClickTrackMixerState) => {
+      reported.push(state);
+    };
+
+    // No Beat Grid yet (Separate tab still running / analysis pending).
+    render(
+      <StemPlayer
+        stems={dummyStems}
+        sampleRate={sampleRate}
+        audioContext={mockCtx}
+        onClickTrackState={collect}
+      />
+    );
+
+    expect(screen.getByTestId("click-track-rail")).toBeInTheDocument();
+    expect(screen.getByTestId("click-track-bpm-label")).toHaveTextContent(
+      "No Beat Grid"
+    );
+    expect(screen.getByTestId("click-track-meter-label")).toHaveTextContent(
+      "Meter 4/4"
+    );
+
+    const enableSwitch = screen.getByRole("switch", { name: /^click track$/i });
+    expect(enableSwitch).toHaveAttribute("aria-checked", "false");
+    // Nothing to lock clicks to: the toggle is inert until the Beat Grid exists.
+    expect(enableSwitch).toHaveAttribute("disabled");
+    fireEvent.click(enableSwitch);
+    expect(enableSwitch).toHaveAttribute("aria-checked", "false");
+
+    // The rail's initial state is reported out: off, un-muted, full volume, 4/4.
+    expect(reported[0]).toEqual({
+      enabled: false,
+      muted: false,
+      volume: 1,
+      meter: "4/4",
+    });
+  });
+
+  it("lights the Click Track rail once the Beat Grid exists: BPM readout, live toggle, reported state", () => {
+    const reported: ClickTrackMixerState[] = [];
+    render(
+      <StemPlayer
+        stems={dummyStems}
+        sampleRate={sampleRate}
+        audioContext={mockCtx}
+        beatGrid={Float64Array.from([0.5, 1.0572789, 1.6145578])}
+        clickTrackBpm={107.7}
+        onClickTrackState={(state) => {
+          reported.push(state);
+        }}
+      />
+    );
+
+    expect(screen.getByTestId("click-track-bpm-label")).toHaveTextContent(
+      "107.7 BPM"
+    );
+    const liveSwitch = screen.getByRole("switch", { name: /^click track$/i });
+    expect(liveSwitch.getAttribute("disabled")).toBeNull();
+    fireEvent.click(liveSwitch);
+    expect(liveSwitch).toHaveAttribute("aria-checked", "true");
+    expect(reported[reported.length - 1]).toEqual({
+      enabled: true,
+      muted: false,
+      volume: 1,
+      meter: "4/4",
+    });
+
+    // The rail is never one of the Stems: the four identities stay intact.
+    const stemGroups = screen.getAllByRole("group", { name: /stem$/i });
+    expect(stemGroups).toHaveLength(4);
+    expect(stemGroups.map((g) => g.getAttribute("aria-label"))).toEqual([
+      "Vocals Stem",
+      "Drums Stem",
+      "Bass Stem",
+      "Other Stem",
+    ]);
   });
 });
