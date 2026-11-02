@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   StemPlayerEngine,
-  ClickTrackMeter,
   ClickTrackMixerState,
   synthesizeClickTrackChannel,
 } from "../lib/stemPlayerEngine";
@@ -772,7 +771,6 @@ describe("StemPlayerEngine", () => {
         enabled: false,
         muted: false,
         volume: 1.0,
-        meter: "4/4",
       });
       expect(engine.getClickGainNode()).toBeNull();
       // Lane off: no click gain node and no click channel materialized.
@@ -843,43 +841,6 @@ describe("StemPlayerEngine", () => {
       expect(engine.getActiveSources()).toHaveLength(5);
     });
 
-    it("changing the Meter mid-playback recreates the lane on the live playhead, not at the play position", async () => {
-      const engine = new StemPlayerEngine(dummyStems, {
-        audioContext: mockCtx as any,
-        sampleRate,
-        beatGrid: beatGridSec,
-      });
-      engine.setClickTrackEnabled(true);
-      await engine.play();
-      expect(mockCtx.createdSources[4].start).toHaveBeenCalledWith(10, 0);
-
-      mockCtx.currentTime = 14;
-      engine.setClickTrackMeter("3/4");
-      // Regenerated channel on the new Meter must ride the same timeline:
-      // anchored at the live playhead (4s at t=14).
-      expect(mockCtx.createdSources).toHaveLength(6);
-      expect(mockCtx.createdSources[5].start).toHaveBeenCalledWith(14, 4);
-    });
-
-    it("the rail's −/+ downbeat hunt mid-playback keeps clicks on the live playhead", async () => {
-      const engine = new StemPlayerEngine(dummyStems, {
-        audioContext: mockCtx as any,
-        sampleRate,
-        beatGrid: beatGridSec,
-      });
-      engine.setClickTrackEnabled(true);
-      await engine.play();
-      expect(mockCtx.createdSources[4].start).toHaveBeenCalledWith(10, 0);
-
-      mockCtx.currentTime = 14;
-      engine.rotateClickTrackDownbeat(1);
-      // Accent-only change, yet the regenerated lane must stay on the
-      // timeline it was heard on: anchored at the live playhead.
-      expect(mockCtx.createdSources).toHaveLength(6);
-      expect(mockCtx.createdSources[5].start).toHaveBeenCalledWith(14, 4);
-      expect(engine.getClickTrackDownbeatPhase()).toBe(1);
-    });
-
     it("re-locking the Beat Grid mid-playback relays the lane from the live playhead", async () => {
       const engine = new StemPlayerEngine(dummyStems, {
         audioContext: mockCtx as any,
@@ -918,7 +879,7 @@ describe("StemPlayerEngine", () => {
       expect(clickGain.gain.value).toBe(1.0);
     });
 
-    it("regenerates the click channel on Meter change only", async () => {
+    it("volume, mute, and a transport seek never rebuild the click channel", async () => {
       const engine = new StemPlayerEngine(dummyStems, {
         audioContext: mockCtx as any,
         sampleRate,
@@ -933,12 +894,6 @@ describe("StemPlayerEngine", () => {
       engine.toggleClickTrackMute();
       engine.toggleClickTrackMute();
       expect(mockCtx.createBuffer).toHaveBeenCalledTimes(5);
-
-      engine.setClickTrackMeter("6/8");
-      expect(mockCtx.createBuffer).toHaveBeenCalledTimes(6);
-      expect(engine.getClickTrackState().meter).toBe("6/8");
-      engine.setClickTrackMeter("6/8"); // same Meter: no regeneration
-      expect(mockCtx.createBuffer).toHaveBeenCalledTimes(6);
     });
 
     it("follows Time-Stretch: the click shares the Stems' rate, with no rate of its own", async () => {
@@ -974,20 +929,9 @@ describe("StemPlayerEngine", () => {
       }
     });
 
-    it("synthesizes deterministic bursts on the Beat Grid, accented per Meter", () => {
-      const fourFour: ClickTrackMeter = "4/4";
-      const channel = synthesizeClickTrackChannel(
-        beatGridSec,
-        fourFour,
-        sampleRate,
-        3
-      );
-      const again = synthesizeClickTrackChannel(
-        beatGridSec,
-        fourFour,
-        sampleRate,
-        3
-      );
+    it("synthesizes deterministic bursts on the Beat Grid: every click the same uniform tone", () => {
+      const channel = synthesizeClickTrackChannel(beatGridSec, sampleRate, 3);
+      const again = synthesizeClickTrackChannel(beatGridSec, sampleRate, 3);
       expect(channel.length).toBe(Math.round(3 * sampleRate));
       for (let i = 0; i < channel.length; i++) {
         expect(channel[i]).toBe(again[i]);
@@ -1003,52 +947,14 @@ describe("StemPlayerEngine", () => {
         );
       }
 
-      // Downbeats are deeper and louder than the other beats of the bar.
-      expect(peakNear(channel, beatGridSec[0], sampleRate)).toBeGreaterThan(
-        peakNear(channel, beatGridSec[1], sampleRate)
-      );
-
-      // Meter regroups the accent: beat 3 is a downbeat in 2/4 but not in 4/4.
-      const twoFour: ClickTrackMeter = "2/4";
-      const inTwoFour = synthesizeClickTrackChannel(
-        beatGridSec,
-        twoFour,
-        sampleRate,
-        3
-      );
-      expect(peakNear(inTwoFour, beatGridSec[2], sampleRate)).toBeGreaterThan(
-        peakNear(channel, beatGridSec[2], sampleRate)
-      );
-    });
-
-    it("moves the accent along the Beat Grid with the Downbeat Phase: same clicks, deeper tone elsewhere", () => {
-      const fourFour: ClickTrackMeter = "4/4";
-      const onGrid = synthesizeClickTrackChannel(
-        beatGridSec,
-        fourFour,
-        sampleRate,
-        3
-      );
-      const shifted = synthesizeClickTrackChannel(
-        beatGridSec,
-        fourFour,
-        sampleRate,
-        3,
-        2
-      );
-
-      // Phase re-accents, it does not re-place: same onsets either way.
-      expect(clickOnsets(shifted, sampleRate)).toEqual(
-        clickOnsets(onGrid, sampleRate)
-      );
-
-      // Beat 2 is where the deeper tone now falls; beat 0 no longer carries it.
-      expect(peakNear(shifted, beatGridSec[2], sampleRate)).toBeGreaterThan(
-        peakNear(onGrid, beatGridSec[2], sampleRate)
-      );
-      expect(peakNear(onGrid, beatGridSec[0], sampleRate)).toBeGreaterThan(
-        peakNear(shifted, beatGridSec[0], sampleRate)
-      );
+      // No accent axis anymore (ADR-0011 Amendment): every click carries the
+      // same loud tap, so the peak at every grid position is the same and
+      // clearly louder than the pre-amendment off-accent amp (0.55).
+      const peaks = beatGridSec.map((t) => peakNear(channel, t, sampleRate));
+      for (let k = 1; k < peaks.length; k++) {
+        expect(peaks[k]).toBeCloseTo(peaks[0], 6);
+      }
+      expect(peaks[0]).toBeGreaterThan(0.9);
     });
 
     it("swapping the Beat Grid re-synthesizes the lane the moment it arrives: no stale clicks, mixer and playhead untouched", async () => {
@@ -1104,59 +1010,8 @@ describe("StemPlayerEngine", () => {
         enabled: true,
         muted: false,
         volume: 0.7,
-        meter: "4/4",
       });
       expect(engine.getCurrentTime()).toBe(0);
-
-      // The swap left the Downbeat Phase where it was: phase belongs to the
-      // grid pairing, and the re-lock that re-pairs it is the rail's pick, not
-      // this lane plumbing.
-      expect(engine.getClickTrackDownbeatPhase()).toBe(0);
-    });
-
-    it("re-reads the Downbeat Phase through the lane: rotation wraps, nothing else moves", async () => {
-      const engine = new StemPlayerEngine(dummyStems, {
-        audioContext: mockCtx as any,
-        sampleRate,
-        beatGrid: beatGridSec,
-        downbeatPhase: 2,
-        initialClickTrack: {
-          enabled: true,
-          muted: false,
-          volume: 0.5,
-          meter: "4/4",
-        },
-      });
-      await engine.play();
-      expect(engine.getClickTrackDownbeatPhase()).toBe(2);
-
-      // The automatic reading reached the heard lane: beat 2 carries the
-      // deeper tone, beat 0 does not.
-      const heard = mockCtx.createdSources[4].buffer.getChannelData(0);
-      expect(peakNear(heard, beatGridSec[2], sampleRate)).toBeGreaterThan(
-        peakNear(heard, beatGridSec[0], sampleRate)
-      );
-
-      // The rail's −/+ pair lands here: one beat per press, wrapping the
-      // grouping at the Meter's size.
-      engine.rotateClickTrackDownbeat(1);
-      expect(engine.getClickTrackDownbeatPhase()).toBe(3);
-      engine.rotateClickTrackDownbeat(1);
-      expect(engine.getClickTrackDownbeatPhase()).toBe(0);
-
-      // Out-of-range requests fold back into the grouping, wrap included.
-      engine.setClickTrackDownbeatPhase(6);
-      expect(engine.getClickTrackDownbeatPhase()).toBe(2);
-
-      // Re-reading is accent-only: the lane's mixer state never moved, and
-      // each re-read re-synthesizes in place (one channel per press).
-      expect(engine.getClickTrackState()).toEqual({
-        enabled: true,
-        muted: false,
-        volume: 0.5,
-        meter: "4/4",
-      });
-      expect(mockCtx.createBuffer).toHaveBeenCalledTimes(9);
     });
   });
 });

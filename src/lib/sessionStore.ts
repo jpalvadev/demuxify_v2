@@ -54,11 +54,6 @@ export interface DemuxifySession {
   // lane shipped (or with the lane never enabled) simply omit it and resume
   // with the rail off by default.
   clickTrack?: ClickTrackMixerState;
-  // Downbeat Phase (ADR-0011): the beat index of the grouping the Click Track
-  // sounds as the Downbeat. A Session-level sibling of the tempo it pairs
-  // with — deliberately NOT inside SessionTempoState or ClickTrackMixerState.
-  // Optional: sessions written before this ADR shipped simply omit it.
-  downbeatPhase?: number;
 }
 
 // Tempo Detector state persisted with a Session (ADR-0010): ranked BPM
@@ -81,7 +76,6 @@ interface StoredSessionRecord {
   mixer: SessionMixerState;
   tempo?: SessionTempoState;
   clickTrack?: ClickTrackMixerState;
-  downbeatPhase?: number;
   sourceMixChannelCount: number;
   sourceMixLength: number;
   stemsLengths: Record<StemName, { channelCount: number; length: number }>;
@@ -282,26 +276,12 @@ function isValidMixer(mixer: any): mixer is SessionMixerState {
 
 function isValidClickTrack(val: any): val is ClickTrackMixerState {
   if (!val || typeof val !== "object") return false;
-  const meterOk =
-    val.meter === "2/4" ||
-    val.meter === "3/4" ||
-    val.meter === "4/4" ||
-    val.meter === "6/8";
   return (
     typeof val.enabled === "boolean" &&
     typeof val.muted === "boolean" &&
     typeof val.volume === "number" &&
-    !isNaN(val.volume) &&
-    meterOk
+    !isNaN(val.volume)
   );
-}
-
-// ADR-0011 Downbeat Phase gate: a beat index of some grouping is a non-negative
-// integer; every Meter the rail offers has at most 6 beats per bar, so the
-// honest upper bound for a stored phase is 5 (folded at read into whichever
-// grouping the Session's lane names). Anything else loads as absent.
-function isValidDownbeatPhase(val: any): boolean {
-  return Number.isInteger(val) && (val as number) >= 0 && (val as number) <= 5;
 }
 
 export async function saveActiveSession(
@@ -387,13 +367,7 @@ export async function saveActiveSession(
             enabled: session.clickTrack.enabled,
             muted: session.clickTrack.muted,
             volume: session.clickTrack.volume,
-            meter: session.clickTrack.meter,
           }
-        : undefined,
-      // ADR-0011: the phase is stored beside the tempo it pairs with, gated to
-      // a plain beat index; a Session without one writes nothing.
-      downbeatPhase: isValidDownbeatPhase(session.downbeatPhase)
-        ? session.downbeatPhase
         : undefined,
       sourceMixChannelCount: session.sourceMix.channels.length,
       sourceMixLength: session.sourceMix.channels[0]?.length ?? 0,
@@ -612,11 +586,6 @@ export async function loadActiveSession(): Promise<DemuxifySession | null> {
       // default.
       clickTrack: isValidClickTrack(record.clickTrack)
         ? record.clickTrack
-        : undefined,
-      // ADR-0011: absent, legacy, or malformed phases load without a value; the
-      // resume merge turns the absence into the pre-ADR grouping (0).
-      downbeatPhase: isValidDownbeatPhase(record.downbeatPhase)
-        ? record.downbeatPhase
         : undefined,
     };
   } catch {

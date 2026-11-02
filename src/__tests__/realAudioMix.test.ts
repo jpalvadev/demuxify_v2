@@ -21,10 +21,7 @@ import {
   handleWorkerMessage,
   WorkerOutMessage,
 } from "../workers/beatDetection.worker";
-import {
-  ClickTrackMeter,
-  synthesizeClickTrackChannel,
-} from "../lib/stemPlayerEngine";
+import { synthesizeClickTrackChannel } from "../lib/stemPlayerEngine";
 // The repair guard is asserted with the SAME constant the worker applies, so
 // the seam cannot drift from the engine (ADR-0011 records its derivation).
 import { SNAP_TOLERANCE_SEC } from "../lib/beatGridRepair";
@@ -287,8 +284,7 @@ describe("Real Audio Ingestion & Processing Pipeline (audioslave_stone.mp3)", ()
     const grid = complete.beatGrid;
     expect(grid.length).toBeGreaterThan(8);
 
-    const meter: ClickTrackMeter = "4/4";
-    const channel = synthesizeClickTrackChannel(grid, meter, rate, durationSec);
+    const channel = synthesizeClickTrackChannel(grid, rate, durationSec);
     expect(channel.length).toBe(total);
 
     // Onset clustering: a burst's sine crosses exact zero once inside it, so
@@ -401,11 +397,10 @@ describe("Real Audio Ingestion & Processing Pipeline (audioslave_stone.mp3)", ()
       return gaps[Math.floor(gaps.length / 2)];
     };
 
-    const meter: ClickTrackMeter = "4/4";
     const clickName = formatClickTrackFileName("audioslave_stone.mp3", "wav");
 
     // --- unstretched: clicks land 1:1 on the Beat Grid itself ---
-    const channel = synthesizeClickTrackChannel(grid, meter, rate, durationSec);
+    const channel = synthesizeClickTrackChannel(grid, rate, durationSec);
     const clickWav = encodeWav([channel], rate, 16);
 
     const zipBlob = await createStemBundleZip(stemBytes, {
@@ -441,7 +436,6 @@ describe("Real Audio Ingestion & Processing Pipeline (audioslave_stone.mp3)", ()
     );
     const stretchedChannel = synthesizeClickTrackChannel(
       stretchedGrid,
-      meter,
       rate,
       durationSec
     );
@@ -519,8 +513,7 @@ describe("Real Audio Ingestion & Processing Pipeline (audioslave_stone.mp3)", ()
     ).toBe(true);
 
     const grid = complete.beatGrid;
-    const meter: ClickTrackMeter = "4/4";
-    const channel = synthesizeClickTrackChannel(grid, meter, rate, durationSec);
+    const channel = synthesizeClickTrackChannel(grid, rate, durationSec);
     // The click channel always covers the whole Source Mix; a re-locked grid
     // can carry one more beat past the window and the channel keeps it.
     expect(channel.length).toBeGreaterThanOrEqual(total);

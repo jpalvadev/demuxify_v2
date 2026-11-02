@@ -13,7 +13,7 @@ import { InferenceClient } from "../lib/inferenceClient";
 import * as toastModule from "../lib/toast";
 import * as bundleZip from "../lib/bundleZip";
 import { WorkerOutMessage } from "../workers/beatDetection.worker";
-import { decodeWavOnsets, decodeWavOnsetPeakLevels } from "./wavOnsetsHelper";
+import { decodeWavOnsets } from "./wavOnsetsHelper";
 
 // --- Tempo Detector Worker stub (ticket 06) ---------------------------------
 // The app only ever reaches the heavy BPM pass through the Web Worker seam, so
@@ -66,11 +66,6 @@ class StubTempoWorker {
       ),
       analyzedBpm: bpm,
       duration: 2,
-      // ADR-0011: the widened complete message also carries the automatic
-      // Downbeat Phase. A hinted pass (the rail's picker re-lock) answers
-      // with a DIFFERENT phase than the unhinted first pass, so the re-lock
-      // tests can prove the rail re-pairs to the new grid's own reading.
-      downbeatPhase: message.hintBpm !== undefined ? 2 : 0,
     };
     tempoWorkerQueue.push(() => {
       this.onmessage?.({ data: complete } as MessageEvent);
@@ -776,17 +771,12 @@ describe("App UI Shell", () => {
         analyzedBpm: 107.7,
         duration: 284,
       },
-      // ADR-0011 (ticket 05): the persisted pairing resumes too — it is a
-      // Session SIBLING of tempo/clickTrack, never a field of SessionTempo.
-      downbeatPhase: 1,
       // Ticket 05: the Click Track lane settings persist with the Session too,
-      // parallel to the Stem mixer contract — the rail must resume switched ON
-      // with the saved Meter.
+      // parallel to the Stem mixer contract — the rail must resume switched ON.
       clickTrack: {
         enabled: true,
         muted: false,
         volume: 0.6,
-        meter: "6/8",
       },
     });
 
@@ -822,22 +812,14 @@ describe("App UI Shell", () => {
     expect(screen.getByTestId("click-track-bpm-label")).toHaveTextContent(
       "107.7 BPM"
     );
-    // Ticket 05: the rail resumes exactly as the saved Session left it — ON,
-    // with the saved Meter (6/8, not the 4/4 default).
-    expect(screen.getByTestId("click-track-meter-label")).toHaveTextContent(
-      "Meter 6/8"
-    );
+    // Ticket 05: the rail resumes exactly as the saved Session left it — ON.
     const resumedRailSwitch = screen.getByRole("switch", {
       name: /^click track$/i,
     });
     expect(resumedRailSwitch).toHaveAttribute("aria-checked", "true");
-
-    // ADR-0011 (ticket 05): the saved Downbeat Phase resumes the deep tone
-    // exactly where the Session left it — beat 2 of the 6/8 grouping, still
-    // tagged auto because the Session stored the Detector's own reading.
-    expect(screen.getByTestId("click-track-downbeat-label")).toHaveTextContent(
-      "Beat 2 of 6 · auto"
-    );
+    // No Meter control and no −/+ phase pair anymore (ADR-0011 Amendment).
+    expect(screen.queryByTestId("click-track-meter-label")).toBeNull();
+    expect(screen.queryByTestId("click-track-phase-control")).toBeNull();
 
     await sessionStore.clearActiveSession();
   });
@@ -1162,7 +1144,7 @@ describe("App UI Shell", () => {
 
     // Ticket 04: the Click Track rail lives inside the Mix player, so while the
     // Mix Tab is grayscaled there is no rail and nothing to click against —
-    // and with it the rail's new −/+ Downbeat rotation buttons too.
+    // and nothing where the retired −/+ rotation buttons used to live.
     expect(screen.queryByTestId("click-track-rail")).toBeNull();
     expect(screen.queryByTestId("click-track-phase-plus")).toBeNull();
 
@@ -2151,273 +2133,27 @@ describe("App UI Shell", () => {
     }
   });
 
-  it("reads the automatic Downbeat Phase in the rail and rotates it with the −/+ pair: the deep tone moves, positions never do, and the auto tag clears on the first press", async () => {
+  it("hosts no Downbeat affordance anymore: no Meter selector, no −/+ pair, tempo-only readout", async () => {
     vi.stubGlobal("Worker", StubTempoWorker);
     try {
       await separateAndDetectTempo();
 
-      // First pass (no hint): the Detector's own reading is phase 0 — the
-      // rail says honestly where the deep tone starts, tagged auto.
+      // The rail is live (the helper lands on the Mix tab with a Beat Grid):
+      // the grid readout still names the locked tempo…
+      expect(screen.getByTestId("click-track-bpm-label")).toHaveTextContent(
+        "107.7 BPM"
+      );
+      // …but nothing Downbeat-shaped survives anywhere on the rail (ADR-0011
+      // Amendment): no Meter label, no Meter selector, no phase control, no
+      // −/+ buttons, and no button phrased around a Downbeat.
+      expect(screen.queryByTestId("click-track-meter-label")).toBeNull();
+      expect(screen.queryByTestId("click-track-meter-selector")).toBeNull();
+      expect(screen.queryByTestId("click-track-phase-control")).toBeNull();
+      expect(screen.queryByTestId("click-track-phase-minus")).toBeNull();
+      expect(screen.queryByTestId("click-track-phase-plus")).toBeNull();
       expect(
-        screen.getByTestId("click-track-downbeat-label")
-      ).toHaveTextContent("Beat 1 of 4 · auto");
-
-      // One + press: the pairing becomes the user's — Beat 2 of 4, tag gone.
-      fireEvent.click(screen.getByTestId("click-track-phase-plus"));
-      await waitFor(() => {
-        expect(
-          screen.getByTestId("click-track-downbeat-label")
-        ).toHaveTextContent(/^Beat 2 of 4$/);
-      });
-
-      // A Meter change mid-hunt keeps the phase (ADR-0010's meter rule
-      // extended to the phase axis): the deep tone stays on beat 2,
-      // regrouped to the 6/8 bar — not reset, and the manual tag stays
-      // cleared.
-      fireEvent.click(screen.getByRole("button", { name: /^meter 6\/8$/i }));
-      expect(screen.getByTestId("click-track-meter-label")).toHaveTextContent(
-        "Meter 6/8"
-      );
-      expect(
-        screen.getByTestId("click-track-downbeat-label")
-      ).toHaveTextContent(/^Beat 2 of 6$/);
-
-      // A − press then wraps the hunt back to the reading's own beat on the
-      // new grouping: manual intent survives, only the deep tone moved.
-      fireEvent.click(screen.getByTestId("click-track-phase-minus"));
-      await waitFor(() => {
-        expect(
-          screen.getByTestId("click-track-downbeat-label")
-        ).toHaveTextContent(/^Beat 1 of 6$/);
-      });
-    } finally {
-      vi.unstubAllGlobals();
-    }
-  });
-
-  it("re-locks re-read the Downbeat: a fresh grid adopts its own automatic pairing, dropping any nudge made against the old grid", async () => {
-    vi.stubGlobal("Worker", StubTempoWorker);
-    try {
-      await separateAndDetectTempo();
-      expect(
-        screen.getByTestId("click-track-downbeat-label")
-      ).toHaveTextContent("Beat 1 of 4 · auto");
-
-      // Nudge manually first: the manual pairing (tag cleared)…
-      fireEvent.click(screen.getByTestId("click-track-phase-plus"));
-      await waitFor(() => {
-        expect(
-          screen.getByTestId("click-track-downbeat-label")
-        ).toHaveTextContent(/^Beat 2 of 4$/);
-      });
-
-      // …then re-lock to the metric doubling: the hinted pass answers with
-      // its own automatic reading (the stub marks hinted passes with phase
-      // 2), so the beam re-pairs to Beat 3 of 4 AND the auto tag comes back
-      // — the old nudge is never carried across different positions.
-      fireEvent.click(
-        screen.getByRole("button", {
-          name: /^re-lock beat grid to 215\.4 bpm$/i,
-        })
-      );
-      fireQueuedTempoCompletions();
-      await waitFor(() => {
-        expect(
-          screen.getByTestId("click-track-downbeat-label")
-        ).toHaveTextContent("Beat 3 of 4 · auto");
-      });
-    } finally {
-      vi.unstubAllGlobals();
-    }
-  });
-
-  it("the Export Bundle's Click Track file obeys the rail's Downbeat Phase: a nudge before exporting deepens the nudged beat in the bundler's bytes, positions untouched", async () => {
-    vi.stubGlobal("Worker", StubTempoWorker);
-    try {
-      await separateAndDetectTempo();
-
-      // Lane on, rail nudged once: the live pairing is Beat 2 of 4 (phase 1).
-      fireEvent.click(screen.getByRole("switch", { name: /^click track$/i }));
-      fireEvent.click(screen.getByTestId("click-track-phase-plus"));
-      await waitFor(() => {
-        expect(
-          screen.getByTestId("click-track-downbeat-label")
-        ).toHaveTextContent(/^Beat 2 of 4$/);
-      });
-      await clickTabButton("Export");
-
-      const bundleSpy = vi.spyOn(bundleZip, "createStemBundleZip");
-      const exportPanel = await waitFor(() =>
-        within(screen.getByRole("region", { name: /export tab/i })).getByRole(
-          "region",
-          { name: /export audio stems/i }
-        )
-      );
-      fireEvent.click(
-        within(exportPanel).getByRole("radio", {
-          name: /full export bundle/i,
-        })
-      );
-      fireEvent.click(
-        within(exportPanel).getByRole("button", { name: /export & download/i })
-      );
-      await waitFor(() => {
-        expect(bundleSpy).toHaveBeenCalledTimes(1);
-      });
-
-      const options = bundleSpy.mock.calls[0][1] as Record<string, unknown>;
-      expect(options.clickTrack).toBeInstanceOf(Uint8Array);
-      const onsets = decodeWavOnsets(options.clickTrack as Uint8Array, 44100);
-      const levels = decodeWavOnsetPeakLevels(
-        options.clickTrack as Uint8Array,
-        44100
-      );
-
-      // Positions are the reading's own grid, untouched by the nudge...
-      const interval = 60 / 107.7;
-      const beatCount = Math.round(2 / interval);
-      expect(onsets).toHaveLength(beatCount);
-      for (let k = 0; k < beatCount; k++) {
-        expect(Math.abs(onsets[k] - k * interval)).toBeLessThan(3 / 44100);
-      }
-
-      // ...and the deeper tone is exactly the nudged beat: phase 1 of 4 puts
-      // it on index 1, louder than every other click on the file.
-      expect(levels).toHaveLength(beatCount);
-      const deepPeak = levels[1];
-      const maxShallow = Math.max(
-        ...levels.filter((_, k) => (((k - 1) % 4) + 4) % 4 !== 0)
-      );
-      expect(deepPeak).toBeGreaterThan(maxShallow * 1.2);
-
-      bundleSpy.mockRestore();
-    } finally {
-      vi.unstubAllGlobals();
-    }
-  });
-
-  it("an un-nudged export carries the automatic pick's phase, not an index-0 default: the re-locked file deepens beat 3, and one + press rotates that deep tone while every click stays put", async () => {
-    vi.stubGlobal("Worker", StubTempoWorker);
-    try {
-      await separateAndDetectTempo();
-      fireEvent.click(screen.getByRole("switch", { name: /^click track$/i }));
-
-      // Re-lock to the metric doubling: the hinted pass re-reads its own
-      // automatic phase (the stub marks hinted passes with phase 2) — Beat 3
-      // of 4, auto. No press ever touched the rail.
-      fireEvent.click(
-        screen.getByRole("button", {
-          name: /^re-lock beat grid to 215\.4 bpm$/i,
-        })
-      );
-      fireQueuedTempoCompletions();
-      await waitFor(() => {
-        expect(
-          screen.getByTestId("click-track-downbeat-label")
-        ).toHaveTextContent("Beat 3 of 4 · auto");
-      });
-      await clickTabButton("Export");
-
-      const bundleSpy = vi.spyOn(bundleZip, "createStemBundleZip");
-      const exportPanel = () =>
-        within(screen.getByRole("region", { name: /export tab/i })).getByRole(
-          "region",
-          { name: /export audio stems/i }
-        );
-      const exportFullBundle = async () => {
-        await waitFor(() => {
-          expect(
-            within(exportPanel()).getByRole("button", {
-              name: /export & download/i,
-            })
-          ).toBeEnabled();
-        });
-        fireEvent.click(
-          within(exportPanel()).getByRole("radio", {
-            name: /full export bundle/i,
-          })
-        );
-        fireEvent.click(
-          within(exportPanel()).getByRole("button", {
-            name: /export & download/i,
-          })
-        );
-      };
-      await exportFullBundle();
-      await waitFor(() => {
-        expect(bundleSpy).toHaveBeenCalledTimes(1);
-      });
-
-      const first = bundleSpy.mock.calls[0][1] as Record<string, unknown>;
-      const firstOnsets = decodeWavOnsets(
-        first.clickTrack as Uint8Array,
-        44100
-      );
-      const firstLevels = decodeWavOnsetPeakLevels(
-        first.clickTrack as Uint8Array,
-        44100
-      );
-      const interval = 60 / 215.4;
-      const beatCount = Math.round(2 / interval);
-      expect(firstOnsets).toHaveLength(beatCount);
-      for (let k = 0; k < beatCount; k++) {
-        expect(Math.abs(firstOnsets[k] - k * interval)).toBeLessThan(3 / 44100);
-      }
-      // The file deepens the AUTO phase (2), never an index-0 default: with
-      // 7 clicks on a 4-per-bar grouping, indices 2 and 6 carry the louder
-      // taps, and both sit above the level of every other click.
-      const loudOf = (phase: number, levels: number[]): number[] =>
-        levels
-          .map((peak, k) => ((((k - phase) % 4) + 4) % 4 === 0 ? peak : -1))
-          .filter((peak) => peak >= 0);
-      const quietMax = (phase: number, levels: number[]): number =>
-        Math.max(...levels.filter((_, k) => (((k - phase) % 4) + 4) % 4 !== 0));
-      const deepLevels = loudOf(2, firstLevels);
-      expect(deepLevels.length).toBeGreaterThan(0);
-      expect(Math.min(...deepLevels)).toBeGreaterThan(quietMax(2, firstLevels));
-      // Phase 0 (the pre-ADR-0011 default) would have deepened index 0 —
-      // honestly excluded: the auto pick is what the bytes carry.
-      expect(firstLevels[0]).toBeLessThan(firstLevels[2]);
-
-      // One + press against the SAME grid: only the deep tone moves. Export
-      // again and diff the file: identical click positions, rotated level.
-      await clickTabButton("mix");
-      fireEvent.click(screen.getByTestId("click-track-phase-plus"));
-      await waitFor(() => {
-        expect(
-          screen.getByTestId("click-track-downbeat-label")
-        ).toHaveTextContent(/^Beat 4 of 4$/);
-      });
-      await clickTabButton("Export");
-      await exportFullBundle();
-      await waitFor(() => {
-        expect(bundleSpy).toHaveBeenCalledTimes(2);
-      });
-
-      const second = bundleSpy.mock.calls[1][1] as Record<string, unknown>;
-      const secondOnsets = decodeWavOnsets(
-        second.clickTrack as Uint8Array,
-        44100
-      );
-      const secondLevels = decodeWavOnsetPeakLevels(
-        second.clickTrack as Uint8Array,
-        44100
-      );
-      expect(secondOnsets).toHaveLength(beatCount);
-      for (let k = 0; k < beatCount; k++) {
-        expect(Math.abs(secondOnsets[k] - firstOnsets[k])).toBeLessThan(
-          3 / 3000
-        );
-      }
-      const deepAgain = loudOf(3, secondLevels);
-      expect(deepAgain.length).toBeGreaterThan(0);
-      expect(Math.min(...deepAgain)).toBeGreaterThan(quietMax(3, secondLevels));
-      // The rotation really moved: beat 2 deepened in the first file but is
-      // an ordinary click in the second, and beat 3 flipped the other way.
-      expect(secondLevels[2]).toBeLessThan(firstLevels[2]);
-      expect(secondLevels[3]).toBeGreaterThan(firstLevels[3]);
-
-      bundleSpy.mockRestore();
+        screen.queryByRole("button", { name: /bring the downbeat/i })
+      ).toBeNull();
     } finally {
       vi.unstubAllGlobals();
     }

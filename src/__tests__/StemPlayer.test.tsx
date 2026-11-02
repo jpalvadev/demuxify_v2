@@ -509,9 +509,8 @@ describe("StemPlayer UI Component", () => {
     expect(screen.getByTestId("click-track-bpm-label")).toHaveTextContent(
       "No Beat Grid"
     );
-    expect(screen.getByTestId("click-track-meter-label")).toHaveTextContent(
-      "Meter 4/4"
-    );
+    // The retired Meter control leaves no label behind (ADR-0011 Amendment).
+    expect(screen.queryByTestId("click-track-meter-label")).toBeNull();
 
     const enableSwitch = screen.getByRole("switch", { name: /^click track$/i });
     expect(enableSwitch).toHaveAttribute("aria-checked", "false");
@@ -520,12 +519,11 @@ describe("StemPlayer UI Component", () => {
     fireEvent.click(enableSwitch);
     expect(enableSwitch).toHaveAttribute("aria-checked", "false");
 
-    // The rail's initial state is reported out: off, un-muted, full volume, 4/4.
+    // The rail's initial state is reported out: off, un-muted, full volume.
     expect(reported[0]).toEqual({
       enabled: false,
       muted: false,
       volume: 1,
-      meter: "4/4",
     });
   });
 
@@ -555,7 +553,6 @@ describe("StemPlayer UI Component", () => {
       enabled: true,
       muted: false,
       volume: 1,
-      meter: "4/4",
     });
 
     // The rail is never one of the Stems: the four identities stay intact.

@@ -46,7 +46,6 @@ describe("Tempo Detector Client Pipeline (beat client & worker relay)", () => {
         ],
         beatGrid,
         analyzedBpm: 107.7,
-        downbeatPhase: 2,
         duration: 1.0,
       },
     } as MessageEvent);
@@ -57,8 +56,6 @@ describe("Tempo Detector Client Pipeline (beat client & worker relay)", () => {
     expect(result.beatGrid).toEqual(beatGrid);
     expect(result.analyzedBpm).toBe(107.7);
     expect(result.duration).toBe(1.0);
-    // The worker's Downbeat Phase rides the same message and is relayed intact.
-    expect(result.downbeatPhase).toBe(2);
     // With no re-lock hint, the Beat Grid is locked to the top-ranked reading.
     expect(result.chosenTempoBpm).toBe(107.7);
     expect(client.isBusy()).toBe(false);
@@ -88,7 +85,6 @@ describe("Tempo Detector Client Pipeline (beat client & worker relay)", () => {
         ],
         beatGrid: doublingGrid,
         analyzedBpm: 215.4,
-        downbeatPhase: 1,
         duration: 1.0,
       },
     } as MessageEvent);

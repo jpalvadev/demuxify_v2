@@ -323,7 +323,7 @@ describe("StemPlayer Time-Stretch & Pitch Controls", () => {
     expect(screen.getByText("00:05")).toBeInTheDocument();
   });
 
-  it("renders the Click Track rail in the Mix player: off by default, Meter selector, one volume fader and no rate control of its own", () => {
+  it("renders the Click Track rail in the Mix player: off by default, tempo-only readout, one volume fader and no rate control of its own", () => {
     const beatGrid = Float64Array.from([
       0.5, 1.0572789, 1.6145578, 2.1718367, 2.7291156,
     ]);
@@ -351,32 +351,20 @@ describe("StemPlayer Time-Stretch & Pitch Controls", () => {
     const enableSwitch = screen.getByRole("switch", { name: /^click track$/i });
     expect(enableSwitch).toHaveAttribute("aria-checked", "false");
 
-    // Beat Grid readout shows the tempo the grid was locked at.
+    // Beat Grid readout shows the tempo the grid was locked at, and nothing
+    // else: the retired Meter/accent axis leaves no readout behind.
     expect(screen.getByTestId("click-track-bpm-label")).toHaveTextContent(
       "107.7 BPM"
     );
-    expect(screen.getByTestId("click-track-meter-label")).toHaveTextContent(
-      "Meter 4/4"
-    );
-
-    // Meter selector: the four allowed values, exactly one pressed.
-    const meters = screen.getAllByRole("button", {
-      name: /^meter [2346]\/[48]$/i,
-    });
-    expect(meters).toHaveLength(4);
-    const pressed = meters.filter(
-      (b) => b.getAttribute("aria-pressed") === "true"
-    );
-    expect(pressed).toHaveLength(1);
-    expect(pressed[0]).toHaveAccessibleName("Meter 4/4");
-
-    // Selecting a Meter re-accentuates the bar.
-    const meter68 = screen.getByRole("button", { name: /^meter 6\/8$/i });
-    fireEvent.click(meter68);
-    expect(screen.getByTestId("click-track-meter-label")).toHaveTextContent(
-      "Meter 6/8"
-    );
-    expect(meter68).toHaveAttribute("aria-pressed", "true");
+    expect(screen.queryByTestId("click-track-meter-label")).toBeNull();
+    expect(screen.queryByTestId("click-track-meter-selector")).toBeNull();
+    expect(
+      screen.queryAllByRole("button", { name: /^meter [2346]\/[48]$/i })
+    ).toHaveLength(0);
+    expect(screen.queryByTestId("click-track-phase-control")).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: /bring the downbeat/i })
+    ).toBeNull();
 
     // Switching the lane on.
     fireEvent.click(enableSwitch);

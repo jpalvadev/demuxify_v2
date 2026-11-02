@@ -222,7 +222,6 @@ describe("sessionStore", () => {
       enabled: true,
       muted: false,
       volume: 0.6,
-      meter: "6/8",
     };
     const mockSession = createMockSession({ clickTrack });
 
@@ -244,50 +243,22 @@ describe("sessionStore", () => {
     expect(legacy.clickTrack).toBeUndefined();
   });
 
-  it("round-trips the Downbeat Phase and leaves legacy sessions without one", async () => {
-    // ADR-0011: the phase is a Session sibling of the tempo pairing, stored
-    // and re-read verbatim (0 is a real reading, not an absence).
-    const withPhase = createMockSession({
-      clickTrack: {
+  it("starts fresh for old Sessions that wrote a Downbeat Phase or a Meter", async () => {
+    // No backwards compatibility (ADR-0011 Amendment): the Click Track has no
+    // Downbeat Phase or Meter field anymore, so nothing reads or re-guesses
+    // one — a resumed Session simply gets the lane as it is stored now.
+    const mockSession = createMockSession({
+      clickTrack: { enabled: true, muted: false, volume: 0.5 },
+    });
+    await saveActiveSession(mockSession);
+    const loaded = await loadActiveSession();
+    expect(loaded).not.toBeNull();
+    if (loaded) {
+      expect(loaded.clickTrack).toEqual({
         enabled: true,
         muted: false,
-        volume: 0.6,
-        meter: "6/8",
-      },
-      downbeatPhase: 5,
-    });
-    await saveActiveSession(withPhase);
-    const phaseLoaded = await loadActiveSession();
-    expect(phaseLoaded).not.toBeNull();
-    if (phaseLoaded) {
-      expect(phaseLoaded.downbeatPhase).toBe(5);
-    }
-
-    // Phase 0 must survive: a falsy reading is still a reading.
-    const zeroPhase = createMockSession({ downbeatPhase: 0 });
-    await saveActiveSession(zeroPhase);
-    const zeroLoaded = await loadActiveSession();
-    expect(zeroLoaded).not.toBeNull();
-    if (zeroLoaded) {
-      expect(zeroLoaded.downbeatPhase).toBe(0);
-    }
-
-    // Legacy Sessions (pre-ADR-0011) load without the field.
-    const legacyNoPhase = createMockSession();
-    await saveActiveSession(legacyNoPhase);
-    const legacyLoaded = await loadActiveSession();
-    expect(legacyLoaded).not.toBeNull();
-    if (legacyLoaded) {
-      expect(legacyLoaded.downbeatPhase).toBeUndefined();
-    }
-
-    // A malformed phase (not a beat index) is gated out on read.
-    const junkPhase = createMockSession({ downbeatPhase: 2.5 });
-    await saveActiveSession(junkPhase);
-    const junkLoaded = await loadActiveSession();
-    expect(junkLoaded).not.toBeNull();
-    if (junkLoaded) {
-      expect(junkLoaded.downbeatPhase).toBeUndefined();
+        volume: 0.5,
+      });
     }
   });
 

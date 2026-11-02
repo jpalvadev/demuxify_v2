@@ -498,7 +498,6 @@ describe("ExportDialog", () => {
       enabled: true,
       muted: false,
       volume: 0.7,
-      meter: "4/4",
     };
 
     const bundleSpy = vi.spyOn(bundleZip, "createStemBundleZip");
@@ -563,7 +562,6 @@ describe("ExportDialog", () => {
           enabled: true,
           muted: false,
           volume: 1,
-          meter: "2/4",
         }}
       />
     );
@@ -625,7 +623,6 @@ describe("ExportDialog", () => {
       enabled: true,
       muted: false,
       volume: 1,
-      meter: "4/4",
     };
     render(
       <ExportDialog

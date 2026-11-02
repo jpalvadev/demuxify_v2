@@ -84,18 +84,6 @@ _Avoid_: BPM counter, tempo meter, DJ analyzer, beat app
 The estimated beat positions across the full timeline of a Source Mix, carrying where the beats actually fall (including slight natural fluctuation) rather than a flat pulse derived from the tempo number alone.
 _Avoid_: Tempo grid, metronome marks, quantized beats, BPM grid
 
-**Meter**:
-The notational grouping of beats that sets the Click Track's accent pattern (4/4, 3/4, 6/8, ...), with the downbeat accented by a deeper tone.
-_Avoid_: Time signature, feel, beat grouping
-
 **Click Track**:
-A synthesized metronome accompaniment locked to the Beat Grid, played alongside the Stems with its own mute and volume controls; it accompanies the Stems but is not one, and never one of the four Stems identities.
+A synthesized metronome accompaniment locked to the Beat Grid, played alongside the Stems with its own on/off, mute and volume controls; it accompanies the Stems but is not one, and never one of the four Stems identities. Every click is the same uniform tap, and the lane follows Time-Stretch with no rate control of its own.
 _Avoid_: Metronome, fifth stem, drum loop, time track
-
-**Downbeat**:
-The accented first beat of a bar — where the Meter's grouping starts — sounded by the Click Track's deeper tone. Which beat of a Source Mix is the Downbeat is a listening decision, not a property of the beat positions, so it is suggested automatically and user-correctable.
-_Avoid_: Head of the bar, beat one, strong beat, accent beat
-
-**Downbeat Phase**:
-The one user-adjustable value per Beat Grid stating which beat position is the Downbeat; set by an automatic reading and rotatable one beat at a time, and re-read whenever the Beat Grid is re-locked to a different candidate tempo.
-_Avoid_: Phase offset, rotation, anacrusis, count-in

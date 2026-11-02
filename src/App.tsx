@@ -184,10 +184,6 @@ export const App: React.FC = () => {
   // Live Click Track rail state (ADR-0010): fed out of the Stem Player so the
   // Session snapshot can persist it (ticket 05). Never part of the Stem mixer.
   const clickTrackStateRef = useRef<ClickTrackMixerState | null>(null);
-  // Live Downbeat Phase (ADR-0011): sibling of the rail state above, never
-  // folded into ClickTrackMixerState — it pairs the Beat Grid with a
-  // grouping, and the rail's −/+ pair owns it once the user nudges it.
-  const downbeatPhaseRef = useRef<number | null>(null);
   const cachedSessionRef = useRef<DemuxifySession | null>(null);
   const autoSaverRef = useRef(createSessionAutoSaver(600));
 
@@ -318,11 +314,6 @@ export const App: React.FC = () => {
           if (beatClientRef.current === client) {
             setTempoAnalysis(result);
             tempoResultRef.current = result;
-            // ADR-0011 (ticket 05): every arriving Beat Grid — first pass or
-            // re-lock — carries its own automatic Downbeat reading, so the
-            // rail ref re-pairs to it and any manual nudge made against the
-            // PREVIOUS grid is dropped, never carried across positions.
-            downbeatPhaseRef.current = result.downbeatPhase ?? 0;
             attachTempoResultToSession(result);
           }
         })
@@ -345,9 +336,6 @@ export const App: React.FC = () => {
     const updatedSession: DemuxifySession = {
       ...session,
       tempo: result,
-      // ADR-0011: the reading travels with the re-locked tempo as a Session
-      // sibling, so the auto-saver writes the pairing the engine now runs.
-      downbeatPhase: result.downbeatPhase,
     };
     cachedSessionRef.current = updatedSession;
     autoSaverRef.current.debounceSave(updatedSession);
@@ -469,18 +457,11 @@ export const App: React.FC = () => {
       // Tempo Detector result, so the Separate-tab readout resumes
       // identical. Sessions without one re-run the detector on the
       // restored Source Mix instead.
-      // ADR-0011: the Session's own persisted pairing wins; only a Session
-      // written before the phase shipped falls back to 0, the pre-ADR-0011
-      // grouping the synthesis already used. Nothing re-guesses it silently.
       const resumedTempo: TempoAnalysisResult | null = session.tempo
-        ? {
-            ...session.tempo,
-            downbeatPhase: session.downbeatPhase ?? 0,
-          }
+        ? { ...session.tempo }
         : null;
       setTempoAnalysis(resumedTempo);
       tempoResultRef.current = resumedTempo;
-      downbeatPhaseRef.current = session.downbeatPhase ?? 0;
       if (!session.tempo) {
         // Same-tick state read would be stale, so the Session's stems are
         // handed over explicitly: the re-detection reads the Drums channel.
@@ -538,12 +519,6 @@ export const App: React.FC = () => {
     if (!cachedSessionRef.current) return;
     const updatedSession: DemuxifySession = {
       ...cachedSessionRef.current,
-      // Mirror the live Downbeat Phase (ADR-0011): the rail's −/+ nudges
-      // travel with the Session exactly like the lane settings beside them,
-      // never inside them, and a Session written before the phase shipped
-      // keeps no phantom value here.
-      downbeatPhase:
-        downbeatPhaseRef.current ?? cachedSessionRef.current.downbeatPhase,
       // Mirror the live Click Track rail (ADR-0010 ticket 05): the lane is
       // domain-separate from the Stem mixer contract below.
       clickTrack:
@@ -1048,18 +1023,6 @@ export const App: React.FC = () => {
                     clickTrackStateRef.current = state;
                   }}
                   initialClickTrack={clickTrackStateRef.current ?? undefined}
-                  // ADR-0011 (tickets 04/05): the Downbeat Phase is a rail
-                  // sibling, seeded from the app's ref (auto reading from the
-                  // worker, resumed Session pairing, or the post-press value
-                  // reported back through onClickTrackPhaseChange below).
-                  initialDownbeatPhase={
-                    downbeatPhaseRef.current ??
-                    tempoAnalysis?.downbeatPhase ??
-                    0
-                  }
-                  onClickTrackPhaseChange={(phase) => {
-                    downbeatPhaseRef.current = phase;
-                  }}
                 />
               </>
             ) : (
@@ -1103,11 +1066,6 @@ export const App: React.FC = () => {
                     activeTimeStretch={exportDialogState?.timeStretch}
                     clickTrackBeatGrid={tempoAnalysis?.beatGrid}
                     clickTrackSettings={clickTrackStateRef.current ?? undefined}
-                    clickTrackDownbeatPhase={
-                      downbeatPhaseRef.current ??
-                      tempoAnalysis?.downbeatPhase ??
-                      0
-                    }
                   />
                 </div>
               </>

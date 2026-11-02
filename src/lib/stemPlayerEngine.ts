@@ -9,9 +9,6 @@ import {
   isSignalsmithStretchSupported,
   MultiTrackStretchNode,
 } from "./signalsmithStretchAdapter";
-// ADR-0011: the Downbeat Phase arithmetic lives with the phase reading itself,
-// so the lane and the worker normalize a phase identically.
-import { normalizeDownbeatPhase } from "./beatGridRepair";
 
 export interface StemMixerState {
   volume: number; // 0.0 to 1.0
@@ -31,61 +28,39 @@ export interface TimeStretchState {
 // StemName union (vocals/drums/bass/other) is not widened here and
 // nowhere else. State is parallel to StemMixerState but has no solo and
 // deliberately no rate control of its own: it follows Time-Stretch.
-export type ClickTrackMeter = "2/4" | "3/4" | "4/4" | "6/8";
-
 export interface ClickTrackMixerState {
   enabled: boolean; // defaults to off: opening the Mix tab never surprises
   muted: boolean;
   volume: number; // 0.0 to 1.0, like a Stem lane
-  meter: ClickTrackMeter;
-}
-
-// Beat grouping of a Meter: "4/4" is four beats per bar, "6/8" six.
-export function clickTrackBeatsPerBar(meter: ClickTrackMeter): number {
-  return parseInt(meter.split("/")[0], 10) || 4;
 }
 
 // Synthesized clicks (no sampled assets): short exponentially-decaying bursts
-// at Beat Grid positions in seconds, deeper/lower on downbeats per the
-// Meter's bar grouping. Deterministic from (Beat Grid, Meter, Downbeat Phase):
-// the phase decides WHICH beat of the grouping is the Downbeat — it never moves
-// a click, only which tone it gets. Shared with the Export Bundle seam so
-// exported clicks match playback exactly.
+// at Beat Grid positions in seconds. Every click is the same uniform tap —
+// deterministic from the Beat Grid alone, the Click Track has no accent axis
+// (ADR-0011 Amendment). Shared with the Export Bundle seam so exported clicks
+// match playback exactly.
 export function synthesizeClickTrackChannel(
   beatGridSec: Float64Array,
-  meter: ClickTrackMeter,
   sampleRate: number,
-  durationSec?: number,
-  // ADR-0011 Downbeat Phase: the beat index of the grouping that is the
-  // Downbeat (0..beatsPerBar−1). Default 0 keeps the pre-ADR-0011 grouping.
-  downbeatPhase: number = 0
+  durationSec?: number
 ): Float32Array {
-  const beatsPerBar = clickTrackBeatsPerBar(meter);
-  const phase = normalizeDownbeatPhase(downbeatPhase, beatsPerBar);
   let gridEndSec = 0;
   for (let i = 0; i < beatGridSec.length; i++) {
     if (beatGridSec[i] > gridEndSec) gridEndSec = beatGridSec[i];
   }
-  const lengthSec = Math.max(durationSec ?? 0, gridEndSec + 0.06);
+  const lengthSec = Math.max(durationSec ?? 0, gridEndSec + 0.09);
   const out = new Float32Array(Math.round(lengthSec * sampleRate));
 
-  const tapLength = Math.round(0.06 * sampleRate);
+  const tapLength = Math.round(0.09 * sampleRate);
   for (let k = 0; k < beatGridSec.length; k++) {
     const t = beatGridSec[k];
     if (t < 0) continue;
     const start = Math.round(t * sampleRate);
     if (start >= out.length) continue;
-    // The Downbeat is the beat `phase` steps into the grouping: rotation moves
-    // which index gets the deeper tone, never where a click lands.
-    const isDownbeat =
-      (((k - phase) % beatsPerBar) + beatsPerBar) % beatsPerBar === 0;
-    const hz = isDownbeat ? 92 : 640;
-    const amp = isDownbeat ? 1.0 : 0.55;
     const burst = Math.min(tapLength, out.length - start);
     for (let i = 0; i < burst; i++) {
       const env = Math.exp((-7 * i) / burst);
-      out[start + i] +=
-        amp * env * Math.sin((2 * Math.PI * hz * i) / sampleRate);
+      out[start + i] += env * Math.sin((2 * Math.PI * 640 * i) / sampleRate);
     }
   }
   return out;
@@ -104,11 +79,6 @@ export interface StemPlayerEngineOptions {
   // Click Track lane (ADR-0010): Beat Grid in seconds + lane state.
   beatGrid?: Float64Array;
   initialClickTrack?: ClickTrackMixerState;
-  // ADR-0011 Downbeat Phase: the automatic reading that came with the Beat
-  // Grid (or the Session's persisted phase on a resume). It is lane-adjacent
-  // state, deliberately not part of ClickTrackMixerState: it belongs to the
-  // Beat Grid, not to the lane's mute/volume/Meter settings.
-  downbeatPhase?: number;
 }
 
 export type PositionListener = (timeSec: number) => void;
@@ -165,14 +135,8 @@ export class StemPlayerEngine {
     enabled: false,
     muted: false,
     volume: 1.0,
-    meter: "4/4",
   };
   private beatGrid: Float64Array | null = null;
-  // ADR-0011 Downbeat Phase: which beat index of the Meter's grouping is the
-  // Downbeat (0..beatsPerBar−1). Sibling of the lane state, never inside
-  // ClickTrackMixerState: it is a property of the Beat Grid, and the Click
-  // Track's domain separation from the four Stems stays untouched.
-  private downbeatPhase: number = 0;
   private clickBuffer: AudioBuffer | null = null;
   private clickGainNode: GainNode | null = null;
   private clickSource: AudioBufferSourceNode | null = null;
@@ -265,20 +229,10 @@ export class StemPlayerEngine {
         enabled: options.initialClickTrack.enabled,
         muted: options.initialClickTrack.muted,
         volume: Math.max(0, Math.min(1, options.initialClickTrack.volume)),
-        meter: options.initialClickTrack.meter,
       };
     }
     if (options?.beatGrid) {
       this.beatGrid = options.beatGrid;
-      this.regenerateClickBuffer();
-    }
-    // The automatic Downbeat reading travels with the Beat Grid (ADR-0011);
-    // wrapping keeps a stale or out-of-range value inside the Meter's bounds.
-    if (options?.downbeatPhase !== undefined) {
-      this.downbeatPhase = normalizeDownbeatPhase(
-        options.downbeatPhase,
-        clickTrackBeatsPerBar(this.clickTrackState.meter)
-      );
       this.regenerateClickBuffer();
     }
     this.applyClickGain();
@@ -534,31 +488,6 @@ export class StemPlayerEngine {
     return this.beatGrid;
   }
 
-  // ADR-0011 Downbeat Phase of the current Beat Grid (0..beatsPerBar−1).
-  public getClickTrackDownbeatPhase(): number {
-    return this.downbeatPhase;
-  }
-
-  public setClickTrackDownbeatPhase(phase: number): void {
-    const normalized = normalizeDownbeatPhase(
-      phase,
-      clickTrackBeatsPerBar(this.clickTrackState.meter)
-    );
-    if (this.downbeatPhase === normalized) return;
-    // Accent-only change: the clicks stay exactly where the Beat Grid put them.
-    this.downbeatPhase = normalized;
-    this.regenerateClickBuffer();
-    if (this.playing) {
-      this.reanchorClickOnLivePlayhead();
-    }
-  }
-
-  // The rail's −/+ pair: one beat per press, wrapping around the Meter.
-  public rotateClickTrackDownbeat(beats: number): void {
-    const delta = Number.isFinite(beats) ? Math.trunc(beats) : 0;
-    this.setClickTrackDownbeatPhase(this.downbeatPhase + delta);
-  }
-
   public getClickGainNode(): GainNode | null {
     return this.clickGainNode;
   }
@@ -606,23 +535,6 @@ export class StemPlayerEngine {
     this.applyClickGain();
   }
 
-  public setClickTrackMeter(meter: ClickTrackMeter): void {
-    if (this.clickTrackState.meter === meter) return;
-    // Regenerated on Meter change only (never on volume/mute).
-    this.clickTrackState.meter = meter;
-    // A mid-hunt Downbeat Phase stays valid under the new grouping: it wraps
-    // into the new Meter's bounds rather than resetting to the auto pick
-    // (ADR-0011; only a re-lock of the Beat Grid re-reads it).
-    this.downbeatPhase = normalizeDownbeatPhase(
-      this.downbeatPhase,
-      clickTrackBeatsPerBar(meter)
-    );
-    this.regenerateClickBuffer();
-    if (this.playing) {
-      this.reanchorClickOnLivePlayhead();
-    }
-  }
-
   private applyClickGain(): void {
     if (this.clickGainNode === null) {
       // Lazy: nodes only materialize once the lane is enabled, keeping the
@@ -650,10 +562,8 @@ export class StemPlayerEngine {
     }
     const samples = synthesizeClickTrackChannel(
       this.beatGrid,
-      this.clickTrackState.meter,
       this.sampleRate,
-      this.duration,
-      this.downbeatPhase
+      this.duration
     );
     const buffer = this.audioContext.createBuffer(
       1,
@@ -665,8 +575,8 @@ export class StemPlayerEngine {
   }
 
   // Shared re-anchor for every mid-playback Click Track lane edit (enable,
-  // Meter, Downbeat hunt, Beat Grid re-lock): the lane relays from the live
-  // playhead, never the stale currentOffset, so it can't shift off the Stems.
+  // volume, Beat Grid re-lock): the lane relays from the live playhead, never
+  // the stale currentOffset, so it can't shift off the Stems.
   private reanchorClickOnLivePlayhead(): void {
     this.restartClickSource(
       this.audioContext.currentTime,
