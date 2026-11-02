@@ -266,12 +266,54 @@ export const App: React.FC = () => {
   // The guard discards stale results if the Source Mix was cleared meanwhile.
   // Ticket 06: the same routine re-runs the pass with a user-selected candidate
   // as the re-lock hint, so the Beat Grid swaps to the chosen feel.
-  const startTempoAnalysis = (buffer: AudioBuffer, hintBpm?: number) => {
+  // Ticket 07 (ADR-0010 Amendment): once the Drums Stem exists, the pass reads
+  // that isolated groove channel instead — measured Source Mix slips are
+  // detection-quality defects on the fed channel (ADR-0011), and the worker
+  // already consumes any Float32Array channel (the re-lock hint reused it).
+  // No usable Drums samples keeps the Source Mix channel: fallback, not gap.
+  const channelForTempoAnalysis = (
+    buffer: AudioBuffer,
+    stems: Record<StemName, Float32Array[]> | null
+  ): Float32Array => {
+    const drumChannels = stems ? stems.drums : null;
+    const usable = (drumChannels ?? []).filter((channel) => channel.length > 0);
+    if (usable.length > 0) {
+      const length = usable.reduce(
+        (max, channel) => Math.max(max, channel.length),
+        0
+      );
+      const merged = new Float32Array(length);
+      for (const channel of usable) {
+        for (let i = 0; i < channel.length; i++) {
+          merged[i] += channel[i];
+        }
+      }
+      if (usable.length > 1) {
+        for (let i = 0; i < length; i++) {
+          merged[i] /= usable.length;
+        }
+      }
+      return merged;
+    }
+    return buffer.getChannelData(0);
+  };
+
+  const startTempoAnalysis = (
+    buffer: AudioBuffer,
+    hintBpm?: number,
+    // Explicit at call sites that just set the stems state in the same tick —
+    // the closure's state binding there is still stale; re-lock reads it live.
+    stems?: Record<StemName, Float32Array[]> | null
+  ) => {
+    const samples = channelForTempoAnalysis(
+      buffer,
+      stems === undefined ? separatedStems : stems
+    );
     try {
       const client = new BeatClient();
       beatClientRef.current = client;
       client
-        .analyze(buffer.getChannelData(0), buffer.sampleRate, hintBpm)
+        .analyze(samples, buffer.sampleRate, hintBpm)
         .then((result) => {
           if (beatClientRef.current === client) {
             setTempoAnalysis(result);
@@ -326,7 +368,9 @@ export const App: React.FC = () => {
       const peaks = computeWaveformPeaks(decoded.buffer);
       setDecodedSourceMix(decoded);
       setWaveformPeaks(peaks);
-      startTempoAnalysis(decoded.buffer);
+      // Explicit null: at decode there is no Drums Stem for THIS file yet —
+      // a previous track's stems binding in the closure must not leak in.
+      startTempoAnalysis(decoded.buffer, undefined, null);
     } catch (err) {
       const message =
         err instanceof Error
@@ -438,7 +482,9 @@ export const App: React.FC = () => {
       tempoResultRef.current = resumedTempo;
       downbeatPhaseRef.current = session.downbeatPhase ?? 0;
       if (!session.tempo) {
-        startTempoAnalysis(buffer);
+        // Same-tick state read would be stale, so the Session's stems are
+        // handed over explicitly: the re-detection reads the Drums channel.
+        startTempoAnalysis(buffer, undefined, session.stems);
       }
       // Ticket 05: the recovered Session also carries its Click Track lane
       // settings, so the Mix Tab's rail resumes exactly where it was left
@@ -601,6 +647,21 @@ export const App: React.FC = () => {
 
       setSeparatedStems(result.stems);
       setSeparationPhase("completed");
+      // Ticket 07 (ADR-0010 Amendment): the Beat Grid gets re-read where the
+      // groove is isolated — but only when the Drums Stem actually carries
+      // samples; with none, the decode-time Source Mix read already IS the
+      // fallback grid and stays untouched. A Source Mix pass still in flight
+      // is abandoned first (ticket 06's one-pass-at-a-time rule), and a
+      // failing stem pass keeps the existing reading (non-fatal catch).
+      const grooveChannels = result.stems.drums.filter(
+        (channel) => channel.length > 0
+      );
+      if (grooveChannels.length > 0) {
+        if (beatClientRef.current) {
+          beatClientRef.current.cancel();
+        }
+        startTempoAnalysis(decodedSourceMix.buffer, undefined, result.stems);
+      }
       // ADR-0008: Separation completes on the Mix Tab, ready for playback
       setSelectedTab("mix");
 

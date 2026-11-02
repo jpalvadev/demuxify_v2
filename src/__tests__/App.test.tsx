@@ -28,6 +28,12 @@ import { decodeWavOnsets, decodeWavOnsetPeakLevels } from "./wavOnsetsHelper";
 // stale. Click a Tab button (e.g. "Export") before asserting the bundler's
 // call args.
 let tempoWorkerQueue: (() => void)[] = [];
+// Ticket 07 (Drums Stem re-detection): which channel each heavy pass was
+// posted over. The stub records every start message so tests can prove the
+// policy point — Drums Stem samples when available, Source Mix as fallback —
+// without reaching into the worker.
+let tempoWorkerStarts: { sampleCount: number; hintBpm: number | undefined }[] =
+  [];
 
 class StubTempoWorker {
   onmessage: ((event: MessageEvent) => void) | null = null;
@@ -35,6 +41,10 @@ class StubTempoWorker {
 
   postMessage(message: any) {
     if (!message || message.type !== "start") return;
+    tempoWorkerStarts.push({
+      sampleCount: message.samples?.length ?? 0,
+      hintBpm: message.hintBpm,
+    });
     const bpm = message.hintBpm ?? 107.7;
     const intervalSec = 60 / bpm;
     // Short span so a completed export bundle stays cheap to encode: the
@@ -2408,6 +2418,100 @@ describe("App UI Shell", () => {
       expect(secondLevels[3]).toBeGreaterThan(firstLevels[3]);
 
       bundleSpy.mockRestore();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  // Ticket 07 (ADR-0010 Amendment — Drums Stem re-detection): once the Drums
+  // Stem exists, the Tempo Detector re-reads the Beat Grid over that isolated
+  // groove channel (measured Source Mix tail slips are detection-quality
+  // defects, ADR-0011); the Source Mix reading stays the fallback.
+  it("re-detects the Beat Grid on the Drums Stem channel once Separation completes", async () => {
+    vi.stubGlobal("Worker", StubTempoWorker);
+    try {
+      tempoWorkerStarts = [];
+      vi.spyOn(webgpuModule, "detectWebGPUCapability").mockResolvedValue({
+        supported: true,
+        isFallback: false,
+      });
+      // A distinguishable Drums Stem: its channels carry 700 frames, while the
+      // decode mock's Source Mix channel is 500 — a pass posted over the stem
+      // is identifiable by the frame count it hands the worker.
+      vi.spyOn(InferenceClient.prototype, "init").mockResolvedValue({
+        backend: "webgpu",
+      });
+      vi.spyOn(InferenceClient.prototype, "separate").mockResolvedValue({
+        stems: {
+          vocals: [new Float32Array(700), new Float32Array(700)],
+          drums: [new Float32Array(700), new Float32Array(700)],
+          bass: [new Float32Array(700), new Float32Array(700)],
+          other: [new Float32Array(700), new Float32Array(700)],
+        },
+        duration: 180,
+      });
+
+      render(<App />);
+      await loadAndSeparate();
+
+      // Two passes posted: the decode-time Source Mix read and the groove-
+      // channel re-detection Separation completion triggers, unhinted.
+      expect(tempoWorkerStarts).toEqual([
+        { sampleCount: 500, hintBpm: undefined },
+        { sampleCount: 700, hintBpm: undefined },
+      ]);
+
+      // Delivering both replies leaves the rail on the re-detection's grid —
+      // and the abandoned Source Mix read is discarded, never resurrected.
+      fireQueuedTempoCompletions();
+      await waitFor(() => {
+        expect(
+          screen.getByTestId("click-track-tempo-readout")
+        ).toBeInTheDocument();
+      });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("keeps the Source Mix Beat Grid when the Drums Stem carries no samples (fallback)", async () => {
+    vi.stubGlobal("Worker", StubTempoWorker);
+    try {
+      tempoWorkerStarts = [];
+      vi.spyOn(webgpuModule, "detectWebGPUCapability").mockResolvedValue({
+        supported: true,
+        isFallback: false,
+      });
+      vi.spyOn(InferenceClient.prototype, "init").mockResolvedValue({
+        backend: "webgpu",
+      });
+      vi.spyOn(InferenceClient.prototype, "separate").mockResolvedValue({
+        stems: {
+          vocals: [new Float32Array(700), new Float32Array(700)],
+          // A Drums Stem with nothing to read: the groove channel cannot
+          // feed the tracker, so the Source Mix reading is kept intact.
+          drums: [],
+          bass: [new Float32Array(700), new Float32Array(700)],
+          other: [new Float32Array(700), new Float32Array(700)],
+        },
+        duration: 180,
+      });
+
+      render(<App />);
+      await loadAndSeparate();
+
+      // No stem pass is posted at all: the decode-time Source Mix read is the
+      // only pass, and its completion keeps the grid on the rail.
+      expect(tempoWorkerStarts).toEqual([
+        { sampleCount: 500, hintBpm: undefined },
+      ]);
+
+      fireQueuedTempoCompletions();
+      await waitFor(() => {
+        expect(
+          screen.getByTestId("click-track-tempo-readout")
+        ).toBeInTheDocument();
+      });
     } finally {
       vi.unstubAllGlobals();
     }
