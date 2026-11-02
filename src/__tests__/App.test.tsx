@@ -57,8 +57,10 @@ class StubTempoWorker {
       analyzedBpm: bpm,
       duration: 2,
       // ADR-0011: the widened complete message also carries the automatic
-      // Downbeat Phase; typecheck still polices that field's presence here.
-      downbeatPhase: 0,
+      // Downbeat Phase. A hinted pass (the rail's picker re-lock) answers
+      // with a DIFFERENT phase than the unhinted first pass, so the re-lock
+      // tests can prove the rail re-pairs to the new grid's own reading.
+      downbeatPhase: message.hintBpm !== undefined ? 2 : 0,
     };
     tempoWorkerQueue.push(() => {
       this.onmessage?.({ data: complete } as MessageEvent);
@@ -764,6 +766,9 @@ describe("App UI Shell", () => {
         analyzedBpm: 107.7,
         duration: 284,
       },
+      // ADR-0011 (ticket 05): the persisted pairing resumes too — it is a
+      // Session SIBLING of tempo/clickTrack, never a field of SessionTempo.
+      downbeatPhase: 1,
       // Ticket 05: the Click Track lane settings persist with the Session too,
       // parallel to the Stem mixer contract — the rail must resume switched ON
       // with the saved Meter.
@@ -816,6 +821,13 @@ describe("App UI Shell", () => {
       name: /^click track$/i,
     });
     expect(resumedRailSwitch).toHaveAttribute("aria-checked", "true");
+
+    // ADR-0011 (ticket 05): the saved Downbeat Phase resumes the deep tone
+    // exactly where the Session left it — beat 2 of the 6/8 grouping, still
+    // tagged auto because the Session stored the Detector's own reading.
+    expect(screen.getByTestId("click-track-downbeat-label")).toHaveTextContent(
+      "Beat 2 of 6 · auto"
+    );
 
     await sessionStore.clearActiveSession();
   });
@@ -1139,8 +1151,10 @@ describe("App UI Shell", () => {
     }
 
     // Ticket 04: the Click Track rail lives inside the Mix player, so while the
-    // Mix Tab is grayscaled there is no rail and nothing to click against.
+    // Mix Tab is grayscaled there is no rail and nothing to click against —
+    // and with it the rail's new −/+ Downbeat rotation buttons too.
     expect(screen.queryByTestId("click-track-rail")).toBeNull();
+    expect(screen.queryByTestId("click-track-phase-plus")).toBeNull();
 
     // Drive the state machine to completion
     const file = new File(["audio"], "song_master.mp3", {
@@ -2122,6 +2136,86 @@ describe("App UI Shell", () => {
       ).toBe(true);
 
       bundleSpy.mockRestore();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("reads the automatic Downbeat Phase in the rail and rotates it with the −/+ pair: the deep tone moves, positions never do, and the auto tag clears on the first press", async () => {
+    vi.stubGlobal("Worker", StubTempoWorker);
+    try {
+      await separateAndDetectTempo();
+
+      // First pass (no hint): the Detector's own reading is phase 0 — the
+      // rail says honestly where the deep tone starts, tagged auto.
+      expect(
+        screen.getByTestId("click-track-downbeat-label")
+      ).toHaveTextContent("Beat 1 of 4 · auto");
+
+      // One + press: the pairing becomes the user's — Beat 2 of 4, tag gone.
+      fireEvent.click(screen.getByTestId("click-track-phase-plus"));
+      await waitFor(() => {
+        expect(
+          screen.getByTestId("click-track-downbeat-label")
+        ).toHaveTextContent(/^Beat 2 of 4$/);
+      });
+
+      // A Meter change mid-hunt keeps the phase (ADR-0010's meter rule
+      // extended to the phase axis): the deep tone stays on beat 2,
+      // regrouped to the 6/8 bar — not reset, and the manual tag stays
+      // cleared.
+      fireEvent.click(screen.getByRole("button", { name: /^meter 6\/8$/i }));
+      expect(screen.getByTestId("click-track-meter-label")).toHaveTextContent(
+        "Meter 6/8"
+      );
+      expect(
+        screen.getByTestId("click-track-downbeat-label")
+      ).toHaveTextContent(/^Beat 2 of 6$/);
+
+      // A − press then wraps the hunt back to the reading's own beat on the
+      // new grouping: manual intent survives, only the deep tone moved.
+      fireEvent.click(screen.getByTestId("click-track-phase-minus"));
+      await waitFor(() => {
+        expect(
+          screen.getByTestId("click-track-downbeat-label")
+        ).toHaveTextContent(/^Beat 1 of 6$/);
+      });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("re-locks re-read the Downbeat: a fresh grid adopts its own automatic pairing, dropping any nudge made against the old grid", async () => {
+    vi.stubGlobal("Worker", StubTempoWorker);
+    try {
+      await separateAndDetectTempo();
+      expect(
+        screen.getByTestId("click-track-downbeat-label")
+      ).toHaveTextContent("Beat 1 of 4 · auto");
+
+      // Nudge manually first: the manual pairing (tag cleared)…
+      fireEvent.click(screen.getByTestId("click-track-phase-plus"));
+      await waitFor(() => {
+        expect(
+          screen.getByTestId("click-track-downbeat-label")
+        ).toHaveTextContent(/^Beat 2 of 4$/);
+      });
+
+      // …then re-lock to the metric doubling: the hinted pass answers with
+      // its own automatic reading (the stub marks hinted passes with phase
+      // 2), so the beam re-pairs to Beat 3 of 4 AND the auto tag comes back
+      // — the old nudge is never carried across different positions.
+      fireEvent.click(
+        screen.getByRole("button", {
+          name: /^re-lock beat grid to 215\.4 bpm$/i,
+        })
+      );
+      fireQueuedTempoCompletions();
+      await waitFor(() => {
+        expect(
+          screen.getByTestId("click-track-downbeat-label")
+        ).toHaveTextContent("Beat 3 of 4 · auto");
+      });
     } finally {
       vi.unstubAllGlobals();
     }

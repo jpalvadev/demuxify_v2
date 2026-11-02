@@ -19,6 +19,7 @@ import {
   TimeStretchState,
   ClickTrackMeter,
   ClickTrackMixerState,
+  clickTrackBeatsPerBar,
 } from "../lib/stemPlayerEngine";
 import { StemStrip } from "./StemStrip";
 import { MasterWaveform } from "./MasterWaveform";
@@ -95,6 +96,13 @@ export interface StemPlayerProps {
   // The rail's picker: the app re-runs the Tempo Detector with the chosen
   // tempo as hint, then swaps the Beat Grid when the re-lock arrives.
   onChooseTempoCandidate?: (bpm: number) => void;
+  // ADR-0011 (tickets 04/05): the Downbeat Phase is a rail SIBLING, never part
+  // of ClickTrackMixerState. initialDownbeatPhase seeds the deep tone from the
+  // Tempo Detector's automatic reading (or the resumed Session's persisted
+  // pairing); each −/+ press reports the engine's new phase back through
+  // onClickTrackPhaseChange so the app's auto-save mirrors what is heard.
+  initialDownbeatPhase?: number;
+  onClickTrackPhaseChange?: (phase: number) => void;
 }
 
 function formatTime(totalSeconds: number): string {
@@ -155,6 +163,8 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
   onClickTrackState,
   tempoCandidates,
   onChooseTempoCandidate,
+  initialDownbeatPhase,
+  onClickTrackPhaseChange,
 }) => {
   const engineRef = useRef<StemPlayerEngine | null>(null);
 
@@ -178,6 +188,12 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
   const [clickTrack, setClickTrack] = useState<ClickTrackMixerState>(
     initialClickTrack ?? CLICK_TRACK_DEFAULT
   );
+  // ADR-0011 Downbeat Phase rail state (tickets 04/05): readout only — the
+  // engine owns the effective value. The dim "auto" tag stays while the
+  // pairing is the Tempo Detector's own reading; the first manual −/+ press
+  // clears it, and a fresh grid (re-lock) pairs back to the new auto reading.
+  const [downbeatPhase, setDownbeatPhase] = useState(initialDownbeatPhase ?? 0);
+  const [downbeatAuto, setDownbeatAuto] = useState(true);
 
   // Initialize engine
   useEffect(() => {
@@ -189,6 +205,9 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
       initialMasterVolume,
       initialCurrentTime,
       initialClickTrack,
+      // ADR-0011: the engine seeds its Downbeat Phase from the app's sibling
+      // ref (auto reading, resumed Session pairing, or post-press value).
+      downbeatPhase: initialDownbeatPhase,
     });
     engineRef.current = engine;
 
@@ -239,16 +258,31 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
     };
   }, [stems, sampleRate, providedDuration, audioContext]);
 
-  // Beat Grid (ADR-0010, ticket 04/06): the grid is swapped in place, so re-
-  // locking it after a candidate choice keeps the mixer settings and the
-  // playhead exactly where they were. A lane with no grid has no clicks.
+  // Beat Grid + Downbeat Phase (ADR-0010/0011, tickets 04/05): the beam is the
+  // PAIR (grid, phase) — swapping the grid re-adopts the pairing's own
+  // automatic reading (a nudge tuned against the old grid is meaningless once
+  // positions move), while the app pushing a manually-rotated phase back
+  // through initialDownbeatPhase re-points the deep tone on the SAME grid
+  // without touching the "auto" tag. A lane with no grid has no clicks.
+  const lastBeamGridRef = useRef<{
+    grid: Float64Array | null | undefined;
+  } | null>(null);
   useEffect(() => {
     const engine = engineRef.current;
     if (!engine) return;
     engine.setBeatGrid(beatGrid ?? null);
+    const sameGrid =
+      lastBeamGridRef.current !== null &&
+      lastBeamGridRef.current.grid === beatGrid;
+    lastBeamGridRef.current = { grid: beatGrid };
+    engine.setClickTrackDownbeatPhase(initialDownbeatPhase ?? 0);
+    setDownbeatPhase(engine.getClickTrackDownbeatPhase());
+    if (!sameGrid) {
+      setDownbeatAuto(true);
+    }
     setClickTrack(engine.getClickTrackState());
     onClickTrackState?.(engine.getClickTrackState());
-  }, [beatGrid]);
+  }, [beatGrid, initialDownbeatPhase]);
 
   // Spacebar Hotkey listener for Play/Pause
   useEffect(() => {
@@ -517,6 +551,22 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
     [onClickTrackState]
   );
 
+  // ADR-0011 (ticket 04): a −/+ press rotates the deeper click tone by one
+  // beat of the grouping (wrapping), tick positions never move. The engine
+  // owns the effective phase; the app's sibling ref is reported back so the
+  // auto-save persists exactly what the user is hearing.
+  const handleRotateClickTrackDownbeat = useCallback(
+    (beats: number) => {
+      const engine = engineRef.current;
+      if (!engine) return;
+      engine.rotateClickTrackDownbeat(beats);
+      setDownbeatPhase(engine.getClickTrackDownbeatPhase());
+      setDownbeatAuto(false);
+      onClickTrackPhaseChange?.(engine.getClickTrackDownbeatPhase());
+    },
+    [onClickTrackPhaseChange]
+  );
+
   // Determine silencing for visual feedback
   const hasAnySolo = STEM_NAMES.some((s) => mixerStates[s]?.solo);
 
@@ -685,6 +735,16 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
           >
             Meter {clickTrack.meter}
           </span>
+          {/* ADR-0011 (ticket 04, look from the FALLBACK RECORD on ticket
+              01): where the deep tone starts, phrased honestly, with the
+              dim "auto" tag while it is still the Detector's own reading. */}
+          <span
+            data-testid="click-track-downbeat-label"
+            className="text-muted-foreground"
+          >
+            {`Beat ${downbeatPhase + 1} of ${clickTrackBeatsPerBar(clickTrack.meter)}`}
+            {downbeatAuto ? " · auto" : ""}
+          </span>
         </div>
 
         {/* Candidates readout (ticket 06): the Tempo Detector ranks a top
@@ -834,6 +894,42 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
                 {meter}
               </button>
             ))}
+          </div>
+
+          {/* Downbeat Phase −/+ (ADR-0011, ticket 04): rotates the deeper click
+              tone by one beat of the grouping, wrapping; the tick positions
+              never move. Look ported from the FALLBACK RECORD on ticket 01
+              (agent-authored — the OpenDesign MCP run never revived). */}
+          <div
+            data-testid="click-track-phase-control"
+            className="flex items-center gap-1.5 shrink-0"
+          >
+            <button
+              type="button"
+              aria-label="Bring the downbeat one beat earlier"
+              title="Bring the downbeat one beat earlier"
+              data-testid="click-track-phase-minus"
+              onClick={() => handleRotateClickTrackDownbeat(-1)}
+              className={cn(
+                "h-8 w-8 rounded-none border text-xs font-bold transition-all flex items-center justify-center",
+                "border-border/70 bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground"
+              )}
+            >
+              <Minus className="h-3.5 w-3.5 shrink-0" />
+            </button>
+            <button
+              type="button"
+              aria-label="Bring the downbeat one beat later"
+              title="Bring the downbeat one beat later"
+              data-testid="click-track-phase-plus"
+              onClick={() => handleRotateClickTrackDownbeat(1)}
+              className={cn(
+                "h-8 w-8 rounded-none border text-xs font-bold transition-all flex items-center justify-center",
+                "border-border/70 bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground"
+              )}
+            >
+              <Plus className="h-3.5 w-3.5 shrink-0" />
+            </button>
           </div>
         </div>
       </div>

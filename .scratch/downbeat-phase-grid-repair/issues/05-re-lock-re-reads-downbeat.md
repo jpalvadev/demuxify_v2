@@ -4,13 +4,13 @@
 
 **Blocked by:** 02 (Automatic Downbeat Phase — the worker's phase reading is what gets re-run), 04 (−/+ rotation — the nudge that must be discarded has to exist to be discarded).
 
-**Status:** ready-for-agent
+**Status:** resolved (landed in ONE commit with ticket 04 — shared beam effect and JSX props)
 
-- [ ] Picking an alternative candidate re-runs the tracker with the tempo hint as today; the complete relay now carries a fresh Downbeat Phase scored against the _new_ grid — the Session's previous phase (auto-picked or nudged) never carries across.
-- [ ] Seam-pinned evidence: after a −/+ hunt at 107.7 then a re-lock to the doubling, the persisted phase equals the new automatic pick, not the old hunt offset; the rail's accents follow the fresh phase while clicks sit on the re-locked grid.
-- [ ] Repeated switching (107.7 → doubling → back) keeps state consistent: every re-lock re-reads, every −/+ hunt applies to the current grid only.
-- [ ] Off-main-thread invariant preserved: the re-read rides the same worker pass (no extra message round-trip on the main thread); the existing mid-flight cancel/replace behavior stays green.
-- [ ] Full suite + typecheck + glossary green on the commit.
+- [x] Picking an alternative candidate re-runs the tracker with the tempo hint as today; the complete relay carries a fresh Downbeat Phase scored against the new grid, and `startTempoAnalysis`'s completion handler re-points `downbeatPhaseRef.current = result.downbeatPhase ?? 0` on EVERY arriving grid — the previous phase (auto or nudged) never carries across.
+- [x] Seam-pinned evidence: App seam test walks a manual −/+ hunt at 107.7 (tag cleared, "Beat 2 of 4") then a re-lock to the doubling — the rail re-pairs to the new pass's own reading ("Beat 3 of 4 · auto", tag back), proving the old hunt offset is dropped and the accents follow the fresh phase on the re-locked grid.
+- [x] Repeated switching keeps state consistent: the beam is the PAIR (grid, phase) — `lastBeamGridRef` identity means a fresh grid always re-adopts its auto reading, while the app pushing a manually rotated phase on the SAME grid re-points the deep tone without touching the tag.
+- [x] Off-main-thread invariant preserved: the re-read rides the same worker pass (the widened complete message already carries it; no extra round-trip), and the existing mid-flight cancel/replace tests stay green.
+- [x] Full suite + typecheck + glossary green on the commit.
 
 ## Comments
 

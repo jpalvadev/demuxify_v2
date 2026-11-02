@@ -276,6 +276,11 @@ export const App: React.FC = () => {
           if (beatClientRef.current === client) {
             setTempoAnalysis(result);
             tempoResultRef.current = result;
+            // ADR-0011 (ticket 05): every arriving Beat Grid — first pass or
+            // re-lock — carries its own automatic Downbeat reading, so the
+            // rail ref re-pairs to it and any manual nudge made against the
+            // PREVIOUS grid is dropped, never carried across positions.
+            downbeatPhaseRef.current = result.downbeatPhase ?? 0;
             attachTempoResultToSession(result);
           }
         })
@@ -982,6 +987,18 @@ export const App: React.FC = () => {
                     clickTrackStateRef.current = state;
                   }}
                   initialClickTrack={clickTrackStateRef.current ?? undefined}
+                  // ADR-0011 (tickets 04/05): the Downbeat Phase is a rail
+                  // sibling, seeded from the app's ref (auto reading from the
+                  // worker, resumed Session pairing, or the post-press value
+                  // reported back through onClickTrackPhaseChange below).
+                  initialDownbeatPhase={
+                    downbeatPhaseRef.current ??
+                    tempoAnalysis?.downbeatPhase ??
+                    0
+                  }
+                  onClickTrackPhaseChange={(phase) => {
+                    downbeatPhaseRef.current = phase;
+                  }}
                 />
               </>
             ) : (
