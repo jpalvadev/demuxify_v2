@@ -2,7 +2,11 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   StemPlayerEngine,
   ClickTrackMixerState,
+  CalibratedClickGrid,
+  ClickCalibrationRejection,
   synthesizeClickTrackChannel,
+  calibrateClickGrid,
+  reanchorBeatGridToAnchor,
 } from "../lib/stemPlayerEngine";
 import { StemName } from "../lib/chunkOverlapAdd";
 import { createMockAudioContext } from "./audioContextMockFactory";
@@ -1014,6 +1018,95 @@ describe("StemPlayerEngine", () => {
       };
       expect(engine.getClickTrackState()).toEqual(expectedLaneAfterSwap);
       expect(engine.getCurrentTime()).toBe(0);
+    });
+
+    it("derives pulse and anchor from taps honestly: steady taps calibrate, ragged taps refuse with a reason", () => {
+      // Three clean pulses (one ragged-but-medianed outlier gap stays honest
+      // at the boundary): median of the deltas survives it.
+      const outcome = calibrateClickGrid([2.0, 0.5, 0, 1.0]);
+      expect(outcome.kind).toBe("calibrated");
+      if (outcome.kind === "calibrated") {
+        const calibrated: CalibratedClickGrid = outcome;
+        expect(calibrated.pulseSec).toBe(0.5);
+        expect(calibrated.bpm).toBe(120);
+        expect(calibrated.anchorSec).toBe(0);
+        expect(calibrated.tapsSec).toEqual([0, 0.5, 1.0, 2.0]);
+      }
+
+      // Fewer than three taps is never a half-calibration.
+      const tooFew = calibrateClickGrid([0.5, 1.0]);
+      expect(tooFew.kind).toBe("rejected");
+      if (tooFew.kind === "rejected") {
+        const refused: ClickCalibrationRejection = tooFew;
+        expect(refused.reason).toBe("too-few-taps");
+        expect(refused.detailSec).toBeNull();
+      }
+
+      // A 0.125 s gap (480 BPM territory) refuses honestly, naming the gap.
+      const tooClose = calibrateClickGrid([0, 0.25, 0.375]);
+      expect(tooClose.kind).toBe("rejected");
+      if (tooClose.kind === "rejected") {
+        const refused: ClickCalibrationRejection = tooClose;
+        expect(refused.reason).toBe("taps-too-close");
+        expect(refused.detailSec).toBe(0.125);
+      }
+
+      // A 2.625 s gap (22.9 BPM territory) refuses honestly too.
+      const tooFar = calibrateClickGrid([0, 0.5, 3.125]);
+      expect(tooFar.kind).toBe("rejected");
+      if (tooFar.kind === "rejected") {
+        const refused: ClickCalibrationRejection = tooFar;
+        expect(refused.reason).toBe("taps-too-far");
+        expect(refused.detailSec).toBe(2.625);
+      }
+    });
+
+    it("a hand calibration re-anchors the lane: source.start tracers relay the swapped grid at the live playhead and the heard clicks sit on the tap lattice, not the Detector's", async () => {
+      // The Detector's grid, locked at the tapped BPM but anchored off the
+      // tap lattice by 0.03 s — a stale-anchor giveaway at every beat.
+      const detectorGrid = new Float64Array([0.03, 0.53, 1.03, 1.53, 2.03]);
+      const engine = new StemPlayerEngine(dummyStems, {
+        audioContext: mockCtx as any,
+        sampleRate,
+        beatGrid: detectorGrid,
+      });
+      engine.setClickTrackEnabled(true);
+      mockCtx.currentTime = 10;
+      await engine.play();
+      expect(mockCtx.createdSources[4].start).toHaveBeenCalledWith(10, 0);
+
+      // Four taps half a second apart, the first at 0.5 s.
+      const calibration = calibrateClickGrid([0.5, 1.0, 1.5, 2.0]);
+      if (calibration.kind !== "calibrated") {
+        throw new Error("clean taps must calibrate");
+      }
+      const handGrid = reanchorBeatGridToAnchor(
+        engine.getBeatGrid() ?? detectorGrid,
+        calibration.pulseSec,
+        calibration.anchorSec
+      );
+      for (let k = 0; k < handGrid.length; k++) {
+        expect(handGrid[k]).toBeCloseTo(k * 0.5, 9);
+      }
+
+      // Four seconds into playback the confirm lands: the lane relays from
+      // the live playhead with the re-anchored grid.
+      mockCtx.currentTime = 14;
+      engine.setBeatGrid(handGrid);
+      expect(mockCtx.createdSources).toHaveLength(6);
+      expect(mockCtx.createdSources[5].start).toHaveBeenCalledWith(14, 4);
+
+      // The heard clicks land on the tap lattice (k*0.5 s) — never back on
+      // the Detector's 0.03-offset positions.
+      const heard = mockCtx.createdSources[5].buffer.getChannelData(0);
+      const onsets = clickOnsets(heard, sampleRate);
+      expect(onsets).toHaveLength(handGrid.length);
+      for (let k = 0; k < handGrid.length; k++) {
+        expect(Math.abs(onsets[k] - k * 0.5)).toBeLessThan(
+          (2 / sampleRate) * 10
+        );
+        expect(Math.abs(onsets[k] - (k * 0.5 + 0.03))).toBeGreaterThan(0.01);
+      }
     });
   });
 });

@@ -66,6 +66,96 @@ export function synthesizeClickTrackChannel(
   return out;
 }
 
+// Calibrate the Click (ticket 08): when every automatic reading is wrong, the
+// user taps beats on the groove they hear. Pulse and grid anchor come from
+// pure arithmetic over the taps — no tracker opinion involved — and the
+// rejection is always honest: fewer than 3 taps, any inter-tap gap under
+// 0.25 s, or any gap over 2.5 s never becomes a half-calibration, it names
+// why it refused. "Anchor" here is grid position only: the Click Track has
+// no accent axis to rotate (ADR-0011 Amendment retired it end to end).
+export interface CalibratedClickGrid {
+  kind: "calibrated";
+  pulseSec: number; // median of the consecutive inter-tap deltas
+  bpm: number; // 60 / pulseSec: the hint the Beat Grid re-locks at
+  anchorSec: number; // first tap: where a Beat Grid beat is pinned
+  tapsSec: number[]; // the taps themselves, sorted by position
+}
+
+export interface ClickCalibrationRejection {
+  kind: "rejected";
+  reason: "too-few-taps" | "taps-too-close" | "taps-too-far";
+  detailSec: number | null; // the offending gap, when a gap caused it
+}
+
+export type ClickCalibrationResult =
+  CalibratedClickGrid | ClickCalibrationRejection;
+
+export function calibrateClickGrid(tapsSec: number[]): ClickCalibrationResult {
+  const taps = [...tapsSec].sort((a, b) => a - b);
+  if (taps.length < 3 || taps.some((t) => !Number.isFinite(t) || t < 0)) {
+    return {
+      kind: "rejected",
+      reason: "too-few-taps",
+      detailSec: null,
+    };
+  }
+
+  const deltas: number[] = [];
+  for (let i = 1; i < taps.length; i++) {
+    const delta = taps[i] - taps[i - 1];
+    // 0.25 s is 240 BPM, 2.5 s is 24 BPM: outside that band the taps stop
+    // describing a steady pulse, so nothing is derived from them.
+    if (delta < 0.25) {
+      return { kind: "rejected", reason: "taps-too-close", detailSec: delta };
+    }
+    if (delta > 2.5) {
+      return { kind: "rejected", reason: "taps-too-far", detailSec: delta };
+    }
+    deltas.push(delta);
+  }
+
+  deltas.sort((a, b) => a - b);
+  const mid = deltas.length >> 1;
+  const pulseSec =
+    deltas.length % 2 === 1 ? deltas[mid] : (deltas[mid - 1] + deltas[mid]) / 2;
+
+  return {
+    kind: "calibrated",
+    pulseSec,
+    bpm: 60 / pulseSec,
+    anchorSec: taps[0],
+    tapsSec: taps,
+  };
+}
+
+// The re-anchor half of the hand calibration: the Beat Grid keeps the
+// Detector's actual beat positions (they follow the drums) but slides, as
+// one rigid body, by the smallest offset (mod pulse) that lands a beat on the
+// tap lattice. Never a re-derivation from BPM: a repaired grid stays repaired.
+export function reanchorBeatGridToAnchor(
+  beatGridSec: Float64Array,
+  pulseSec: number,
+  anchorSec: number
+): Float64Array {
+  const out = new Float64Array(beatGridSec.length);
+  for (let i = 0; i < beatGridSec.length; i++) out[i] = beatGridSec[i];
+  if (!(pulseSec > 0) || beatGridSec.length === 0) return out;
+
+  let shift = 0;
+  let bestFound = false;
+  for (let i = 0; i < beatGridSec.length; i++) {
+    let candidate = (anchorSec - beatGridSec[i]) % pulseSec;
+    if (candidate > pulseSec / 2) candidate -= pulseSec;
+    if (candidate < -pulseSec / 2) candidate += pulseSec;
+    if (!bestFound || Math.abs(candidate) < Math.abs(shift)) {
+      shift = candidate;
+      bestFound = true;
+    }
+  }
+  for (let i = 0; i < beatGridSec.length; i++) out[i] += shift;
+  return out;
+}
+
 export interface StemPlayerEngineOptions {
   audioContext?: AudioContext;
   sampleRate?: number;

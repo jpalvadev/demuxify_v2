@@ -11,6 +11,7 @@ import { SourceMixDropzone } from "./components/SourceMixDropzone";
 import { FallbackAdvisory } from "./components/FallbackAdvisory";
 import { SourceMixCard } from "./components/SourceMixCard";
 import { MasterWaveform } from "./components/MasterWaveform";
+import { BeatGridTapCalibration } from "./components/BeatGridTapCalibration";
 import {
   StemPlayer,
   ExportDialogState,
@@ -53,8 +54,15 @@ import {
   createSessionAutoSaver,
   DemuxifySession,
   SessionMixerState,
+  SessionClickCalibration,
 } from "./lib/sessionStore";
-import { StemMixerStates, ClickTrackMixerState } from "./lib/stemPlayerEngine";
+import {
+  StemMixerStates,
+  ClickTrackMixerState,
+  CalibratedClickGrid,
+  calibrateClickGrid,
+  reanchorBeatGridToAnchor,
+} from "./lib/stemPlayerEngine";
 import { DISPLAY_FONT_STACK, MONO_FONT_STACK } from "./lib/typography";
 
 // Bold pairing (ticket 10): the bundled display face paints the focal Tab banners and
@@ -149,6 +157,16 @@ export const App: React.FC = () => {
   // a Stem of its own.
   const [tempoAnalysis, setTempoAnalysis] =
     useState<TempoAnalysisResult | null>(null);
+
+  // Calibrate the Click (ticket 08): the by-hand reading the rail reports —
+  // domain-separate from tempoAnalysis, a hand decision is never dressed
+  // up as a Detector reading. Set only when a tap-confirm's grid arrives.
+  const [clickCalibration, setClickCalibration] =
+    useState<CalibratedClickGrid | null>(null);
+  // The tap-confirm keeps its derived pulse until the re-lock pass delivers
+  // its Beat Grid; only then is the re-anchor applied, so the Mix Tab stays
+  // honest on the old grid while the pass is in flight.
+  const pendingCalibrationRef = useRef<CalibratedClickGrid | null>(null);
 
   // Session Recovery & Persistence State
   const [detectedSession, setDetectedSession] = useState<{
@@ -310,11 +328,42 @@ export const App: React.FC = () => {
       beatClientRef.current = client;
       client
         .analyze(samples, buffer.sampleRate, hintBpm)
-        .then((result) => {
+        .then((rawResult) => {
           if (beatClientRef.current === client) {
+            // Calibrate the Click (ticket 08): when this pass came from a
+            // tap-confirm, the new Beat Grid slides as one rigid body to the
+            // tap lattice at the engine seam — the Detector's beat positions
+            // stay (they follow the drums), only the anchor moves.
+            const pending = pendingCalibrationRef.current;
+            const result = pending
+              ? {
+                  ...rawResult,
+                  beatGrid: reanchorBeatGridToAnchor(
+                    rawResult.beatGrid,
+                    pending.pulseSec,
+                    pending.anchorSec
+                  ),
+                }
+              : rawResult;
+            pendingCalibrationRef.current = null;
             setTempoAnalysis(result);
             tempoResultRef.current = result;
-            attachTempoResultToSession(result);
+            // Honest supersession: any later automatic pass clears the by-
+            // hand claim; only a tap-confirm's pass carries one forward.
+            // Order matters: the new Beat Grid lands before the claim, so no
+            // render ever shows "calibrated by hand" over the old grid.
+            setClickCalibration(pending);
+            attachTempoResultToSession(
+              result,
+              pending
+                ? {
+                    bpm: pending.bpm,
+                    pulseSec: pending.pulseSec,
+                    anchorSec: pending.anchorSec,
+                    tapsSec: pending.tapsSec,
+                  }
+                : undefined
+            );
           }
         })
         .catch(() => {
@@ -329,13 +378,19 @@ export const App: React.FC = () => {
 
   // A re-locked Beat Grid replaces the one the Session carries, so the auto-
   // saver keeps writing the chosen tempo and its grid (ticket 03 persistence
-  // keeps working after every candidate switch).
-  const attachTempoResultToSession = (result: TempoAnalysisResult) => {
+  // keeps working after every candidate switch). Hand Calibration (ticket 08)
+  // rides along: only a tap-confirm pass supplies one, every other pass
+  // clears the Session's by-hand reading — honest supersession.
+  const attachTempoResultToSession = (
+    result: TempoAnalysisResult,
+    calibration?: SessionClickCalibration | null
+  ) => {
     const session = cachedSessionRef.current;
     if (!session) return;
     const updatedSession: DemuxifySession = {
       ...session,
       tempo: result,
+      calibration: calibration ?? undefined,
     };
     cachedSessionRef.current = updatedSession;
     autoSaverRef.current.debounceSave(updatedSession);
@@ -350,6 +405,9 @@ export const App: React.FC = () => {
     setSeparatedStems(null);
     setTempoAnalysis(null);
     tempoResultRef.current = null;
+    // Calibrate the Click (ticket 08): a fresh track has no by-hand reading.
+    setClickCalibration(null);
+    pendingCalibrationRef.current = null;
 
     try {
       const decoded = await decodeAudio(file);
@@ -398,6 +456,8 @@ export const App: React.FC = () => {
     setSeparatedStems(null);
     setTempoAnalysis(null);
     tempoResultRef.current = null;
+    setClickCalibration(null);
+    pendingCalibrationRef.current = null;
     setDownloadProgress(null);
     setChunkProgress(null);
     setChunkStart(null);
@@ -467,6 +527,14 @@ export const App: React.FC = () => {
         // handed over explicitly: the re-detection reads the Drums channel.
         startTempoAnalysis(buffer, undefined, session.stems);
       }
+      // Calibrate the Click (ticket 08): a Session that was anchored by hand
+      // resumes with that reading, so the rail keeps saying "calibrated by
+      // hand"; Sessions without one resume honest about the Detector alone.
+      setClickCalibration(
+        session.calibration
+          ? { ...session.calibration, kind: "calibrated" }
+          : null
+      );
       // Ticket 05: the recovered Session also carries its Click Track lane
       // settings, so the Mix Tab's rail resumes exactly where it was left
       // (off by default for Sessions that never enabled it).
@@ -555,6 +623,23 @@ export const App: React.FC = () => {
       beatClientRef.current.cancel();
     }
     startTempoAnalysis(decodedSourceMix.buffer, bpm);
+  };
+
+  // Calibrate the Click (ticket 08): the tap strip's confirm hands the taps
+  // over. The derivation is pure arithmetic (calibrateClickGrid): fewer than
+  // 3 taps, or any gap under 0.25 s or over 2.5 s, are refused honestly —
+  // nothing starts, and the strip already says why. Never a silent
+  // half-calibration. Accepted taps re-lock through the same heavy-pass
+  // machinery as at decode, with the derived BPM as the re-lock hint.
+  const handleConfirmTapCalibration = (tapsSec: number[]) => {
+    if (!decodedSourceMix) return;
+    const outcome = calibrateClickGrid(tapsSec);
+    if (outcome.kind !== "calibrated") return;
+    if (beatClientRef.current) {
+      beatClientRef.current.cancel();
+    }
+    pendingCalibrationRef.current = outcome;
+    startTempoAnalysis(decodedSourceMix.buffer, outcome.bpm);
   };
 
   const handleFileInputChange = (e: ChangeEvent<HTMLInputElement>) => {
@@ -989,6 +1074,15 @@ export const App: React.FC = () => {
                     height={84}
                   />
                 </div>
+                {/* Calibrate the Click (ticket 08): the tap strip shares the
+                    spine's timeline scale — the user taps the groove they
+                    hear, then confirm re-anchors through the re-lock pass. */}
+                <div className="pt-2">
+                  <BeatGridTapCalibration
+                    duration={decodedSourceMix.metadata.duration}
+                    onTapCalibration={handleConfirmTapCalibration}
+                  />
+                </div>
                 <StemPlayer
                   stems={separatedStems}
                   sampleRate={decodedSourceMix.metadata.sampleRate}
@@ -1019,6 +1113,10 @@ export const App: React.FC = () => {
                   // picker, which re-locks the Beat Grid off the main thread.
                   tempoCandidates={tempoAnalysis?.candidates}
                   onChooseTempoCandidate={handleChooseTempoCandidate}
+                  // Calibrate the Click (ticket 08): when the Beat Grid was
+                  // anchored by hand, the rail says "calibrated by hand" —
+                  // never an auto reading for a by-hand decision.
+                  clickCalibration={clickCalibration}
                   onClickTrackState={(state) => {
                     clickTrackStateRef.current = state;
                   }}

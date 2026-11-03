@@ -2,17 +2,29 @@
 
 **What to build:** When every automatic reading is wrong on the user's material, the Click Track gets a 100%-reliable manual route: the user taps four beats on the groove they hear (Mix Tab affordance on the waveform spine), the engine derives pulse (median of the three inter-tap deltas) and phase (first tap as the Downbeat anchor) from the taps, and the Beat Grid re-anchors to that lattice through the ticket 06 re-lock machinery — same single pass, hint = derived BPM, plus a phase re-anchor at the engine seam. The rail says "calibrated by hand", never "auto".
 
-**Blocked by:** 06 (re-lock hint seam to extend) — and an OpenDesign run for the tap-capture UI view (MANDATORY per AGENTS: new UI must be designed through the OpenDesign MCP artifact, then ported; record the run on this ticket).
+**Blocked by:** 06 (re-lock hint seam to extend) — resolved. The OpenDesign run for the tap-capture view could not happen (MCP dead this session, documented fallback); recorded in the Design provenance section below.
 
-**Status:** open
+**Status:** resolved
 
-- [ ] OpenDesign run: tap-capture affordance on the Mix Tab waveform (four taps, live pulse readout, confirm/reset).
-- [ ] Engine seam: `calibrateClickGrid(tapsSec)` derives pulse/phase; taps at <0.25 s or >2.5 s apart or <3 taps are rejected honestly (never a silent half-calibration).
-- [ ] Re-anchor pins: mock-AudioContext `source.start(when, offset)` tracers prove clicks land on the calibrated lattice, not the Detector's.
-- [ ] Session persistence: a calibrated grid survives Session Recovery (sibling to `tempo`, marking the reading as hand-set).
-- [ ] Full suite + typecheck + glossary green on the commit.
+- [x] OpenDesign run: tap-capture affordance on the Mix Tab waveform (four taps, live pulse readout, confirm/reset) — **NOT from an OpenDesign run**. MCP dead for this session: server never loaded (zero tools, reconnect recipe per `docs/agents/open-design-mcp.md` applied — block commented out and restored verbatim — then the retry probe returned no servers). Look is agent-authored per the documented dead-MCP fallback, to be described in full on this ticket when it lands.
+- [x] Engine seam: `calibrateClickGrid(tapsSec)` in `src/lib/stemPlayerEngine.ts` (module scope, class untouched) returns the discriminated `ClickCalibrationResult` — pulse = median of sorted inter-tap deltas, anchor = first tap. Pinned in `stemPlayerEngine.test.ts`: `[2.0,0.5,0,1.0]` calibrates to pulse 0.5 s / 120 BPM / anchor 0 s (sorted defensively), while `<3` taps, a 0.125 s gap and a 2.625 s gap refuse as `too-few-taps` / `taps-too-close` / `taps-too-far` with the offending gap named in `detailSec`. The App refuses the same way before starting a pass, and the strip keeps confirm disabled — never a silent half-calibration.
+- [x] Re-anchor pins: `reanchorBeatGridToAnchor(grid, pulseSec, anchorSec)` slides the grid as one rigid body by the smallest shift mod pulse. Pinned with mock-AudioContext tracers: Detector grid `[0.03,0.53,1.03,1.53,2.03]` (a 0.03 s stale-anchor giveaway) + taps `[0.5,1.0,1.5,2.0]` → `source.start(14, 4)` relay at the live playhead and every heard click onset lands on `k*0.5` s, never the Detector's offsets. No accent/Downbeat axis revived — the tap only moves the grid anchor lattice.
+- [x] Session persistence: `calibration?: SessionClickCalibration` on `DemuxifySession`/`StoredSessionRecord`, sibling to `tempo` and never folded into the ranked candidates; gate-validated on load (`isValidCalibration`, same honesty as `isValidClickTrack`) so a malformed record loads as absent, never half. App Session Recovery restores it and the rail keeps saying "calibrated by hand".
+- [x] Full suite + typecheck + glossary green on the commit: 353/353 across 40 files (6 new: 2 engine, 1 sessionStore, 1 StemPlayer rail, 2 App integration), typecheck clean, glossary/doc-anchor/test-fixture guards clean.
+
+## Design provenance — look is agent-authored (documented dead-MCP fallback)
+
+Per `docs/agents/open-design-mcp.md`: the OpenDesign MCP never loaded this session (zero tools at start), the reconnect recipe was applied — the server block in `~/.config/opencode/opencode.jsonc` was commented out and restored verbatim — and the retry probe returned zero servers, so no design artifact exists for this view. The fallback in that doc puts the agent in charge of the design; this records it, as required. **Do not re-attempt OpenDesign for this view this session.**
+
+The tap-capture view is `src/components/BeatGridTapCalibration.tsx` (new component, hosted by the shell in a dedicated strip _under_ the Mix Tab's waveform spine — it does not extend the scrub slider, so tapping never fights seeking). Look, modelled on the surrounding `MasterWaveform`/rail treatment so the affordance reads as part of the Mix Tab rather than a new island:
+
+- Header line "Calibrate the Click" in the bundled display face, muted, `tracking-wide uppercase` — the same Tab-banner typography the shell already paints.
+- The strip itself is a full-width dark card on `bg-secondary` with a `primary/30` hairline border, square corners (`rounded-none`) like every other Mix Tab surface, `select-none` so a tap never reads as text selection. One press = one tap; taps stand as full-height lime (`bg-primary`) ticks positioned by percentage of duration, so the pattern the user heard stays visible on the timeline at the spine's own scale.
+- Mono readout below in `MONO_FONT_STACK` at 11 px — the Transport/rail micro-line: it states the honest state in one line only — "tap 4 beats on the groove…" while empty, "N of 4 taps" while short, the gap-refusal naming the offending gap ("refused honestly · a 2.625 s gap is slower than 24 BPM") once ≥3 taps, and "4 taps · pulse 500 ms · 120.0 BPM" once the taps describe a steady pulse.
+- Two chips underneath: "Confirm hand calibration" (`primary` hairline, mono) `disabled` until `calibrateClickGrid` says the taps mean something; "Reset taps" (`border/70` hairline) clears them. Same chip geometry and opacity-40 disabled treatment as the rail's candidate picker.
+- Pinned testids: `click-tap-calibration-strip` / `-readout` / `-confirm` / `-reset`. All pre-existing `click-track-*` rail testids are untouched.
 
 ## Comments
 
 - Motivation measured (ADR-0011 Amendment): after the pickup-rule fix the intro damage collapsed (18→1 bad clicks in 0–10 s) but the tail stays (54/170 clicks >80 ms from any hit, RAW grid identical) — detection-quality territory. Ticket 07 attacks it automatically; this one is the guaranteed escape hatch when the automatic route misses: four taps by ear beat any tracker.
-- Keep the axes apart: taps anchor pulse+phase only; the Downbeat −/+ rotation stays the existing accent control riding on top.
+- Keep the axes apart: taps anchor pulse+phase (grid position) only. There is NO accent axis to keep apart from — the Downbeat/−/+ rotation was retired end to end (ticket 09, ADR-0011 Amendment) and must not be revived by this ticket: "phase" here means the grid anchor lattice, nothing else.

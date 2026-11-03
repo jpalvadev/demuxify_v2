@@ -7,6 +7,7 @@ import {
   createSessionAutoSaver,
   DemuxifySession,
   StorageQuotaError,
+  SessionClickCalibration,
 } from "../lib/sessionStore";
 import { StemName } from "../lib/chunkOverlapAdd";
 import type { ClickTrackMixerState } from "../lib/stemPlayerEngine";
@@ -241,6 +242,36 @@ describe("sessionStore", () => {
     expect(legacy).not.toBeNull();
     if (!legacy) return;
     expect(legacy.clickTrack).toBeUndefined();
+  });
+
+  it("round-trips a Hand Calibration and leaves sessions that never hand-calibrated without one", async () => {
+    // Ticket 08: the taps-to-pulse reading persists with the Session as its
+    // own field, sibling to tempo — the ranked candidates above are untouched
+    // by it, and a by-hand decision never masquerades as a Detector reading.
+    const calibration: SessionClickCalibration = {
+      bpm: 120,
+      pulseSec: 0.5,
+      anchorSec: 90.25,
+      tapsSec: [90.25, 90.75, 91.25, 91.75],
+    };
+    const mockSession = createMockSession({ calibration });
+
+    await saveActiveSession(mockSession);
+
+    const loaded = await loadActiveSession();
+    expect(loaded).not.toBeNull();
+    if (!loaded) return;
+
+    expect(loaded.calibration).toEqual(calibration);
+
+    // Sessions that never hand-calibrated (or pre-ticket-08) load without the
+    // field: nothing half-calibrated is invented on read.
+    const neverCalibrated = createMockSession();
+    await saveActiveSession(neverCalibrated);
+    const never = await loadActiveSession();
+    expect(never).not.toBeNull();
+    if (!never) return;
+    expect(never.calibration).toBeUndefined();
   });
 
   it("starts fresh for old Sessions that wrote a Downbeat Phase or a Meter", async () => {

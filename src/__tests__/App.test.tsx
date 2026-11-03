@@ -2159,6 +2159,133 @@ describe("App UI Shell", () => {
     }
   });
 
+  // Calibrate the Click (ticket 08): when the automatic readings are wrong,
+  // the user taps four beats on the spine's timeline; confirm re-locks
+  // through the same heavy-pass machinery with the derived BPM as hint, and
+  // the rail says "calibrated by hand" — never an auto reading.
+  it("anchors the Beat Grid by hand: four taps on the spine re-lock at the derived BPM and the rail says calibrated by hand", async () => {
+    vi.stubGlobal("Worker", StubTempoWorker);
+    try {
+      await separateAndDetectTempo();
+
+      // Four taps half a second apart on the 180 s spine (600 px mock): the
+      // strip maps client X to timeline seconds, rounded to ms.
+      const strip = screen.getByTestId("click-tap-calibration-strip");
+      vi.spyOn(strip, "getBoundingClientRect").mockReturnValue({
+        left: 0,
+        top: 0,
+        width: 600,
+        height: 64,
+        right: 600,
+        bottom: 64,
+        x: 0,
+        y: 0,
+        toJSON: () => {},
+      });
+      fireEvent.pointerDown(strip, { clientX: 300.8333, pointerId: 1 });
+      fireEvent.pointerDown(strip, { clientX: 302.5, pointerId: 2 });
+      fireEvent.pointerDown(strip, { clientX: 304.1667, pointerId: 3 });
+      fireEvent.pointerDown(strip, { clientX: 305.8333, pointerId: 4 });
+
+      // The readout derives the pulse honestly from the taps themselves:
+      // 90.25–91.75 s at 0.5 s apart is a 120 BPM pulse.
+      await waitFor(() => {
+        expect(
+          screen.getByTestId("click-tap-calibration-readout")
+        ).toHaveTextContent("pulse 500 ms");
+      });
+
+      const confirm = screen.getByTestId("click-tap-calibration-confirm");
+      expect(confirm).not.toBeDisabled();
+
+      const startsBefore = tempoWorkerStarts.length;
+      fireEvent.click(confirm);
+
+      // Mid-pass: nothing half-applied — the rail still reads the old grid
+      // and claims no by-hand decision yet.
+      expect(screen.getByTestId("click-track-bpm-label")).toHaveTextContent(
+        "107.7 BPM"
+      );
+      expect(
+        screen.getByTestId("click-track-confidence-label")
+      ).toHaveTextContent("2 readings ranked");
+
+      // The re-lock went through the same heavy-pass seam with the derived
+      // BPM as its hint (ticket 06 machinery extended, not bypassed).
+      expect(tempoWorkerStarts).toHaveLength(startsBefore + 1);
+      expect(tempoWorkerStarts[startsBefore].hintBpm).toBe(120);
+
+      fireQueuedTempoCompletions();
+      await waitFor(() => {
+        expect(screen.getByTestId("click-track-bpm-label")).toHaveTextContent(
+          "120.0 BPM · calibrated by hand"
+        );
+      });
+
+      // The confidence line names the hand decision and its taps — never a
+      // Detector claim while calibrated.
+      expect(
+        screen.getByTestId("click-track-confidence-label")
+      ).toHaveTextContent("calibrated by hand · your 4 taps anchor the grid");
+      expect(screen.queryByText(/solid reading/)).toBeNull();
+
+      // Reset clears the taps: the strip returns to its invitation.
+      fireEvent.click(screen.getByTestId("click-tap-calibration-reset"));
+      await waitFor(() => {
+        expect(
+          screen.getByTestId("click-tap-calibration-readout")
+        ).toHaveTextContent("tap 4 beats on the groove");
+      });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("refuses ragged taps honestly: a double tap never becomes a half-calibration, confirm stays disabled and no pass starts", async () => {
+    vi.stubGlobal("Worker", StubTempoWorker);
+    try {
+      await separateAndDetectTempo();
+
+      const strip = screen.getByTestId("click-tap-calibration-strip");
+      vi.spyOn(strip, "getBoundingClientRect").mockReturnValue({
+        left: 0,
+        top: 0,
+        width: 600,
+        height: 64,
+        right: 600,
+        bottom: 64,
+        x: 0,
+        y: 0,
+        toJSON: () => {},
+      });
+      fireEvent.pointerDown(strip, { clientX: 300, pointerId: 1 });
+      fireEvent.pointerDown(strip, { clientX: 301, pointerId: 2 });
+
+      await waitFor(() => {
+        expect(
+          screen.getByTestId("click-tap-calibration-readout")
+        ).toHaveTextContent("2 of 4 taps");
+      });
+
+      const confirm = screen.getByTestId("click-tap-calibration-confirm");
+      expect(confirm).toBeDisabled();
+      const startsBefore = tempoWorkerStarts.length;
+      fireEvent.click(confirm);
+
+      // Honest refusal: no Tempo Detector pass was started, and the rail
+      // keeps its automatic reading with no by-hand claim.
+      expect(tempoWorkerStarts).toHaveLength(startsBefore);
+      expect(screen.getByTestId("click-track-bpm-label")).toHaveTextContent(
+        "107.7 BPM"
+      );
+      expect(
+        screen.getByTestId("click-track-confidence-label")
+      ).toHaveTextContent("2 readings ranked");
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   // Ticket 07 (ADR-0010 Amendment — Drums Stem re-detection): once the Drums
   // Stem exists, the Tempo Detector re-reads the Beat Grid over that isolated
   // groove channel (measured Source Mix tail slips are detection-quality

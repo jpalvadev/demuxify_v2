@@ -54,6 +54,10 @@ export interface DemuxifySession {
   // lane shipped (or with the lane never enabled) simply omit it and resume
   // with the rail off by default.
   clickTrack?: ClickTrackMixerState;
+  // Hand Calibration (ticket 08): the taps-to-pulse reading the user anchored
+  // the Beat Grid to, kept when automatic detection missed. Optional like the
+  // other tempo-domain fields: sessions that never hand-calibrated omit it.
+  calibration?: SessionClickCalibration;
 }
 
 // Tempo Detector state persisted with a Session (ADR-0010): ranked BPM
@@ -68,6 +72,17 @@ export interface SessionTempoState {
   duration: number;
 }
 
+// Hand Calibration persisted with a Session (ticket 08): the pulse/BPM derived
+// from the user's taps plus the anchor tap the Beat Grid was slid to. Kept as
+// its own field, sibling to tempo: it records a by-hand decision, which is
+// never folded into the Detector's ranked candidates.
+export interface SessionClickCalibration {
+  bpm: number;
+  pulseSec: number;
+  anchorSec: number;
+  tapsSec: number[];
+}
+
 interface StoredSessionRecord {
   id: "active_session";
   sessionId: string;
@@ -76,6 +91,7 @@ interface StoredSessionRecord {
   mixer: SessionMixerState;
   tempo?: SessionTempoState;
   clickTrack?: ClickTrackMixerState;
+  calibration?: SessionClickCalibration;
   sourceMixChannelCount: number;
   sourceMixLength: number;
   stemsLengths: Record<StemName, { channelCount: number; length: number }>;
@@ -284,6 +300,29 @@ function isValidClickTrack(val: any): val is ClickTrackMixerState {
   );
 }
 
+// Same honest gate as the Click Track settings (ticket 08): a malformed or
+// half-written calibration loads as absent, never as a half-calibration.
+function isValidCalibration(val: any): val is SessionClickCalibration {
+  if (!val || typeof val !== "object") return false;
+  if (
+    typeof val.bpm !== "number" ||
+    !isFinite(val.bpm) ||
+    val.bpm <= 0 ||
+    typeof val.pulseSec !== "number" ||
+    !isFinite(val.pulseSec) ||
+    val.pulseSec <= 0 ||
+    typeof val.anchorSec !== "number" ||
+    !isFinite(val.anchorSec) ||
+    !Array.isArray(val.tapsSec) ||
+    val.tapsSec.length === 0
+  ) {
+    return false;
+  }
+  return val.tapsSec.every(
+    (t: unknown) => typeof t === "number" && isFinite(t)
+  );
+}
+
 export async function saveActiveSession(
   session: DemuxifySession
 ): Promise<void> {
@@ -367,6 +406,14 @@ export async function saveActiveSession(
             enabled: session.clickTrack.enabled,
             muted: session.clickTrack.muted,
             volume: session.clickTrack.volume,
+          }
+        : undefined,
+      calibration: session.calibration
+        ? {
+            bpm: session.calibration.bpm,
+            pulseSec: session.calibration.pulseSec,
+            anchorSec: session.calibration.anchorSec,
+            tapsSec: [...session.calibration.tapsSec],
           }
         : undefined,
       sourceMixChannelCount: session.sourceMix.channels.length,
@@ -586,6 +633,11 @@ export async function loadActiveSession(): Promise<DemuxifySession | null> {
       // default.
       clickTrack: isValidClickTrack(record.clickTrack)
         ? record.clickTrack
+        : undefined,
+      // Hand Calibration (ticket 08): absent, legacy, or malformed records
+      // load without it, exactly like the other tempo-domain fields.
+      calibration: isValidCalibration(record.calibration)
+        ? record.calibration
         : undefined,
     };
   } catch {

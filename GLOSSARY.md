@@ -87,3 +87,7 @@ _Avoid_: Tempo grid, metronome marks, quantized beats, BPM grid
 **Click Track**:
 A synthesized metronome accompaniment locked to the Beat Grid, played alongside the Stems with its own on/off, mute and volume controls; it accompanies the Stems but is not one, and never one of the four Stems identities. Every click is the same uniform tap, and the lane follows Time-Stretch with no rate control of its own.
 _Avoid_: Metronome, fifth stem, drum loop, time track
+
+**Hand Calibration**:
+The user's own four-tap reading of a groove — taps struck on the waveform spine from which the engine derives pulse (median of the inter-tap deltas) and the Beat Grid anchor (first tap), then re-anchors the Beat Grid through the same re-lock machinery with the derived BPM as hint. The guaranteed escape hatch when every automatic Tempo Detector reading misses: the rail says "calibrated by hand", never "auto".
+_Avoid_: Manual BPM, tap meter, auto calibration, beat adjustment

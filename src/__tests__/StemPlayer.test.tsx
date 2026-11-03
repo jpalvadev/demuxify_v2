@@ -12,6 +12,7 @@ import { StemName } from "../lib/chunkOverlapAdd";
 import {
   StemPlayerEngine,
   ClickTrackMixerState,
+  CalibratedClickGrid,
 } from "../lib/stemPlayerEngine";
 import * as customMixdown from "../lib/customMixdown";
 import { createMockAudioContext } from "./audioContextMockFactory";
@@ -615,6 +616,51 @@ describe("StemPlayer UI Component", () => {
       "aria-label",
       "Re-lock Beat Grid to 215.4 BPM"
     );
+  });
+
+  it("says calibrated by hand for a hand-anchored grid: the BPM line owns the claim, the confidence line names the taps, never an auto reading", () => {
+    const handCalibration: CalibratedClickGrid = {
+      kind: "calibrated",
+      pulseSec: 0.5,
+      bpm: 120,
+      anchorSec: 90.25,
+      tapsSec: [90.25, 90.75, 91.25, 91.75],
+    };
+
+    render(
+      <StemPlayer
+        stems={dummyStems}
+        sampleRate={sampleRate}
+        audioContext={mockCtx}
+        beatGrid={Float64Array.from([0.25, 0.75, 1.25])}
+        clickTrackBpm={120}
+        clickCalibration={handCalibration}
+        tempoCandidates={[
+          { bpm: 107.7, confidence: 0.93 },
+          { bpm: 215.4, confidence: 0.61 },
+        ]}
+        onChooseTempoCandidate={() => {}}
+      />
+    );
+
+    // The BPM line carries the claim: the grid reads at the tapped pulse,
+    // and it is owned as a hand decision.
+    expect(screen.getByTestId("click-track-bpm-label")).toHaveTextContent(
+      "120.0 BPM · calibrated by hand"
+    );
+
+    // The confidence line names the taps behind the grid: never the
+    // Detector's "solid reading" wording while a hand decision holds.
+    expect(
+      screen.getByTestId("click-track-confidence-label")
+    ).toHaveTextContent("calibrated by hand · your 4 taps anchor the grid");
+    expect(screen.queryByText(/solid reading/)).toBeNull();
+
+    // The candidate picker stays intact: hand calibration replaces the
+    // Beat Grid, it does not hide the Detector's ranked readings.
+    const picker = screen.getByTestId("click-track-candidate-picker");
+    const chips = within(picker).getAllByRole("button");
+    expect(chips).toHaveLength(2);
   });
 
   it("hands the rail's candidate picker to the app: choosing an alternative asks for a re-lock at that tempo", async () => {

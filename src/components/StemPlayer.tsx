@@ -18,6 +18,7 @@ import {
   StemMixerStates,
   TimeStretchState,
   ClickTrackMixerState,
+  CalibratedClickGrid,
 } from "../lib/stemPlayerEngine";
 import { StemStrip } from "./StemStrip";
 import { MasterWaveform } from "./MasterWaveform";
@@ -94,6 +95,10 @@ export interface StemPlayerProps {
   // The rail's picker: the app re-runs the Tempo Detector with the chosen
   // tempo as hint, then swaps the Beat Grid when the re-lock arrives.
   onChooseTempoCandidate?: (bpm: number) => void;
+  // Hand Calibration (ticket 08): set when the user tapped beats and the
+  // Beat Grid was re-anchored by hand instead of the Detector. The rail says
+  // "calibrated by hand" — it never calls a by-hand decision an auto reading.
+  clickCalibration?: CalibratedClickGrid | null;
 }
 
 function formatTime(totalSeconds: number): string {
@@ -150,6 +155,7 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
   onClickTrackState,
   tempoCandidates,
   onChooseTempoCandidate,
+  clickCalibration,
 }) => {
   const engineRef = useRef<StemPlayerEngine | null>(null);
 
@@ -659,7 +665,9 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
             className="text-xs font-bold text-foreground"
           >
             {clickTrackBpm !== null && clickTrackBpm !== undefined
-              ? `${clickTrackBpm.toFixed(1)} BPM`
+              ? clickCalibration
+                ? `${clickTrackBpm.toFixed(1)} BPM · calibrated by hand`
+                : `${clickTrackBpm.toFixed(1)} BPM`
               : "No Beat Grid"}
           </span>
         </div>
@@ -680,9 +688,11 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
               data-testid="click-track-confidence-label"
               className="text-[11px] font-mono text-muted-foreground"
             >
-              {isConfidentReading(tempoCandidates)
-                ? `solid reading · confidence ${formatConfidence(tempoCandidates[0].confidence)}`
-                : `${tempoCandidates.length} readings ranked · pick the feel you hear`}
+              {clickCalibration
+                ? `calibrated by hand · your ${clickCalibration.tapsSec.length} taps anchor the grid`
+                : isConfidentReading(tempoCandidates)
+                  ? `solid reading · confidence ${formatConfidence(tempoCandidates[0].confidence)}`
+                  : `${tempoCandidates.length} readings ranked · pick the feel you hear`}
             </span>
             <div
               data-testid="click-track-candidate-picker"
