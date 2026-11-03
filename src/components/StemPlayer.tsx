@@ -523,8 +523,90 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
         className
       )}
     >
-      {/* Player Header with Title and Global Transport */}
-      <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 border-b border-border/60 pb-4">
+      {/* Tempo Detector candidate Rail (ADR-0013, ticket 08): the picker is
+          decision support for the Beat Grid, not part of the Click Track lane's
+          on/off-and-volume contract, so it owns its own Rail and sits first —
+          the Mix stage reads in the order the work is done: hear the ranked
+          readings and pick the feel, then mix, then bend the rate. */}
+      {tempoCandidates && tempoCandidates.length > 0 && (
+        <div
+          role="group"
+          aria-label="Tempo Detector candidates (ranked)"
+          data-testid="tempo-candidates-rail"
+          className="flex flex-col items-stretch gap-3 rounded-none border border-primary/30 bg-secondary/40 p-3 transition-colors shadow-xs"
+        >
+          {/* Candidates readout (ticket 06): the Tempo Detector ranks a top
+              reading plus ranked alternatives, each with its confidence, and a
+              pulse and its metric doubling are genuinely indistinguishable — so
+              nothing here claims one BPM as certain. The chips are the picker:
+              picking one asks the app to re-run the Tempo Detector with that
+              tempo as hint, which re-locks the Beat Grid. Domain-separate:
+              candidates are never Stems. */}
+          <div
+            data-testid="click-track-tempo-readout"
+            className="flex flex-col gap-1.5 shrink-0 sm:w-46"
+          >
+            <span
+              data-testid="click-track-confidence-label"
+              className="text-[11px] font-mono text-muted-foreground"
+            >
+              {clickCalibration
+                ? `calibrated by hand · your ${clickCalibration.tapsSec.length} taps anchor the grid`
+                : isConfidentReading(tempoCandidates)
+                  ? `solid reading · confidence ${formatConfidence(tempoCandidates[0].confidence)}`
+                  : `${tempoCandidates.length} readings ranked · pick the feel you hear`}
+            </span>
+            <div
+              data-testid="click-track-candidate-picker"
+              className="grid grid-cols-2 gap-1"
+            >
+              {tempoCandidates.map((candidate) => {
+                const locked = isLockedCandidate(
+                  candidate.bpm,
+                  clickTrackBpm ?? null
+                );
+                const bpmLabel = `${candidate.bpm.toFixed(1)} BPM`;
+                return (
+                  <button
+                    key={bpmLabel}
+                    type="button"
+                    aria-label={
+                      locked
+                        ? `Beat Grid locked to ${bpmLabel}`
+                        : `Re-lock Beat Grid to ${bpmLabel}`
+                    }
+                    aria-pressed={locked}
+                    title={bpmLabel}
+                    disabled={locked || !onChooseTempoCandidate}
+                    onClick={() => {
+                      if (!locked) {
+                        onChooseTempoCandidate?.(candidate.bpm);
+                      }
+                    }}
+                    className={cn(
+                      "px-2 py-1 rounded-none border text-[11px] font-mono font-bold transition-all flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed",
+                      locked
+                        ? "border-primary/70 bg-primary/25 text-primary cursor-default"
+                        : "border-border/70 bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground"
+                    )}
+                  >
+                    {`${bpmLabel} ${formatConfidence(candidate.confidence)}`}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Transport row: the "Multi-Track Stem Player" title, its Layers mark and
+          tagline surviving at the row's head, transport controls beside them —
+          the Mix stage's one mm:ss clock. Named per ADR-0013 so the rail-order
+          seams can pin what comes before it. */}
+      <div
+        data-testid="transport-row"
+        className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 border-b border-border/60 pb-4"
+      >
         <div className="flex items-center gap-2.5">
           <div className="flex h-9 w-9 items-center justify-center rounded-none bg-primary/10 border border-primary/20 text-primary">
             <Layers className="h-5 w-5" />
@@ -630,11 +712,51 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
         </div>
       </div>
 
-      {/* Click Track rail (ADR-0010, ticket 04): sits beside the Transport, and
-          because it lives inside the Stem Player it only exists once the Mix is
-          live. Look is agent-authored — the ticket-01 OpenDesign run died (see
-          its FALLBACK RECORD) — and stays on the same HSL token architecture as
-          the rest of the Tab Shell. The lane is domain-separate: never a Stem. */}
+      {/* Stem Strips (ADR-0013, ticket 08): the thing you actually mix, right
+          after the Transport row and before the Click Track lane — the stage
+          reads in the order the work is done. */}
+      <div className="space-y-2.5">
+        <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-muted-foreground px-1">
+          <span>Stems</span>
+          <span className="hidden sm:inline font-normal lowercase text-[11px] text-muted-foreground/80">
+            Solo (S) isolations mute unselected stems • Mute (M) silences stem
+          </span>
+        </div>
+
+        {STEM_NAMES.map((stem) => {
+          const state = mixerStates[stem];
+          const isSilenced = hasAnySolo
+            ? !state.solo || state.muted
+            : state.muted;
+          const stemBuffer = engineRef.current?.getStemBuffer(stem);
+
+          return (
+            <StemStrip
+              key={stem}
+              stem={stem}
+              settings={state}
+              audioBuffer={stemBuffer}
+              duration={duration}
+              currentTime={currentTime}
+              isSilenced={isSilenced}
+              onVolumeChange={(vol) => handleVolumeChange(stem, vol)}
+              onToggleMute={() => handleToggleMute(stem)}
+              onToggleSolo={() => handleToggleSolo(stem)}
+              onSeek={handleSeek}
+            />
+          );
+        })}
+      </div>
+
+      {/* Click Track rail (ADR-0010, ticket 04): the last mixer lane — after
+          the four Stem Strips — and because it lives inside the Stem Player it
+          only exists once the Mix is live. Mix Tab cohesion (ADR-0013, ticket
+          08): the lane keeps exactly its on/off switch, its volume fader and
+          its one readout of the Beat Grid it is locked to; the candidate picker
+          moved to its own Rail ahead of the Transport row. Look is agent-authored
+          — the ticket-01 OpenDesign run died (see its FALLBACK RECORD) — and
+          stays on the same HSL token architecture as the rest of the Tab Shell.
+          The lane is domain-separate: never a Stem. */}
       <div
         role="group"
         aria-label="Click Track"
@@ -676,70 +798,6 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
               : "No Beat Grid"}
           </span>
         </div>
-
-        {/* Candidates readout (ticket 06): the Tempo Detector ranks a top
-            reading plus ranked alternatives, each with its confidence, and a
-            pulse and its metric doubling are genuinely indistinguishable — so
-            nothing here claims one BPM as certain. The chips are the picker:
-            picking one asks the app to re-run the Tempo Detector with that
-            tempo as hint, which re-locks the Beat Grid. Domain-separate:
-            candidates are never Stems. */}
-        {tempoCandidates && tempoCandidates.length > 0 && (
-          <div
-            data-testid="click-track-tempo-readout"
-            className="flex flex-col gap-1.5 shrink-0 sm:w-46"
-          >
-            <span
-              data-testid="click-track-confidence-label"
-              className="text-[11px] font-mono text-muted-foreground"
-            >
-              {clickCalibration
-                ? `calibrated by hand · your ${clickCalibration.tapsSec.length} taps anchor the grid`
-                : isConfidentReading(tempoCandidates)
-                  ? `solid reading · confidence ${formatConfidence(tempoCandidates[0].confidence)}`
-                  : `${tempoCandidates.length} readings ranked · pick the feel you hear`}
-            </span>
-            <div
-              data-testid="click-track-candidate-picker"
-              className="grid grid-cols-2 gap-1"
-            >
-              {tempoCandidates.map((candidate) => {
-                const locked = isLockedCandidate(
-                  candidate.bpm,
-                  clickTrackBpm ?? null
-                );
-                const bpmLabel = `${candidate.bpm.toFixed(1)} BPM`;
-                return (
-                  <button
-                    key={bpmLabel}
-                    type="button"
-                    aria-label={
-                      locked
-                        ? `Beat Grid locked to ${bpmLabel}`
-                        : `Re-lock Beat Grid to ${bpmLabel}`
-                    }
-                    aria-pressed={locked}
-                    title={bpmLabel}
-                    disabled={locked || !onChooseTempoCandidate}
-                    onClick={() => {
-                      if (!locked) {
-                        onChooseTempoCandidate?.(candidate.bpm);
-                      }
-                    }}
-                    className={cn(
-                      "px-2 py-1 rounded-none border text-[11px] font-mono font-bold transition-all flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed",
-                      locked
-                        ? "border-primary/70 bg-primary/25 text-primary cursor-default"
-                        : "border-border/70 bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground"
-                    )}
-                  >
-                    {`${bpmLabel} ${formatConfidence(candidate.confidence)}`}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
 
         {/* Mixer controls: enable switch (off by default), mute, volume — like a
             lane, with no rate control of its own (Time-Stretch owns the rate). */}
@@ -1023,40 +1081,6 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
             </div>
           </div>
         </div>
-      </div>
-
-      {/* 4 Stem Strips List */}
-      <div className="space-y-2.5">
-        <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-muted-foreground px-1">
-          <span>Stems</span>
-          <span className="hidden sm:inline font-normal lowercase text-[11px] text-muted-foreground/80">
-            Solo (S) isolations mute unselected stems • Mute (M) silences stem
-          </span>
-        </div>
-
-        {STEM_NAMES.map((stem) => {
-          const state = mixerStates[stem];
-          const isSilenced = hasAnySolo
-            ? !state.solo || state.muted
-            : state.muted;
-          const stemBuffer = engineRef.current?.getStemBuffer(stem);
-
-          return (
-            <StemStrip
-              key={stem}
-              stem={stem}
-              settings={state}
-              audioBuffer={stemBuffer}
-              duration={duration}
-              currentTime={currentTime}
-              isSilenced={isSilenced}
-              onVolumeChange={(vol) => handleVolumeChange(stem, vol)}
-              onToggleMute={() => handleToggleMute(stem)}
-              onToggleSolo={() => handleToggleSolo(stem)}
-              onSeek={handleSeek}
-            />
-          );
-        })}
       </div>
 
       {/* Export panel fallback — standalone form only; the hosted app form

@@ -1598,10 +1598,11 @@ describe("App UI Shell", () => {
       supported: true,
       isFallback: false,
     });
-    completeSeparationMocks();
-
-    render(<App />);
-    await loadAndSeparate();
+    // Mix Tab cohesion (ADR-0013, ticket 08): the rail-order chain below needs
+    // the Tempo Detector's ranked readings, so this seam runs the full stage —
+    // separation plus the queued decode-time BPM pass over the worker stub.
+    vi.stubGlobal("Worker", StubTempoWorker);
+    await separateAndDetectTempo();
 
     // Separate Tab keeps ingestion: the Source Mix dropzone lives there
     const separateTab = screen.getByRole("region", { name: /separate tab/i });
@@ -1611,14 +1612,39 @@ describe("App UI Shell", () => {
 
     // Mix Tab hosts the shared Master Waveform spine and the Stem Player
     const mixTab = screen.getByRole("region", { name: /mix tab/i });
-    expect(
-      within(mixTab).getByRole("slider", {
-        name: /master waveform timeline/i,
-      })
-    ).toBeInTheDocument();
+    const spine = within(mixTab).getByRole("slider", {
+      name: /master waveform timeline/i,
+    });
+    expect(spine).toBeInTheDocument();
     expect(
       within(mixTab).getByRole("region", { name: /stem player/i })
     ).toBeInTheDocument();
+
+    // Mix Tab cohesion (ADR-0013, ticket 08): one rail order at every
+    // breakpoint — the stage reads in the order the work is done. The whole-app
+    // seam walks the Mix stage top-down: spine → Hand Calibration tap lane →
+    // the Tempo Detector candidate picker (now its own Rail) → the Transport
+    // row → the Stem Strips → the Click Track lane → Time-Stretch last.
+    const tapStrip = within(mixTab).getByTestId("click-tap-calibration-strip");
+    const pickerRail = within(mixTab).getByTestId("tempo-candidates-rail");
+    const transportRow = within(mixTab).getByTestId("transport-row");
+    const firstStrip = within(mixTab).getAllByRole("group", {
+      name: /stem$/i,
+    })[0];
+    const clickRail = within(mixTab).getByTestId("click-track-rail");
+    const timeStretchPanel = within(mixTab).getByRole("slider", {
+      name: /playback tempo/i,
+    });
+    for (const [earlier, later] of [
+      [spine, tapStrip],
+      [tapStrip, pickerRail],
+      [pickerRail, transportRow],
+      [transportRow, firstStrip],
+      [firstStrip, clickRail],
+      [clickRail, timeStretchPanel],
+    ]) {
+      expect(earlier.compareDocumentPosition(later) & 4).not.toBe(0);
+    }
 
     // System Tab hosts the WebGPU status badge
     const systemTab = screen.getByRole("region", { name: /system tab/i });

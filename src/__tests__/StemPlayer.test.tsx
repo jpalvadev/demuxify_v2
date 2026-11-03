@@ -570,6 +570,14 @@ describe("StemPlayer UI Component", () => {
         onClickTrackState={(state) => {
           reported.push(state);
         }}
+        // Mix Tab cohesion (ADR-0013, ticket 08): the rail contract is pinned
+        // with ranked readings live, so a picker that slipped back into the
+        // lane would turn the absence assertions below red.
+        tempoCandidates={[
+          { bpm: 107.7, confidence: 0.93 },
+          { bpm: 215.4, confidence: 0.61 },
+        ]}
+        onChooseTempoCandidate={() => {}}
       />
     );
 
@@ -592,6 +600,12 @@ describe("StemPlayer UI Component", () => {
     expect(
       within(railRoot).getAllByRole("slider", { name: /click track volume/i })
     ).toHaveLength(1);
+    // Mix Tab cohesion (ADR-0013, ticket 08): the candidate picker is its own
+    // Rail ahead of the Transport row, not a guest inside the lane — with the
+    // ranked readings above live, the picker island must still be absent here.
+    expect(
+      within(railRoot).queryByTestId("click-track-candidate-picker")
+    ).toBeNull();
     const enabledRailState: ClickTrackMixerState = {
       enabled: true,
       volume: 1,
@@ -655,6 +669,20 @@ describe("StemPlayer UI Component", () => {
     expect(chips[1]).toHaveAttribute(
       "aria-label",
       "Re-lock Beat Grid to 215.4 BPM"
+    );
+
+    // ADR-0013 (ticket 08): the picker is its own Rail — a named group, not a
+    // guest inside the Click Track lane — and it renders before the Transport
+    // row: the Mix stage reads hear-the-readings first.
+    const candidatesRail = screen.getByTestId("tempo-candidates-rail");
+    expect(candidatesRail).toHaveAttribute("role", "group");
+    expect(candidatesRail).toHaveAttribute(
+      "aria-label",
+      "Tempo Detector candidates (ranked)"
+    );
+    const transportRow = screen.getByTestId("transport-row");
+    expect(candidatesRail.compareDocumentPosition(transportRow) & 4).not.toBe(
+      0
     );
   });
 
