@@ -294,7 +294,8 @@ function isValidClickTrack(val: any): val is ClickTrackMixerState {
   if (!val || typeof val !== "object") return false;
   return (
     typeof val.enabled === "boolean" &&
-    typeof val.muted === "boolean" &&
+    // Mix Rail Tidy-Up (ticket 03): a legacy payload may still carry a
+    // muted key — it is not required here and load drops it (below).
     typeof val.volume === "number" &&
     !isNaN(val.volume)
   );
@@ -404,7 +405,6 @@ export async function saveActiveSession(
       clickTrack: session.clickTrack
         ? {
             enabled: session.clickTrack.enabled,
-            muted: session.clickTrack.muted,
             volume: session.clickTrack.volume,
           }
         : undefined,
@@ -631,8 +631,14 @@ export async function loadActiveSession(): Promise<DemuxifySession | null> {
       // Same on the Click Track lane settings (ticket 05): absent, legacy, or
       // malformed records load without it, and the rail resumes off by
       // default.
+      // Mix Rail Tidy-Up (ticket 03): the lane is reconstituted reduced, so
+      // a legacy record still carrying a mute flag loads without it and an
+      // old muted:true never resurfaces as behavior (ADR-0010 Amendment).
       clickTrack: isValidClickTrack(record.clickTrack)
-        ? record.clickTrack
+        ? {
+            enabled: record.clickTrack.enabled,
+            volume: record.clickTrack.volume,
+          }
         : undefined,
       // Hand Calibration (ticket 08): absent, legacy, or malformed records
       // load without it, exactly like the other tempo-domain fields.

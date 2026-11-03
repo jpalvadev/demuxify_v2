@@ -520,10 +520,9 @@ describe("StemPlayer UI Component", () => {
     fireEvent.click(enableSwitch);
     expect(enableSwitch).toHaveAttribute("aria-checked", "false");
 
-    // The rail's initial state is reported out: off, un-muted, full volume.
+    // The rail's initial state is reported out: off, full volume.
     const initialRailState: ClickTrackMixerState = {
       enabled: false,
-      muted: false,
       volume: 1,
     };
     expect(reported[0]).toEqual(initialRailState);
@@ -551,9 +550,20 @@ describe("StemPlayer UI Component", () => {
     expect(liveSwitch.getAttribute("disabled")).toBeNull();
     fireEvent.click(liveSwitch);
     expect(liveSwitch).toHaveAttribute("aria-checked", "true");
+    // Mix Rail Tidy-Up (ticket 03): the rail exposes exactly one control pair
+    // — the ♪ on/off switch and the volume slider. The separate "M" mute
+    // button died with the concept, so nothing else may live in the rail.
+    const railRoot = screen.getByTestId("click-track-rail");
+    expect(
+      within(railRoot).getAllByRole("switch", { name: /^click track$/i })
+    ).toHaveLength(1);
+    // The dead M button would be the rail's only role-button: zero now.
+    expect(within(railRoot).queryAllByRole("button")).toHaveLength(0);
+    expect(
+      within(railRoot).getAllByRole("slider", { name: /click track volume/i })
+    ).toHaveLength(1);
     const enabledRailState: ClickTrackMixerState = {
       enabled: true,
-      muted: false,
       volume: 1,
     };
     expect(reported[reported.length - 1]).toEqual(enabledRailState);

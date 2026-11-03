@@ -28,9 +28,10 @@ export interface TimeStretchState {
 // StemName union (vocals/drums/bass/other) is not widened here and
 // nowhere else. State is parallel to StemMixerState but has no solo and
 // deliberately no rate control of its own: it follows Time-Stretch.
+// Mix Rail Tidy-Up (ADR-0010 Amendment): no mute flag either — the lane's
+// concept is {enabled, volume}, and volume 0 is its own silence.
 export interface ClickTrackMixerState {
   enabled: boolean; // defaults to off: opening the Mix tab never surprises
-  muted: boolean;
   volume: number; // 0.0 to 1.0, like a Stem lane
 }
 
@@ -223,7 +224,6 @@ export class StemPlayerEngine {
   private sampleRate: number = 44100;
   private clickTrackState: ClickTrackMixerState = {
     enabled: false,
-    muted: false,
     volume: 1.0,
   };
   private beatGrid: Float64Array | null = null;
@@ -317,7 +317,6 @@ export class StemPlayerEngine {
     if (options?.initialClickTrack) {
       this.clickTrackState = {
         enabled: options.initialClickTrack.enabled,
-        muted: options.initialClickTrack.muted,
         volume: Math.max(0, Math.min(1, options.initialClickTrack.volume)),
       };
     }
@@ -611,15 +610,8 @@ export class StemPlayerEngine {
     this.setClickTrackEnabled(!this.clickTrackState.enabled);
   }
 
-  public setClickTrackMuted(muted: boolean): void {
-    this.clickTrackState.muted = muted;
-    this.applyClickGain();
-  }
-
-  public toggleClickTrackMute(): void {
-    this.setClickTrackMuted(!this.clickTrackState.muted);
-  }
-
+  // Mix Rail Tidy-Up (ticket 03, ADR-0010 Amendment): there is no setClickTrackMuted
+  // and no toggleClickTrackMute anymore — the lane has no mute concept to set.
   public setClickTrackVolume(volume: number): void {
     this.clickTrackState.volume = Math.max(0, Math.min(1, volume));
     this.applyClickGain();
@@ -633,10 +625,9 @@ export class StemPlayerEngine {
       this.clickGainNode = this.audioContext.createGain();
       this.clickGainNode.connect(this.masterGainNode);
     }
-    const effectiveGain =
-      this.clickTrackState.enabled && !this.clickTrackState.muted
-        ? this.clickTrackState.volume
-        : 0;
+    const effectiveGain = this.clickTrackState.enabled
+      ? this.clickTrackState.volume
+      : 0;
     this.clickGainNode.gain.setValueAtTime(
       effectiveGain,
       this.audioContext.currentTime

@@ -221,7 +221,6 @@ describe("sessionStore", () => {
     // settings above are untouched by this field.
     const clickTrack: ClickTrackMixerState = {
       enabled: true,
-      muted: false,
       volume: 0.6,
     };
     const mockSession = createMockSession({ clickTrack });
@@ -280,7 +279,6 @@ describe("sessionStore", () => {
     // one — a resumed Session simply gets the lane as it is stored now.
     const resumedClickTrack: ClickTrackMixerState = {
       enabled: true,
-      muted: false,
       volume: 0.5,
     };
     const mockSession = createMockSession({
@@ -292,6 +290,26 @@ describe("sessionStore", () => {
     if (loaded) {
       expect(loaded.clickTrack).toEqual(resumedClickTrack);
     }
+  });
+
+  it("loads legacy Click Track lane payloads carrying a mute flag as the reduced lane", async () => {
+    // Mix Rail Tidy-Up (ticket 03): the mute control died, so old persisted
+    // lanes still validate — the extra muted key is simply dropped, the rest
+    // round-trips, and an old muted:true payload loads as the lane exactly as
+    // it is now (enabled + volume), never as a refusal.
+    const legacyStoredLane = {
+      enabled: true,
+      muted: true,
+      volume: 0.5,
+    };
+    const mockSession = createMockSession({
+      clickTrack: legacyStoredLane as unknown as ClickTrackMixerState,
+    });
+    await saveActiveSession(mockSession);
+    const loaded = await loadActiveSession();
+    expect(loaded).not.toBeNull();
+    if (!loaded) return;
+    expect(loaded.clickTrack).toEqual({ enabled: true, volume: 0.5 });
   });
 
   it("clears active session safely and releases storage", async () => {

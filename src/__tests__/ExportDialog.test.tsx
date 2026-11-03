@@ -496,7 +496,6 @@ describe("ExportDialog", () => {
     const beatGrid = Float64Array.from([0.5, 1.0572789, 1.6145578]);
     const enabled: ClickTrackMixerState = {
       enabled: true,
-      muted: false,
       volume: 0.7,
     };
 
@@ -560,7 +559,6 @@ describe("ExportDialog", () => {
         clickTrackBeatGrid={beatGrid}
         clickTrackSettings={{
           enabled: true,
-          muted: false,
           volume: 1,
         }}
       />
@@ -621,7 +619,6 @@ describe("ExportDialog", () => {
     const user = userEvent.setup();
     const enabled: ClickTrackMixerState = {
       enabled: true,
-      muted: false,
       volume: 1,
     };
     render(

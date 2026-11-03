@@ -967,7 +967,6 @@ describe("App UI Shell", () => {
       // parallel to the Stem mixer contract — the rail must resume switched ON.
       clickTrack: {
         enabled: true,
-        muted: false,
         volume: 0.6,
       },
     });

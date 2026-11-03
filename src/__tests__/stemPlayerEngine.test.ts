@@ -771,9 +771,10 @@ describe("StemPlayerEngine", () => {
       });
 
       const lane: ClickTrackMixerState = engine.getClickTrackState();
+      // Mix Rail Tidy-Up (ticket 03): the lane concept is {enabled, volume};
+      // the separate mute flag died end to end.
       const expectedLaneOff: ClickTrackMixerState = {
         enabled: false,
-        muted: false,
         volume: 1.0,
       };
       expect(lane).toEqual(expectedLaneOff);
@@ -863,7 +864,7 @@ describe("StemPlayerEngine", () => {
       expect(mockCtx.createdSources[5].start).toHaveBeenCalledWith(14, 4);
     });
 
-    it("mutes and volumes the lane exactly like a Stem lane", () => {
+    it("volumes the lane exactly like a Stem lane: zero volume is the lane's silence", () => {
       const engine = new StemPlayerEngine(dummyStems, {
         audioContext: mockCtx as any,
         sampleRate,
@@ -876,15 +877,13 @@ describe("StemPlayerEngine", () => {
 
       engine.setClickTrackVolume(0.4);
       expect(clickGain.gain.value).toBeCloseTo(0.4, 6);
-      engine.toggleClickTrackMute();
+      engine.setClickTrackVolume(0);
       expect(clickGain.gain.value).toBe(0);
-      engine.toggleClickTrackMute();
-      expect(clickGain.gain.value).toBeCloseTo(0.4, 6);
       engine.setClickTrackVolume(1.5); // clamped like a Stem lane
       expect(clickGain.gain.value).toBe(1.0);
     });
 
-    it("volume, mute, and a transport seek never rebuild the click channel", async () => {
+    it("volume and a transport seek never rebuild the click channel", async () => {
       const engine = new StemPlayerEngine(dummyStems, {
         audioContext: mockCtx as any,
         sampleRate,
@@ -894,10 +893,8 @@ describe("StemPlayerEngine", () => {
       await engine.play();
       expect(mockCtx.createBuffer).toHaveBeenCalledTimes(5);
 
-      // Volume, mute, and a transport seek never rebuild the channel.
+      // Volume and a transport seek never rebuild the channel.
       engine.setClickTrackVolume(0.7);
-      engine.toggleClickTrackMute();
-      engine.toggleClickTrackMute();
       expect(mockCtx.createBuffer).toHaveBeenCalledTimes(5);
     });
 
@@ -1013,7 +1010,6 @@ describe("StemPlayerEngine", () => {
       // where they were.
       const expectedLaneAfterSwap: ClickTrackMixerState = {
         enabled: true,
-        muted: false,
         volume: 0.7,
       };
       expect(engine.getClickTrackState()).toEqual(expectedLaneAfterSwap);

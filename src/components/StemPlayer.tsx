@@ -113,7 +113,6 @@ function formatTime(totalSeconds: number): string {
 // opening the Mix tab never surprises the user with a metronome over the Stems.
 const CLICK_TRACK_DEFAULT: ClickTrackMixerState = {
   enabled: false,
-  muted: false,
   volume: 1.0,
 };
 
@@ -488,13 +487,8 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
     onClickTrackState?.(engine.getClickTrackState());
   }, [onClickTrackState]);
 
-  const handleToggleClickTrackMute = useCallback(() => {
-    const engine = engineRef.current;
-    if (!engine) return;
-    engine.toggleClickTrackMute();
-    setClickTrack(engine.getClickTrackState());
-    onClickTrackState?.(engine.getClickTrackState());
-  }, [onClickTrackState]);
+  // Mix Rail Tidy-Up (ticket 03): no handleToggleClickTrackMute — the rail
+  // has no M button to press (ADR-0010 Amendment).
 
   const handleSetClickTrackVolume = useCallback(
     (volume: number) => {
@@ -758,25 +752,10 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
             >
               ♪
             </button>
-            <button
-              type="button"
-              aria-label="Mute Click Track"
-              aria-pressed={clickTrack.muted}
-              title="Mute Click Track"
-              onClick={handleToggleClickTrackMute}
-              className={cn(
-                "h-8 w-8 rounded-none border text-xs font-bold transition-all flex items-center justify-center",
-                clickTrack.muted
-                  ? "border-destructive/60 bg-destructive text-destructive-foreground shadow-xs"
-                  : "border-border/70 bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground"
-              )}
-            >
-              M
-            </button>
           </div>
 
           <div className="flex items-center gap-2 w-32 sm:w-36">
-            {clickTrack.muted ? (
+            {clickTrack.volume === 0 ? (
               <VolumeX className="h-4 w-4 text-muted-foreground/60 shrink-0" />
             ) : (
               <Volume2 className="h-4 w-4 text-muted-foreground shrink-0" />

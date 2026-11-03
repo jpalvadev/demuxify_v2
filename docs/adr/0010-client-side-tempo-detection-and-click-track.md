@@ -20,6 +20,31 @@ The rejection above kept the wrong axis. Its anchor ("107.7 BPM, 503 vs 513 beat
 
 Adopted: on Separation completion the Tempo Detector re-runs over the Drums Stem's channel-averaged samples, abandoning any Source Mix pass still in flight (ticket 06's one-pass-at-a-time rule); with no usable Drums samples the decode-time Source Mix reading stays untouched, and a failing stem pass keeps the existing reading (fallback, never a gap). Re-lock and Session-recovery passes follow the same channel policy. Honest boundary: the stem-channel tail A/B could NOT be re-measured on this machine (no isolated stems on disk; separation is client-side), so what ships grounded here is the channel-level attribution of the tail defect — the grid-quality A/B lands on the user's own material in the app. Recorded on ticket 07; the guaranteed manual escape hatch when both channels miss is ticket 08 (four-tap Click calibration), deferred behind an OpenDesign run.
 
+## Amendment — the Click Track lane loses its mute control (2026-11-02)
+
+The rail kept a separate "M" button (`aria-label="Mute Click Track"`) next to the
+♪ switch and the Volume slider. Rejected as a live affordance: it is a third
+route to silence the same lane (switch off, volume 0, mute), and it was the only
+mute affordance in the Mix rail area whose counterpart on the Stem rows — the
+Stem Strip's M buttons — is a genuinely live control the lanes need. Adopted:
+the mute concept dies end to end. `ClickTrackMixerState` is `{enabled, volume}`
+and nothing mute-shaped comes back to the lane; `setClickTrackMuted`,
+`toggleClickTrackMute` and `handleToggleClickTrackMute` are deleted; the rail
+renders exactly the ♪ switch and the slider; the VolumeX icon retires to what
+the slider actually shows (`volume === 0`); and the lane's silence gets its two
+honest routes: the ♪ switch, and dragging the slider to 0.
+
+No back-compat for this retirement: removing a UI affordance moves nothing, so
+there is no before/after pair to pin. `sessionStore` keeps the load gate honest
+instead — `isValidClickTrack` no longer requires the `muted` key, so a legacy
+payload still carrying one validates, and `loadActiveSession` reconstitutes the
+lane reduced as `{enabled, volume}`: an old `muted: true` never resurfaces as
+behavior and never refuses the load (the ADR-0011 Amendment's legacy-payload
+rule, followed). `check:retired-affordances` grows the mute-symbol bans so a
+revival fails at commit time (ticket 05). The export gate (`enabled && beatGrid.length`)
+never consulted mute, so the Click Track export stays byte-identical — its tests
+retarget the type shape and stay green as that parity proof.
+
 ## Amendment — hand-calibration escape hatch adopted: Calibrate the Click (2026-11-02)
 
 Both automatic channels can miss the same groove, and at that point the honest options are "here are my ranked readings" (wrong) or silence. Adopted instead: a guaranteed manual route. The user taps four beats on the Mix Tab spine (the `BeatGridTapCalibration` strip); derivation is pure arithmetic at the engine seam, `calibrateClickGrid` in `src/lib/stemPlayerEngine.ts` — pulse is the median of the sorted inter-tap deltas, the grid anchor is the first tap, and fewer than three taps or any gap under 0.25 s (240 BPM) or over 2.5 s (24 BPM) is refused with a named reason, never folded into a half-calibration. Confirm re-locks through the exact ticket-06 machinery (one heavy pass, hint = derived BPM), then `reanchorBeatGridToAnchor` slides the Beat Grid as one rigid body by the smallest shift mod pulse that lands a beat on the tap lattice — the Detector's beat positions stay (they follow the drums), only the anchor moves, and no grid is ever re-derived from the BPM number alone.

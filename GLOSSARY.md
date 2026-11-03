@@ -85,7 +85,7 @@ The estimated beat positions across the full timeline of a Source Mix, carrying 
 _Avoid_: Tempo grid, metronome marks, quantized beats, BPM grid
 
 **Click Track**:
-A synthesized metronome accompaniment locked to the Beat Grid, played alongside the Stems with its own on/off, mute and volume controls; it accompanies the Stems but is not one, and never one of the four Stems identities. Every click is the same uniform tap, and the lane follows Time-Stretch with no rate control of its own.
+A synthesized metronome accompaniment locked to the Beat Grid, played alongside the Stems with its own on/off and volume controls; it accompanies the Stems but is not one, and never one of the four Stems identities. Every click is the same uniform tap, and the lane follows Time-Stretch with no rate control of its own.
 _Avoid_: Metronome, fifth stem, drum loop, time track
 
 **Hand Calibration**:
