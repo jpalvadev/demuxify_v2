@@ -575,6 +575,118 @@ describe("App UI Shell", () => {
     ).toBeInTheDocument();
   });
 
+  it("flattens the Stem Player outer frames below md and re-rules them from md and up", async () => {
+    // Mix-Rail Tidy-Up (ticket 01): below md the Mix stage sits in exactly one
+    // frame — the Tab Shell stage panel — so the Stem Player root and the
+    // Time-Stretch & Pitch wrapper carry their hairline only as an md: class
+    // token pair. grz-18 precedent: the DOM seam cannot evaluate media
+    // queries, so responsive truth is asserted through class tokens.
+    vi.spyOn(webgpuModule, "detectWebGPUCapability").mockResolvedValue({
+      supported: true,
+      isFallback: false,
+    });
+    vi.spyOn(InferenceClient.prototype, "init").mockResolvedValue({
+      backend: "webgpu",
+    });
+    vi.spyOn(InferenceClient.prototype, "separate").mockResolvedValue({
+      stems: {
+        vocals: [new Float32Array(500), new Float32Array(500)],
+        drums: [new Float32Array(500), new Float32Array(500)],
+        bass: [new Float32Array(500), new Float32Array(500)],
+        other: [new Float32Array(500), new Float32Array(500)],
+      },
+      duration: 180,
+    });
+
+    render(<App />);
+
+    const file = new File(["audio"], "song_master.mp3", { type: "audio/mp3" });
+    const fileInput = screen.getByLabelText(/select source mix file/i, {
+      selector: "input",
+    });
+    fireEvent.change(fileInput, { target: { files: [file] } });
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: /separate stems|start separation/i })
+      ).toBeInTheDocument();
+    });
+
+    const separateBtn = screen.getByRole("button", {
+      name: /separate stems|start separation/i,
+    });
+    fireEvent.click(separateBtn);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("region", { name: /stem player/i })
+      ).toBeInTheDocument();
+    });
+
+    const stemPlayerRegion = screen.getByRole("region", {
+      name: /stem player/i,
+    });
+
+    // The root region: the border pair is born at md, and nothing on the
+    // element carries a base (unprefixed) border token on mobile.
+    const rootClasses = stemPlayerRegion.getAttribute("class") ?? "";
+    expect(rootClasses).toContain("md:border-border");
+    expect(rootClasses).not.toMatch(/(^|\s)border(-border)?(\/\d+)?(\s|:|$)/);
+    // Everything else on the root stays verbatim (no padding/spacing/bg drift).
+    for (const token of [
+      "w-full",
+      "rounded-none",
+      "bg-card/70",
+      "p-4",
+      "sm:p-6",
+      "shadow-md",
+      "backdrop-blur-md",
+      "space-y-6",
+    ]) {
+      expect(rootClasses).toContain(token);
+    }
+
+    // The Time-Stretch & Pitch wrapper: one level above the row that hosts its
+    // Reset control. Same md line the Tempo/Pitch grid already flips on
+    // (md:grid-cols-2) — no second sm-style pair is introduced.
+    const resetControl = within(stemPlayerRegion).getByRole("button", {
+      name: /reset time-stretch/i,
+    });
+    const wrapperClasses =
+      resetControl.parentElement?.parentElement?.getAttribute("class") ?? "";
+    expect(wrapperClasses).toContain("md:border-border/60");
+    expect(wrapperClasses).not.toMatch(/(^|\s)border(-border)?(\/60)?(\s|:|$)/);
+    for (const token of [
+      "rounded-none",
+      "bg-secondary/30",
+      "p-4",
+      "space-y-4",
+    ]) {
+      expect(wrapperClasses).toContain(token);
+    }
+
+    // Deliberate untouched neighbors: the Tempo/Speed and Pitch Transposition
+    // sub-boxes keep their shipped base-border frames at every viewport, and
+    // the Click Track rail keeps its bordered lane look.
+    const tempoSubBoxClasses =
+      screen
+        .getByTestId("current-tempo-label")
+        .parentElement?.parentElement?.getAttribute("class") ?? "";
+    expect(tempoSubBoxClasses).toContain("border border-border/50");
+    const pitchSubBoxClasses =
+      screen
+        .getByTestId("current-pitch-label")
+        .parentElement?.parentElement?.getAttribute("class") ?? "";
+    expect(pitchSubBoxClasses).toContain("border border-border/50");
+
+    await waitFor(() => {
+      expect(screen.getByTestId("click-track-rail")).toBeInTheDocument();
+    });
+    const railClasses =
+      screen.getByTestId("click-track-rail").getAttribute("class") ?? "";
+    expect(railClasses).toContain("border border-primary/30");
+  });
+
   it("detects a saved session on startup and presents the recovery banner", async () => {
     vi.spyOn(webgpuModule, "detectWebGPUCapability").mockResolvedValue({
       supported: true,

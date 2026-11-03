@@ -514,7 +514,7 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
       role="region"
       aria-label="Stem Player"
       className={cn(
-        "w-full rounded-none border border-border bg-card/70 p-4 sm:p-6 shadow-md backdrop-blur-md space-y-6",
+        "w-full rounded-none md:border md:border-border bg-card/70 p-4 sm:p-6 shadow-md backdrop-blur-md space-y-6",
         className
       )}
     >
@@ -814,7 +814,7 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
       )}
 
       {/* Time-Stretch & Pitch Shift Controls */}
-      <div className="rounded-none border border-border/60 bg-secondary/30 p-4 space-y-4">
+      <div className="rounded-none md:border md:border-border/60 bg-secondary/30 p-4 space-y-4">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <div className="flex h-7 w-7 items-center justify-center rounded-none bg-primary/10 text-primary border border-primary/20">
