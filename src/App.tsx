@@ -1078,10 +1078,11 @@ export const App: React.FC = () => {
                     height={84}
                   />
                 </div>
-                {/* Calibrate the Click (ticket 08): the tap strip shares the
-                    spine's timeline scale — the user taps the groove they
-                    hear, then confirm re-anchors through the re-lock pass. */}
-                <div className="pt-2">
+                {/* Hand Calibration (ADR-0013, ticket 09): the lane welds
+                    directly under the spine — same width, same time axis, no
+                    card gap. Tapping stays a gesture against the axis the
+                    user can already see; the decision contract is untouched. */}
+                <div>
                   <BeatGridTapCalibration
                     duration={decodedSourceMix.metadata.duration}
                     onTapCalibration={handleConfirmTapCalibration}

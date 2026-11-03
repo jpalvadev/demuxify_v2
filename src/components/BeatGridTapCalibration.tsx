@@ -5,7 +5,7 @@ import {
   ClickCalibrationRejection,
 } from "../lib/stemPlayerEngine";
 import { cn } from "../lib/utils";
-import { DISPLAY_FONT_STACK, MONO_FONT_STACK } from "../lib/typography";
+import { MONO_FONT_STACK } from "../lib/typography";
 
 // Calibrate the Click (ticket 08): the honest manual route. The user taps
 // beats on the groove they hear along the Mix Tab's waveform spine; this strip
@@ -52,7 +52,9 @@ export const BeatGridTapCalibration: React.FC<BeatGridTapCalibrationProps> = ({
   disabled = false,
   onTapCalibration,
   className,
-  height = 64,
+  // Mix Tab cohesion (ADR-0013, ticket 09): the card's tall default died —
+  // the lane is a thin strip welded under the spine, same time axis.
+  height = 24,
 }) => {
   const stripRef = useRef<HTMLDivElement>(null);
   const [taps, setTaps] = useState<number[]>([]);
@@ -96,17 +98,13 @@ export const BeatGridTapCalibration: React.FC<BeatGridTapCalibrationProps> = ({
     <section
       aria-label="Beat Grid tap calibration"
       className={cn(
-        "flex flex-col gap-2 rounded-none border border-border/60 bg-card/60 px-3 py-2",
+        // Mix Tab cohesion (ADR-0013): the card look is dead — the lane is a
+        // thin strip on the spine's width and time axis: no border rhythm, no
+        // outer padding, no height default. The decision contract stays whole.
+        "flex flex-col gap-1 items-center rounded-none bg-transparent px-0 py-0",
         className
       )}
     >
-      <span
-        className="block text-[11px] font-semibold tracking-wide uppercase text-muted-foreground"
-        style={{ fontFamily: DISPLAY_FONT_STACK }}
-      >
-        Calibrate the Click
-      </span>
-
       {/* The tap strip: one tap per press along the timeline; taps stand as
           lime ticks so the pattern the user heard stays visible. */}
       <div

@@ -1646,6 +1646,21 @@ describe("App UI Shell", () => {
       expect(earlier.compareDocumentPosition(later) & 4).not.toBe(0);
     }
 
+    // Hand Calibration collapse (ADR-0013, ticket 09): the card look is dead —
+    // the lane is a thin strip welded under the spine, asserted through the
+    // component's own class tokens (the DOM seam cannot see media queries):
+    // no card fill, no border rhythm, no outer padding, and the height default
+    // is now the thin lane's inline style, not the old tall card.
+    const tapLane = within(mixTab).getByRole("region", {
+      name: /beat grid tap calibration/i,
+    });
+    const laneClasses = tapLane.getAttribute("class") ?? "";
+    expect(laneClasses).not.toMatch(/(^|\s)border/);
+    expect(laneClasses).not.toContain("bg-card");
+    expect(laneClasses).not.toMatch(/(^|\s)p[xxy]-[1-9]/);
+    expect(laneClasses).toContain("bg-transparent");
+    expect(tapStrip.getAttribute("style") ?? "").toContain("24px");
+
     // System Tab hosts the WebGPU status badge
     const systemTab = screen.getByRole("region", { name: /system tab/i });
     expect(within(systemTab).getByText(/webgpu active/i)).toBeInTheDocument();
