@@ -262,7 +262,7 @@ describe("StemPlayerEngine", () => {
       expect(engine.getStemGainNode("other").gain.value).toBeCloseTo(0.6);
     });
 
-    it("solo logic: a soloed stem that is also muted has 0 gain", () => {
+    it("solo logic: solo and mute are per-Stem exclusive, the last press wins", () => {
       const engine = new StemPlayerEngine(dummyStems, {
         audioContext: mockCtx as any,
         sampleRate,
@@ -271,12 +271,20 @@ describe("StemPlayerEngine", () => {
       engine.setStemVolume("vocals", 0.9);
       engine.setStemSolo("vocals", true);
       expect(engine.getStemGainNode("vocals").gain.value).toBeCloseTo(0.9);
+      // Solo isolates: the others fall to silence.
+      expect(engine.getStemGainNode("drums").gain.value).toBe(0);
 
       engine.setStemMute("vocals", true);
+      // Mix Rail Tidy-Up (ticket 04, ADR-0012): pressing M on the soloed Stem
+      // drops the solo — the solo+mute pair is unrepresentable, so the matrix
+      // has no all-silent state left to fall into and the others restore.
       expect(engine.getStemGainNode("vocals").gain.value).toBe(0);
+      expect(engine.getStemGainNode("drums").gain.value).toBeCloseTo(1);
 
-      engine.setStemMute("vocals", false);
+      engine.setStemSolo("vocals", true);
+      // Pressing S again re-arms solo and clears the mute: last press wins.
       expect(engine.getStemGainNode("vocals").gain.value).toBeCloseTo(0.9);
+      expect(engine.getStemGainNode("drums").gain.value).toBe(0);
     });
 
     it("updates master volume", () => {

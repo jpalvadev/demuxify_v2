@@ -266,6 +266,11 @@ export class StemPlayerEngine {
           other: { volume: 1.0, muted: false, solo: false },
         };
 
+    // ADR-0012: even init cannot smuggle the solo+mute pair back in.
+    for (const name of STEM_NAMES) {
+      if (this.stemStates[name].solo) this.stemStates[name].muted = false;
+    }
+
     if (options?.initialMasterVolume !== undefined) {
       this.masterVolume = Math.max(0, Math.min(1, options.initialMasterVolume));
       this.masterGainNode.gain.setValueAtTime(
@@ -547,6 +552,10 @@ export class StemPlayerEngine {
 
   public setStemMute(stem: StemName, muted: boolean): void {
     this.stemStates[stem].muted = muted;
+    // ADR-0012: solo and mute are per-Stem exclusive, last press wins —
+    // pressing mute drops a held solo, so the matrix never falls to the
+    // all-silent pair state.
+    if (muted) this.stemStates[stem].solo = false;
     this.applyGainMatrix();
     this.notifyState();
   }
@@ -557,6 +566,8 @@ export class StemPlayerEngine {
 
   public setStemSolo(stem: StemName, solo: boolean): void {
     this.stemStates[stem].solo = solo;
+    // ADR-0012: pressing solo clears a held mute — the last press wins.
+    if (solo) this.stemStates[stem].muted = false;
     this.applyGainMatrix();
     this.notifyState();
   }

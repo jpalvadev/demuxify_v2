@@ -215,6 +215,34 @@ describe("sessionStore", () => {
     expect(loaded.tempo).toBeUndefined();
   });
 
+  it("restores a legacy Session whose Stem carries solo and muted together as solo, mute dropped", async () => {
+    // Mix Rail Tidy-Up (ticket 04, ADR-0012): the engine can no longer produce
+    // the pair, but an old stored mixer may still carry it on one Stem. The
+    // load gate resolves it solo-wins — the mute flag is dropped silently, the
+    // solo survives — at the same validation gate recovery already drives.
+    const legacyMixer = {
+      stems: {
+        vocals: { volume: 0.8, muted: true, solo: true },
+        drums: { volume: 0.9, muted: false, solo: false },
+        bass: { volume: 1.0, muted: false, solo: false },
+        other: { volume: 0.7, muted: false, solo: false },
+      },
+      masterVolume: 1.0,
+      currentTime: 3.5,
+      pitchSemitones: 0,
+      tempoRatio: 1.0,
+    };
+    const mockSession = createMockSession({ mixer: legacyMixer });
+
+    await saveActiveSession(mockSession);
+
+    const loaded = await loadActiveSession();
+    expect(loaded).not.toBeNull();
+    if (!loaded) return;
+    expect(loaded.mixer.stems.vocals.solo).toBe(true);
+    expect(loaded.mixer.stems.vocals.muted).toBe(false);
+  });
+
   it("round-trips Click Track lane settings and leaves legacy sessions without them", async () => {
     // Ticket 05: Click Track settings persist with the Session, parallel to
     // the Stem mixer contract — the four StemName identities and their mixer

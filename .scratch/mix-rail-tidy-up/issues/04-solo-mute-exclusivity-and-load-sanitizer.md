@@ -4,14 +4,14 @@
 
 **Blocked by:** None (can start immediately).
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Engine seam: the solo toggle clears `muted` when it presses on; the mute toggle clears `solo` when it presses; a second press re-arms the axis — asserted on lane state and on the **gain-matrix outcomes** through the shared mock AudioContext factory (existing mixer-state describe blocks are the prior art).
-- [ ] The `solo && muted` pair is unrepresentable: the existing gain-matrix branch that silenced everything when a soloed Stem was muted never fires; the rest of the matrix behavior (solo isolates unselected Stems; mute silences one) stays identical.
-- [ ] Stem Player rail: the M and S buttons keep their accessible names and `aria-pressed` states; their visuals and layout stay untouched — only the state behind them changes.
-- [ ] Session load gate: restored mixer settings with both flags set resolve to solo (`muted` cleared) at the same validation gate the existing Session Recovery tests already drive; the write side needs no change once the engine cannot produce the pair.
-- [ ] New ADR "Solo and Mute are per-Stem exclusive" authored with this increment: last press wins + solo-wins load rule + why (a future reader wondering "why does M clear S" finds the answer).
-- [ ] Full pre-commit check cycle green.
+- [x] Engine seam: the solo toggle clears `muted` when it presses on; the mute toggle clears `solo` when it presses; a second press re-arms the axis — asserted on lane state and on the **gain-matrix outcomes** through the shared mock AudioContext factory (existing mixer-state describe blocks are the prior art).
+- [x] The `solo && muted` pair is unrepresentable: the existing gain-matrix branch that silenced everything when a soloed Stem was muted never fires; the rest of the matrix behavior (solo isolates unselected Stems; mute silences one) stays identical.
+- [x] Stem Player rail: the M and S buttons keep their accessible names and `aria-pressed` states; their visuals and layout stay untouched — only the state behind them changes.
+- [x] Session load gate: restored mixer settings with both flags set resolve to solo (`muted` cleared) at the same validation gate the existing Session Recovery tests already drive; the write side needs no change once the engine cannot produce the pair.
+- [x] New ADR "Solo and Mute are per-Stem exclusive" authored with this increment: last press wins + solo-wins load rule + why (a future reader wondering "why does M clear S" finds the answer).
+- [x] Full pre-commit check cycle green.
 
 ## Design decisions for this ticket
 

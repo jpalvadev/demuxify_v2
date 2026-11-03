@@ -290,6 +290,19 @@ function isValidMixer(mixer: any): mixer is SessionMixerState {
   return true;
 }
 
+// ADR-0012 (Mix Rail Tidy-Up, ticket 04): solo and mute are per-Stem exclusive.
+// The write side needs no rule — the engine cannot produce the pair — but a
+// legacy Session may still carry it. The load sanitizer resolves solo-wins:
+// a restored Session has no press order to replay, and solo is the
+// intent-revealing state, so the mute flag drops silently.
+function sanitizeMixer(mixer: SessionMixerState): SessionMixerState {
+  const stems = { ...mixer.stems };
+  for (const stem of STEM_NAMES) {
+    if (stems[stem].solo) stems[stem] = { ...stems[stem], muted: false };
+  }
+  return { ...mixer, stems };
+}
+
 function isValidClickTrack(val: any): val is ClickTrackMixerState {
   if (!val || typeof val !== "object") return false;
   return (
@@ -624,7 +637,8 @@ export async function loadActiveSession(): Promise<DemuxifySession | null> {
         channels: sourceChannels,
       },
       stems,
-      mixer: record.mixer,
+      // ADR-0012: legacy payloads with solo and muted together load solo-wins.
+      mixer: sanitizeMixer(record.mixer),
       // Optional on read: sessions written before the Tempo Detector shipped
       // simply load without it (ticket 03 backwards-compat box).
       tempo: record.tempo ?? undefined,
