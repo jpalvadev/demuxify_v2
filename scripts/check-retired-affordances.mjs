@@ -19,6 +19,17 @@ import * as path from "path";
 //                                              `meter` is not a field anymore)
 //   - retired symbol names, spelled out       (revivals of deleted code)
 //   - the retired testids, as rendered attrs  (a control back on the rail)
+//   - dead markup pinned as its exact class/attr string (the Formant pill-slider
+//                                             track, the spine header's readout
+//                                             group)
+// Convention: EVERY ban pattern carries the identity of the affordance it
+// retires — a symbol name, a rendered attribute, an aria-label, or the exact
+// class string of the dead markup group — so a red gate always names what must
+// be gone instead of an anonymous string an agent has to guess about. The class
+// -string pins are the best-effort end of the list: a utility trio could in
+// principle be worn by unrelated live markup, so when one goes red, read its
+// reason line first and tighten the pattern if the match is not the dead group —
+// never drop the ban just because one match looks unrelated.
 // Comments and `src/__tests__` are exempt, exactly as `npm run check:glossary`
 // exempts them: comments legitimately record the retirement as history, and
 // tests carry ABSENCE pins naming what must stay gone (CODING_STANDARDS.md §9).
@@ -95,7 +106,10 @@ const BANNED_IN_SRC = [
       "ADR-0013 killed the Master Waveform spine's header mm:ss / mm:ss readout " +
       "group: the Transport is the Mix Tab's only visible clock, and a second " +
       "readout of one Playhead is the redundancy the amendment deleted. The " +
-      "dead group's class string is the pin — do not re-render it on the spine.",
+      "dead group's class string is the pin — do not re-render it on the spine. " +
+      "Best-effort pin: a utility trio can in principle be worn by unrelated " +
+      "live markup, so if a match is not the spine header's readout, tighten " +
+      "the pattern around its context — do not delete this ban.",
   },
 ];
 

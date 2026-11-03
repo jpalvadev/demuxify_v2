@@ -13,6 +13,11 @@ check:testids` gates that drift at commit time — every id a PRESENCE accessor
   axis (`docs/adr/0011-downbeat-reading-and-beat-grid-repair.md` Amendment: deleted
   symbols, the `meter` field, the rail's Meter selector and −/+ pair). Tests and
   comments are exempt, so the absence pins and the ADR history stay readable.
+- lint-staged rewrites test files at commit time and prettier's reflow migrates
+  string quoting (single → double): a grep pattern copied from a pre-formatting
+  read of a test (`'click-track-bpm-label'` with quotes) can miss the very line
+  it targets once the file has been committed. grep the bare identifier, never
+  one quote style — `grep -n click-track-bpm-label` beats every quoted form.
 - When the suite goes red, `npm run test:report` gives a compact failure list —
   do not re-read raw vitest output (thousands of tokens of DOM dumps).
 - To anchor an edit inside a 1,100+ line file in one call, `npm run outline`

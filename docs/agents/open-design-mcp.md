@@ -1,7 +1,9 @@
 # OpenDesign MCP — recovery procedure
 
-Reached from `AGENTS.md` ("OpenDesign MCP — when a call fails") and from the
-"OpenDesign MCP for all view design" rule and `CODING_STANDARDS.md` rule 8:
+Reached from the "OpenDesign MCP for all view design" rule in `AGENTS.md`
+(which now carries the failure route inline) and the UI View Design rule
+(`CODING_STANDARDS.md` §6): every view/look normally comes from an OpenDesign
+MCP run, and this doc covers what to do when the MCP itself stops answering.
 every view/look normally comes from an OpenDesign MCP run, and this doc covers
 what to do when the MCP itself stops answering.
 

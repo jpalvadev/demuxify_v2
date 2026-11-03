@@ -14,4 +14,7 @@ npm run check:test-fixtures
 npm run check:testids
 npm run check:retired-affordances
 npm run typecheck
-npm run test
+# The suite runs through scripts/vitest-summary.mjs, NOT raw vitest: same suite,
+# same exit code (red still aborts the commit), but `git commit` gets its compact
+# failure list instead of ~40 k lines of raw vitest output on every commit.
+npm run test:report

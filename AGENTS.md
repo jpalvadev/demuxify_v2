@@ -14,6 +14,8 @@ MANDATORY: every UI view or visual redesign must be designed through the OpenDes
 
 Probe before designing: the MCP daemon dies between sessions without the config changing, so the first OpenDesign call of a session must be a light one (`list_projects`). If it errors, go straight to the fallback in `docs/agents/open-design-mcp.md` and make no further OpenDesign calls that session — do not re-pay a doomed design call per ticket.
 
+Failure route: if an OpenDesign call fails mid-session (daemon connection lost, cancelled run, or tool errors), follow the recovery procedure in `docs/agents/open-design-mcp.md` — reconnect recipe, then exactly one retry of the pending call after reconnecting, and if that fails too, the agent-authored fallback, which must be recorded on the ticket as the design source. After the fallback fires, do not call the OpenDesign MCP again that session.
+
 ## Agent skills
 
 ### Issue tracker
@@ -56,12 +58,8 @@ When working on Windows, avoid cross-drive NTFS junctions to `node_modules` beca
 
 Every commit must pass the chain wired in `.husky/pre-commit` (read it for the current gate list). Never stage and commit blind to it: the hook re-runs the whole chain (~22–33 s) on every `git commit`.
 
-When the suite fails, do NOT re-read raw vitest output (thousands of tokens of DOM dumps). Run `npm run test:report` (`scripts/vitest-summary.mjs`) and work from its compact failure list.
+When the suite fails, do NOT re-read raw vitest output (thousands of tokens of DOM dumps). Run `npm run test:report` (`scripts/vitest-summary.mjs`) and work from its compact failure list — the hook's last gate is that same command, so `git commit` itself already prints the compact list (and aborts on red) instead of flooding ~40 k lines of raw vitest into the commit result.
 
 ### Git layout
 
 This repo has **no remote**. All branches and commits are local only; there is no such thing as "unpushed" work here. Do not attempt `git push`, force-pushes, or PR workflows.
-
-### OpenDesign MCP — when a call fails
-
-If OpenDesign MCP calls fail (daemon connection lost, cancelled run, or tool errors): follow the recovery procedure in `docs/agents/open-design-mcp.md` — reconnect recipe, one retry, then the agent-authored fallback that must be recorded on the ticket.
