@@ -4,14 +4,18 @@
 
 **Blocked by:** 06 (ADR-0013 and the glossary vocabulary must exist first).
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] The one net-new regression test: press play, fire no mixer/seek event, and the spine slider's `aria-valuenow` walks off its start value — the screenshot's drift can never regress silently.
-- [ ] Spine `aria-valuenow`/`aria-valuetext` stay exact against a moving **Playhead**; the spine's canvas repaint is time-gated near 15 draws/s while the position value itself keeps flowing — asserted only through value exactness, never frame counts.
-- [ ] Scrubbed-then-played position plays: the spine stays the only scrub surface and the **Stem Strips** grow no scrubber of their own (existing keyboard-step, pointer-scrub and spine-absent-from-other-Tabs pins stay green untouched).
-- [ ] The spine header's `mm:ss / mm:ss` group is absent at both the component seam and the composed whole-app Mix stage; the "Master Waveform" label and "Overview" chip survive (one surface, half retired); canvas tick graduations survive.
-- [ ] Exactly one visible `mm:ss` readout in the Mix Tab — the **Transport**'s — and at 0.5×/2× it keeps counting canonical **Source Mix** seconds (the canonical-duration anchor survives).
-- [ ] The anchor test's NAME is retargeted to say **Transport** (its zero-padded literal is the **Transport** face, and after this ticket the spine shows no duration at all); the pin itself stays green untouched.
-- [ ] `npm run check:retired-affordances` gains the spine header readout marker so a second clock cannot come back in shipped code (tests and comments exempt as that rule already is).
-- [ ] **Session** cadence untouched: the live bridge never drives auto-save; a resumed **Session** lands at the position the mixer events saved.
-- [ ] Look is agent-authored: OpenDesign MCP answered nothing this session (documented dead-MCP fallback) — recorded here, no OpenDesign run paid (removals-and-re-home exception per `AGENTS.md`).
+- [x] The one net-new regression test: press play, fire no mixer/seek event, and the spine slider's `aria-valuenow` walks off its start value — the screenshot's drift can never regress silently.
+- [x] Spine `aria-valuenow`/`aria-valuetext` stay exact against a moving **Playhead**; the spine's canvas repaint is time-gated near 15 draws/s while the position value itself keeps flowing — asserted only through value exactness, never frame counts.
+- [x] Scrubbed-then-played position plays: the spine stays the only scrub surface and the **Stem Strips** grow no scrubber of their own (existing keyboard-step, pointer-scrub and spine-absent-from-other-Tabs pins stay green untouched).
+- [x] The spine header's `mm:ss / mm:ss` group is absent at both the component seam and the composed whole-app Mix stage; the "Master Waveform" label and "Overview" chip survive (one surface, half retired); canvas tick graduations survive.
+- [x] Exactly one visible `mm:ss` readout in the Mix Tab — the **Transport**'s — and at 0.5×/2× it keeps counting canonical **Source Mix** seconds (the canonical-duration anchor survives).
+- [x] The anchor test's NAME is retargeted to say **Transport** (its zero-padded literal is the **Transport** face, and after this ticket the spine shows no duration at all); the pin itself stays green untouched.
+- [x] `npm run check:retired-affordances` gains the spine header readout marker so a second clock cannot come back in shipped code (tests and comments exempt as that rule already is).
+- [x] **Session** cadence untouched: the live bridge never drives auto-save; a resumed **Session** lands at the position the mixer events saved.
+- [x] Look is agent-authored: OpenDesign MCP answered nothing this session (documented dead-MCP fallback) — recorded here, no OpenDesign run paid (removals-and-re-home exception per `AGENTS.md`).
+
+## Comments
+
+**2026-11-03 — port record (branch `mix-tab-cohesion`, second commit).** The channel: `StemPlayer` gains one optional `onPlayheadChange(timeSec)` prop fired from the EXISTING engine position subscription (the single `subscribePosition` listener now feeds component state and the channel together — no second subscriber), and the app wires `onPlayheadChange={(timeSec) => setCurrentTime(timeSec)}` into the Mix Tab's **Stem Player**. Domain-separate kept: `handleMixerChange` loses its per-frame `setCurrentTime` write (the bridge is now mixer-and-**Session** only, save cadence untouched), and `handleSeek` stops writing the clock directly — scrub now round-trips through `engine.seek`, whose position notify lands on the same channel, so scrub-then-play still plays from the scrubbed spot. The readout death: the spine header's `mm:ss / mm:ss` group deleted outright (label and "Overview" chip survive, canvas graduations are the axis); `PLAYHEAD_REPAINT_CEILING_MS = 66` (span recorded in ADR-0013, pinned by `check:doc-anchors`) time-gates the canvas repaint to ~15 draws/s while the aria attrs keep exact. Test side: one net-new live-mirror test (press play, pump a mock rAF/clock, spine `aria-valuenow` walks to 3 and the **Transport** reads "00:03"), the **Master Waveform** seam retargeted to assert no DOM clock survives anywhere on the spine, and the time-stretch canonical-duration anchor's NAME retargeted to **Transport** (pin untouched). `check:retired-affordances` gains the dead markup ban (`flex items-center gap-1 font-semibold`, unique to the deleted group) and its success banner names the new absence. Suite: 359 tests green, +1 over the merge base. No OpenDesign run: the MCP answered nothing this session, so this increment's look is agent-authored per the documented dead-MCP fallback.

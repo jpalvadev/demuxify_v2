@@ -78,6 +78,11 @@ export interface StemPlayerProps {
   exportDialogHosted?: boolean;
   onExportDialogState?: (state: ExportDialogState) => void;
   onTransportControls?: (controls: TransportControls) => void;
+  // Mix Tab cohesion (ADR-0013): one outbound Playhead channel — the app wires
+  // the shared Master Waveform spine to it, fed by the engine's existing
+  // position subscription. The mixer-and-Session bridge keeps its own meaning
+  // and is never fired per frame.
+  onPlayheadChange?: (timeSec: number) => void;
   // Tab Shell (ADR-0007): the shell hosts the shared Master Waveform spine in
   // Listen and Mix, so the player's own overview waveform stays hidden.
   masterWaveformHosted?: boolean;
@@ -148,6 +153,7 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
   exportDialogHosted,
   onExportDialogState,
   onTransportControls,
+  onPlayheadChange,
   masterWaveformHosted,
   beatGrid,
   initialClickTrack,
@@ -217,6 +223,10 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
     const unsubPos = engine.subscribePosition((time) => {
       setCurrentTime(time);
       setIsPlaying(engine.isPlaying());
+      // Mix Tab cohesion (ADR-0013): the same subscription feeds the app's one
+      // Playhead channel — the spine mirrors the live position, no second
+      // subscriber and no per-frame mixer bridge.
+      onPlayheadChange?.(time);
     });
 
     const unsubState = engine.subscribeState((states) => {

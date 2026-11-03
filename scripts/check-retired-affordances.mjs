@@ -89,6 +89,14 @@ const BANNED_IN_SRC = [
       "control re-homed into the square rail-button family wearing the Mic " +
       "glyph.",
   },
+  {
+    pattern: /flex items-center gap-1 font-semibold/,
+    reason:
+      "ADR-0013 killed the Master Waveform spine's header mm:ss / mm:ss readout " +
+      "group: the Transport is the Mix Tab's only visible clock, and a second " +
+      "readout of one Playhead is the redundancy the amendment deleted. The " +
+      "dead group's class string is the pin — do not re-render it on the spine.",
+  },
 ];
 
 let hasErrors = false;
@@ -146,7 +154,8 @@ if (hasErrors) {
 } else {
   console.log(
     "✅ Retired affordances stay gone: no Downbeat axis, no Meter selector, " +
-      "no Click Track mute control, no Formant pill-slider in src/.\n"
+      "no Click Track mute control, no Formant pill-slider, no spine time " +
+      "readout in src/.\n"
   );
   process.exit(0);
 }

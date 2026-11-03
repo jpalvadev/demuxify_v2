@@ -2050,6 +2050,69 @@ describe("App UI Shell", () => {
     }
   });
 
+  it("mirrors the live Playhead to the spine: press play, no mixer event, the spine walks", async () => {
+    completeSeparationMocks();
+
+    // The engine's position loop needs two things jsdom lacks: a rAF pump and
+    // a clock that moves. The pump advances the mock AudioContext by half a
+    // second per frame, so six frames put the Playhead at 3 s — while no mixer
+    // event ever fires, the spine's aria and the Transport both read it.
+    const appCtx: { ctx: any } = { ctx: null };
+    const OrigAudioContext = window.AudioContext;
+    // A constructor function, not an arrow: the app builds the ctx with `new`.
+    const LiveAudioContext = function (_options?: AudioContextOptions) {
+      appCtx.ctx ??= new OrigAudioContext();
+      return appCtx.ctx;
+    };
+    window.AudioContext = LiveAudioContext as any;
+
+    const rafQueue: (() => void)[] = [];
+    const OrigRaf = window.requestAnimationFrame;
+    window.requestAnimationFrame = ((callback: () => void) => {
+      rafQueue.push(callback);
+      return rafQueue.length;
+    }) as any;
+
+    try {
+      render(<App />);
+      await loadAndSeparate();
+
+      const mixTab = screen.getByRole("region", { name: /mix tab/i });
+      const spine = within(mixTab).getByRole("slider", {
+        name: /master waveform timeline/i,
+      });
+      const toggle = within(mixTab).getByRole("button", {
+        name: /^play\/pause$/i,
+      });
+
+      fireEvent.click(toggle);
+
+      // Each tick re-schedules itself, so the queue keeps refilling while the
+      // pump walks the mock clock forward half a second at a time.
+      const pump = (frames: number) => {
+        for (let i = 0; i < frames; i++) {
+          appCtx.ctx!.currentTime += 0.5;
+          const next = rafQueue.shift();
+          if (!next) return;
+          next();
+        }
+      };
+      pump(6);
+
+      await waitFor(() => {
+        expect(spine).toHaveAttribute("aria-valuenow", "3");
+      });
+
+      // One Playhead: the Transport shows the same 3 s the spine walked to.
+      const transportReadout = within(mixTab).getByTestId("stem-player-time");
+      expect(transportReadout.textContent).toContain("00:03");
+    } finally {
+      // Hand the globals back so the rest of the suite keeps jsdom's shape.
+      window.AudioContext = OrigAudioContext as any;
+      window.requestAnimationFrame = OrigRaf as any;
+    }
+  });
+
   it("keeps the toast DOM surface dead: no notice container anywhere, notices only in the manager", async () => {
     vi.spyOn(webgpuModule, "detectWebGPUCapability").mockResolvedValue({
       supported: true,

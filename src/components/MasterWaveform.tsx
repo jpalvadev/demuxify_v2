@@ -36,6 +36,12 @@ function calculateTickInterval(duration: number): number {
   return 120;
 }
 
+// Mix Tab cohesion (ADR-0013): the spine carries a live Playhead, so its canvas
+// repaint runs at a ceiling near fifteen draws per second instead of once per
+// position update. The position value itself keeps flowing every frame — the
+// assistive readout is never a stale approximation, only the paint cadence is.
+const PLAYHEAD_REPAINT_CEILING_MS = 66;
+
 export const MasterWaveform: React.FC<MasterWaveformProps> = ({
   peaks: providedPeaks,
   audioBuffer,
@@ -48,6 +54,7 @@ export const MasterWaveform: React.FC<MasterWaveformProps> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const lastPaintAtRef = useRef(0);
   const [isScrubbing, setIsScrubbing] = useState(false);
   const [containerWidth, setContainerWidth] = useState(800);
 
@@ -89,10 +96,15 @@ export const MasterWaveform: React.FC<MasterWaveformProps> = ({
     }
   }, []);
 
-  // Draw canvas waveform
+  // Draw canvas waveform — time-gated (ADR-0013): the live Playhead's position
+  // flows every frame, but the canvas repaints at the ceiling only.
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+
+    const now = Date.now();
+    if (now - lastPaintAtRef.current < PLAYHEAD_REPAINT_CEILING_MS) return;
+    lastPaintAtRef.current = now;
 
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
@@ -283,7 +295,8 @@ export const MasterWaveform: React.FC<MasterWaveformProps> = ({
         className
       )}
     >
-      {/* Header with Title and Time indicators */}
+      {/* Header with Title and Overview chip (ADR-0013: the spine's own
+          mm:ss / mm:ss group died — the Transport is the Mix Tab's clock) */}
       <div className="mb-2.5 flex items-center justify-between text-xs font-mono text-muted-foreground">
         <div className="flex items-center gap-2">
           <span className="font-semibold text-foreground tracking-wide uppercase text-[11px]">
@@ -291,15 +304,6 @@ export const MasterWaveform: React.FC<MasterWaveformProps> = ({
           </span>
           <span className="rounded-none bg-secondary/80 px-2 py-0.5 text-[10px] text-muted-foreground">
             Overview
-          </span>
-        </div>
-        <div className="flex items-center gap-1 font-semibold">
-          <span className="text-primary font-mono text-sm">
-            {formatTime(currentTime)}
-          </span>
-          <span className="text-muted-foreground/60">/</span>
-          <span className="text-muted-foreground font-mono text-sm">
-            {formatTime(duration)}
           </span>
         </div>
       </div>

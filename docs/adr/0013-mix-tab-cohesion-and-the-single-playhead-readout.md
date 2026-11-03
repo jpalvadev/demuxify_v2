@@ -6,7 +6,7 @@ Partially supersedes [ADR-0008](./0008-four-tab-shell-and-single-toggle-transpor
 
 **One Playhead, one clock, one readout, rails ordered the way the work is done.**
 
-The **Playhead** is one value — canonical seconds of the **Source Mix**, invariant under **Time-Stretch** — and the spine, the four **Stem Strips** and the **Transport** readout show that same value at every instant. The **Stem Player** gains one outbound position channel, in the shape `onPlayheadChange(timeSec)`, fed by the engine's existing position subscription; the app wires the **Master Waveform** spine to it. The spine's canvas repaint is time-gated near fifteen draws per second while the position value keeps flowing every frame, so the assistive readout is never a stale approximation.
+The **Playhead** is one value — canonical seconds of the **Source Mix**, invariant under **Time-Stretch** — and the spine, the four **Stem Strips** and the **Transport** readout show that same value at every instant. The **Stem Player** gains one outbound position channel, in the shape `onPlayheadChange(timeSec)`, fed by the engine's existing position subscription; the app wires the **Master Waveform** spine to it. The spine's canvas repaint is time-gated near fifteen draws per second (`PLAYHEAD_REPAINT_CEILING_MS = 66` ms) while the position value keeps flowing every frame, so the assistive readout is never a stale approximation.
 
 The **Transport** row owns the Mix Tab's only visible `mm:ss` readout. The spine header keeps its label and its "Overview" chip while its own `mm:ss / mm:ss` group dies outright; the canvas tick graduations survive because they are the time axis, not a position.
 

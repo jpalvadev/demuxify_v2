@@ -581,9 +581,9 @@ export const App: React.FC = () => {
     masterVolume: number;
     currentTime: number;
   }) => {
-    // Shared spine (ADR-0008): mirror the live playhead so the Mix Tab's
-    // spine readout stays in lockstep with playback.
-    setCurrentTime(mixer.currentTime);
+    // Mix Tab cohesion (ADR-0013): this bridge is mixer-and-Session only — the
+    // live Playhead reaches the spine via onPlayheadChange below, so the
+    // bridge never runs per frame and the Session save cadence is untouched.
     if (!cachedSessionRef.current) return;
     const updatedSession: DemuxifySession = {
       ...cachedSessionRef.current,
@@ -650,7 +650,9 @@ export const App: React.FC = () => {
   };
 
   const handleSeek = (seekTime: number) => {
-    setCurrentTime(seekTime);
+    // Mix Tab cohesion (ADR-0013): the spine never writes the clock directly —
+    // the engine's seek notifies its position, which lands on the app's
+    // Playhead through the one onPlayheadChange channel below.
     // Shared spine (ADR-0008): scrubbing on the Mix Tab's spine drives the
     // same Stem Player engine through the transport bridge.
     transportActionsRef.current.seek(seekTime);
@@ -1063,7 +1065,9 @@ export const App: React.FC = () => {
             decodedSourceMix ? (
               <>
                 {/* Master Waveform spine (ADR-0008): the Mix Tab owns the single
-                    timeline surface; scrubbing it drives the Stem Player playhead. */}
+                    timeline surface; scrubbing it drives the Stem Player engine
+                    through the transport bridge, and its position flows back on
+                    the one Playhead channel (ADR-0013). */}
                 <div className="pt-2">
                   <MasterWaveform
                     peaks={waveformPeaks}
@@ -1093,6 +1097,10 @@ export const App: React.FC = () => {
                   initialMasterVolume={restoredMixerState?.masterVolume}
                   initialCurrentTime={restoredMixerState?.currentTime}
                   onMixerChange={handleMixerChange}
+                  // Mix Tab cohesion (ADR-0013): the spine's clock is fed by
+                  // the engine's one position subscription, not by the mixer
+                  // bridge — press play with no mixer event and it walks.
+                  onPlayheadChange={(timeSec) => setCurrentTime(timeSec)}
                   sourceMixTitle={decodedSourceMix.metadata.fileName}
                   exportDialogHosted
                   onExportDialogState={handleExportDialogStateChange}

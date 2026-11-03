@@ -334,7 +334,7 @@ describe("StemPlayer Time-Stretch & Pitch Controls", () => {
     expect(formantToggle.querySelectorAll("svg")).toHaveLength(1);
   });
 
-  it("anchors Master Waveform duration display to canonical duration during time-stretch playback", () => {
+  it("anchors Transport duration display to canonical duration during time-stretch playback", () => {
     render(
       <StemPlayer
         stems={dummyStems}
