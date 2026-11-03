@@ -1,9 +1,11 @@
 import * as fs from "fs";
 import * as path from "path";
 
-// Guardrail: code identifiers and file anchors cited in the decision docs
-// (docs/adr/** and CODING_STANDARDS.md) must still resolve in the repo. Docs
-// that name a renamed or retired symbol mislead every agent that reads them.
+// Guardrail: code identifiers, file anchors and the derived numbers an ADR
+// records (`NAME = 0.08 s`) cited in the decision docs (docs/adr/** and
+// CODING_STANDARDS.md) must still resolve in the repo — a doc that keeps a
+// renamed symbol, a deleted file, or a number the shipped code no longer runs
+// with misleads every agent that reads it.
 // Deliberately ignored: prose inside backticks (spaces, parens, commands,
 // plain lowercase words) — that drift stays a judgement call — and whole
 // sections/lines that explicitly mark names as retired/deleted/history,
@@ -22,10 +24,22 @@ const pathSpan = /^[^\s`]+\/[^\s`]*$/; // path-shaped, no whitespace
 const fileExtSpan = /^[^\s`]+\.(ts|tsx|mjs|md)$/i;
 
 // Every identifier that appears in src/ or in the root config files,
-// plus every src/ file path and every declared npm dependency.
+// plus every src/ file path and every declared npm dependency, plus every
+// NUMERIC constant src/ declares: an ADR that records a derived number
+// (`NAME = 0.08 s`) is checked against the value the shipped code runs with.
 const srcTokens = new Set();
 const srcFiles = new Set();
 const declaredDeps = new Set();
+const srcConstants = new Map(); // NAME -> Set of numeric values it is set to
+
+function collectConstantAnchors(content) {
+  for (const m of content.matchAll(
+    /(?:export\s+)?const\s+([A-Z][A-Z0-9_]*)\s*=\s*(-?\d+(?:\.\d+)?)/g
+  )) {
+    if (!srcConstants.has(m[1])) srcConstants.set(m[1], new Set());
+    srcConstants.get(m[1]).add(Number(m[2]));
+  }
+}
 
 function collectSrc(dir) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -47,6 +61,7 @@ function collectSrc(dir) {
       for (const m of content.matchAll(/[A-Za-z_$][A-Za-z0-9_$]*/g)) {
         srcTokens.add(m[0]);
       }
+      collectConstantAnchors(content);
     }
   }
 }
@@ -132,6 +147,29 @@ for (const docPath of docsToScan) {
 
     for (const m of line.matchAll(/`([^`\r\n]+)`/g)) {
       const span = m[1].trim();
+
+      // A derived number recorded in prose: `NAME = 0.08 s` must equal the
+      // constant the shipped code runs with, or the ADR's derivation silently
+      // drifted from what executes. A number that names no such constant in
+      // src/ is as broken an anchor as a renamed symbol is.
+      const constant =
+        /^([A-Z][A-Z0-9_]{2,})\s*=\s*(-?\d+(?:\.\d+)?)(?:\s*[A-Za-zµ°%/]+\s*)?$/.exec(
+          span
+        );
+      if (constant) {
+        const [, name, recorded] = constant;
+        const values = srcConstants.get(name);
+        if (values && values.has(Number(recorded))) continue;
+        if (values) {
+          at(
+            `derived-constant drift for \`${name}\``,
+            `${span} recorded, src/ runs ${[...values].join(" | ")}`
+          );
+        } else {
+          at("unresolvable constant anchor", span);
+        }
+        continue;
+      }
 
       if (packageSpan.test(span)) {
         if (!declaredDeps.has(span)) {

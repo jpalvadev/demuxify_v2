@@ -12,9 +12,12 @@
     "check:glossary": "node scripts/check-glossary.mjs",
     "check:doc-anchors": "node scripts/check-doc-anchors.mjs",
     "check:test-fixtures": "node scripts/check-test-fixtures.mjs",
+    "check:testids": "node scripts/check-testids.mjs",
+    "check:retired-affordances": "node scripts/check-retired-affordances.mjs",
     "test": "vitest run",
     "test:report": "node scripts/vitest-summary.mjs",
     "verify:beat-grid-anchor": "node scripts/verify_beat_grid_anchor.mjs",
+    "outline": "node scripts/outline.mjs",
     "test:watch": "vitest",
     "prepare": "husky"
   },

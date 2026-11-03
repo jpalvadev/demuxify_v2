@@ -11,5 +11,7 @@ npx lint-staged
 npm run check:glossary
 npm run check:doc-anchors
 npm run check:test-fixtures
+npm run check:testids
+npm run check:retired-affordances
 npm run typecheck
 npm run test

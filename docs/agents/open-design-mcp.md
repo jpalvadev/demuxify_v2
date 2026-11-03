@@ -5,6 +5,18 @@ Reached from `AGENTS.md` ("OpenDesign MCP — when a call fails") and from the
 every view/look normally comes from an OpenDesign MCP run, and this doc covers
 what to do when the MCP itself stops answering.
 
+## Liveness (last observed)
+
+Dead for the sessions of 2026-11-01 and 2026-11-02: every design call errored
+("Tool execution failed") even though `opencode.jsonc` still has the
+`"open-design"` block enabled, and the tickets in that window carry the
+agent-authored fallback instead. This is not a stale-path problem — the
+configured daemon path points at `versions/0.26.1`, the newest installed
+version (only `0.21.1` and `0.26.1` exist on disk). So: probe with a light
+`list_projects` call FIRST, and if it errors go straight to the fallback below
+without trying a design call. Update this section when a session finds the MCP
+alive again.
+
 ## Reconnect without restarting OpenCode
 
 If OpenDesign MCP calls fail because the daemon connection was lost, restore it

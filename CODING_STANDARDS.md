@@ -63,3 +63,12 @@ Always use canonical domain terms defined in `GLOSSARY.md`.
 - Readouts that survive the retirement (BPM label, lane on/off, mute, volume) keep their pinned DOM assertions; a retirement must not weaken what the suite sees around it.
 - `getAllByRole` THROWS when empty — absence checks must use the `query*` variants.
 - Before touching any rail control, grep `src/__tests__` for its `data-testid`: test files pin these attributes across the suite (see `docs/agents/navigation.md`).
+- That pin is gated, not remembered: `npm run check:testids` fails when a PRESENCE accessor (`getByTestId`/`getAllByTestId`/`findByTestId`/`findAllByTestId`) names an id no component renders. The ABSENCE half (`queryByTestId`, `queryAllByTestId`, `filterByTestId`) is exempt on principle — it is the pin that proves a retirement held, so it legitimately names something that no longer exists.
+- The other half of a retirement is gated the same way: `npm run check:retired-affordances` bans the deleted affordance from shipped code (the Click Track's accent/Downbeat axis per the `docs/adr/0011-downbeat-reading-and-beat-grid-repair.md` Amendment: a `downbeat`-shaped symbol, a bare `meter` field, the retired rail testids). `src/__tests__` and comments are exempt — absence pins and ADR history are supposed to name what is gone.
+
+## 10. Derivation-Honesty Claims Name the Derivation They Read
+
+- A UI claim about _how_ a value was derived (the rail's readouts: "calibrated by hand", "solid reading", "N readings ranked") must name the derivation that produced the value the component is actually reading — never a derivation that produced an earlier one. This is ADR-0010/ADR-0011's ranking-over-certainty honesty extended to Hand Calibration: no claim may be dressed in a stronger derivation than the one the readout came from.
+- When one pass replaces a derivation with another (a tap-confirm supplies a Hand Calibration and re-locks the Beat Grid), commit the value BEFORE the claim renders: value setter first, then claim setter — `setTempoAnalysis` before `setClickCalibration` in `src/App.tsx` — so no frame claims "calibrated by hand" while the old Beat Grid is still what the rail reads.
+- Persistence obeys the same rule: a claim is stored only beside the value it describes (`calibration` beside `tempo` on `DemuxifySession`), and superseding one supersedes the other — a stale pairing is never left half-cleared.
+- This stays a reviewer rule, not a guardrail: it is about which value a claim refers to, and no check can substitute for reading that intent.
