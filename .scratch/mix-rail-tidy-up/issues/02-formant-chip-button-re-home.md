@@ -22,3 +22,7 @@
 **Branch:** mix-rail-tidy-up (new branch off `main` at porting start)
 
 **Spec:** `.scratch/mix-rail-tidy-up/spec.md`
+
+## Comments
+
+- **Ported — commit `d7bd115` (2026-11-02, amended for the honest count).** What landed: the Formant pill-slider died outright in `StemPlayer.tsx` (~1018-1037) and re-homed as the square rail-button chip family (`h-8 w-8 rounded-none border`, pressed/unpressed token pair verbatim from the ♪/M/S chips) wearing the `Mic` glyph (added to the lucide imports) inline on its label row; `role="switch"` + `aria-checked` + accessible name "Vocal Formant Preservation" preserved; the "Vocals Stem" chip stayed verbatim. Test delta: suite 354→355 — extended the component seam test in `stemPlayerTimeStretch.test.tsx` (family tokens, svg=1/span=0 knob death, no `translate-x|ring-0|cursor-pointer`) plus a new `App.test.tsx` test pinning pill-marker absence via `document.querySelectorAll('[class*="translate-x-4"]'…)` and the untouched Vocals chip. Gotchas: vitest 2.1.3 has no chai `notToMatch` property — use `expect(x).not.toMatch(/…/)`; no OpenDesign run (removal + re-home into an existing family, MCP daemon dead that session per the documented fallback).

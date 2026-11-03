@@ -24,3 +24,7 @@
 **Branch:** mix-rail-tidy-up (new branch off `main` at porting start)
 
 **Spec:** `.scratch/mix-rail-tidy-up/spec.md`
+
+## Comments
+
+- **Ported — commit `6f485c8` (2026-11-02).** What landed: mute concept death end to end — rail M button (`aria-label="Mute Click Track"`) and `handleToggleClickTrackMute` gone from `StemPlayer.tsx`; `setClickTrackMuted`/`toggleClickTrackMute` and the `muted` field gone from `stemPlayerEngine.ts` (`applyClickGain` now `enabled ? volume : 0`); sessionStore write reduced, `isValidClickTrack` stops requiring the legacy key, `loadActiveSession` reconstitutes the lane reduced so an old `muted: true` never resurfaces and never refuses; the VolumeX icon face reties to `volume === 0`; GLOSSARY Click Track entry drops the mute word; ADR-0010 gains the lane-mute Amendment. Test delta: suite 355→356 (+1 new sessionStore legacy-payload test proving reconstitution); retargets kept the rail/engine/store/export fixtures compiling against the narrowed type. Gotchas: RED first came as TS missing-key errors on the annotated fixtures plus the rail button-count pin — `getAllByRole` throws on zero matches, so the absence pin uses `queryAllByRole("button")`; the sibling trap held (stem-level `muted` in mixer fixtures stays alive); the export literals retarget shape only — gating behavior untouched, those tests green as the parity proof; the ADR amendment heading carries "retired" to stay doc-anchor exempt.

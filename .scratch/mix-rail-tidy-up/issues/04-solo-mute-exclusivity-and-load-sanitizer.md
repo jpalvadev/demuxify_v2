@@ -22,3 +22,7 @@
 **Branch:** mix-rail-tidy-up (new branch off `main` at porting start)
 
 **Spec:** `.scratch/mix-rail-tidy-up/spec.md`
+
+## Comments
+
+- **Ported — commit `9899430` (2026-11-02).** What landed: last-press-wins exclusivity at the engine seam (`setStemSolo` clears a held mute, `setStemMute` drops a held solo; constructor init runs the same clear so `initialMixerStates` cannot smuggle the pair); `applyGainMatrix` untouched (its all-silent solo&&muted branch now unreachable); sessionStore gains `sanitizeMixer` at the load gate — solo-wins, mute dropped silently, at the same gate recovery tests drive; new ADR-0012 records the runtime rule, the solo-wins load rule, and why for the "why does M clear S" reader. Test delta: suite 356→357 (+1 sanitizer test) plus the retargeted solo-logic observical (mute on a soloed Stem restores the other Stems' gains — the observable that distinguishes last-press-wins from the old pair state). Gotchas: no existing fixture anywhere carried `solo:true && muted:true`, so exclusivity broke no prior pin; `sanitizeMixer` spreads `{ ...mixer.stems }` (a bare `{}` annotated `Record<StemName, …>` fails TS2739); `ExportDialog.tsx` `state.solo && !state.muted` stays live and correct under exclusivity — deliberately untouched.

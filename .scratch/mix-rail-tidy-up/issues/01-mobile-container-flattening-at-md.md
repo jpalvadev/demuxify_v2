@@ -21,3 +21,7 @@
 **Branch:** mix-rail-tidy-up (new branch off `main` at porting start)
 
 **Spec:** `.scratch/mix-rail-tidy-up/spec.md`
+
+## Comments
+
+- **Ported — commit `4fa6b9b` (2026-11-02).** What landed: two class-token edits inside `src/components/StemPlayer.tsx` — the card root (`md:border md:border-border`) and the Time-Stretch & Pitch wrapper (`md:border md:border-border/60`) — flipping on the same `md` line the Tempo/Pitch grid already uses; every other token verbatim, sub-boxes/rail/Strips untouched. Test delta: suite 353→354 — one whole-app class-token seam test (presence of the `md:` pairs, absence of the bare `border`/`border-border` standalone tokens; grz-18 precedent). Gotchas: class-token tests pin tokens, not pixels — the DOM seam cannot evaluate media queries (noted above the test); both edits anchored with grep line numbers per big-file steering.

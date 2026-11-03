@@ -22,6 +22,14 @@ import * as path from "path";
 // Comments and `src/__tests__` are exempt, exactly as `npm run check:glossary`
 // exempts them: comments legitimately record the retirement as history, and
 // tests carry ABSENCE pins naming what must stay gone (CODING_STANDARDS.md §9).
+//
+// Mix Rail Tidy-Up (ticket 05) widens the list with the two affordances THIS
+// increment killed: the Click Track rail's "M" mute control (docs/adr/0010-
+// client-side-tempo-detection-and-click-track.md, Amendment: lane state is
+// {enabled, volume}, silence is switch-off + volume 0) and the Formant
+// pill-slider markup (docs/adr/... the shadcn relative-track + translating
+// knob died; the control is now a square rail button). The Stem Strip's M/S
+// buttons stay live, so the mute bans name the Click Track lane only.
 
 const SRC_DIR = path.resolve(process.cwd(), "src");
 
@@ -54,6 +62,30 @@ const BANNED_IN_SRC = [
       "a retired affordance's DOM is being rendered again (phase −/+ pair, " +
       "Meter selector and their labels). The suite's absence pins will go red " +
       "with this — remove the control.",
+  },
+  {
+    pattern:
+      /\b(setClickTrackMuted|toggleClickTrackMute|handleToggleClickTrackMute)\b|clickTrack(State)?\.muted\b/,
+    reason:
+      "the Click Track lane's mute concept is dead end to end (ADR-0010 " +
+      "Amendment, Mix Rail Tidy-Up ticket 03): ClickTrackMixerState is " +
+      "{enabled, volume} and the rail's silence routes are the ♪ switch and " +
+      "volume 0. The Stem Strip's M/S buttons are live — only the lane is " +
+      "named here.",
+  },
+  {
+    pattern: /aria-label="Mute Click Track"/,
+    reason:
+      "the dead rail M button is being rendered again (Mix Rail Tidy-Up " +
+      "ticket 03). The rail renders its ♪ switch and its volume slider only.",
+  },
+  {
+    pattern: /\b(translate-x-4|translate-x-5|ring-0)\b/,
+    reason:
+      "the Formant pill-slider markup is back (Mix Rail Tidy-Up ticket 02): " +
+      "the shadcn relative track + translating white-knob span died; the " +
+      "control re-homed into the square rail-button family wearing the Mic " +
+      "glyph.",
   },
 ];
 
@@ -111,8 +143,8 @@ if (hasErrors) {
   process.exit(1);
 } else {
   console.log(
-    "✅ Retired affordances stay gone: no Downbeat axis, no Meter selector in " +
-      "src/.\n"
+    "✅ Retired affordances stay gone: no Downbeat axis, no Meter selector, " +
+      "no Click Track mute control, no Formant pill-slider in src/.\n"
   );
   process.exit(0);
 }
