@@ -172,6 +172,36 @@ describe("StemPlayer UI Component", () => {
     expect(soloVocalsBtn).toHaveAttribute("aria-pressed", "true");
   });
 
+  it("keeps Solo and Mute on one Stem exclusive at the rail, the last press wins", () => {
+    // Mix Rail Tidy-Up (ticket 04, ADR-0012): the exclusivity is felt at the
+    // rail — pressing the other control of a Stem clears the held one, so the
+    // announced aria-pressed pair never carries both true at once.
+    render(
+      <StemPlayer
+        stems={dummyStems}
+        sampleRate={sampleRate}
+        audioContext={mockCtx}
+      />
+    );
+
+    const muteVocalsBtn = screen.getByRole("button", { name: /mute vocals/i });
+    const soloVocalsBtn = screen.getByRole("button", { name: /solo vocals/i });
+
+    fireEvent.click(muteVocalsBtn);
+    expect(muteVocalsBtn).toHaveAttribute("aria-pressed", "true");
+    expect(soloVocalsBtn).toHaveAttribute("aria-pressed", "false");
+
+    // Pressing Solo on the muted Stem clears its mute...
+    fireEvent.click(soloVocalsBtn);
+    expect(soloVocalsBtn).toHaveAttribute("aria-pressed", "true");
+    expect(muteVocalsBtn).toHaveAttribute("aria-pressed", "false");
+
+    // ...and pressing Mute back drops the solo: the last press wins.
+    fireEvent.click(muteVocalsBtn);
+    expect(muteVocalsBtn).toHaveAttribute("aria-pressed", "true");
+    expect(soloVocalsBtn).toHaveAttribute("aria-pressed", "false");
+  });
+
   it("allows seeking via Master Waveform timeline", () => {
     render(
       <StemPlayer

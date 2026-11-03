@@ -27,8 +27,10 @@ import * as path from "path";
 // increment killed: the Click Track rail's "M" mute control (docs/adr/0010-
 // client-side-tempo-detection-and-click-track.md, Amendment: lane state is
 // {enabled, volume}, silence is switch-off + volume 0) and the Formant
-// pill-slider markup (docs/adr/... the shadcn relative-track + translating
-// knob died; the control is now a square rail button). The Stem Strip's M/S
+// pill-slider markup (Mix Rail Tidy-Up spec + ticket 02 on the tracker: the
+// shadcn relative track + translating white-knob span died and the control
+// re-homed into the square rail-button family; no ADR — a re-home is not a
+// decision that reverses painfully, ADR-0008/0009 exception). The Stem Strip's M/S
 // buttons stay live, so the mute bans name the Click Track lane only.
 
 const SRC_DIR = path.resolve(process.cwd(), "src");
