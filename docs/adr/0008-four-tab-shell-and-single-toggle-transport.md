@@ -12,3 +12,7 @@ Revise the Tab Shell from [ADR-0007](./0007-tab-shell-ui.md): the **Listen** Tab
 ## Supersede
 
 Partially supersedes [ADR-0007](./0007-tab-shell-ui.md): the Tab Shell frame, grayscaled gating, shared spine, Bold visual identity, and port-through-React process stay; "exactly five Tabs" (Listen), the Transport bridge hosted in Listen, and the click-to-open Export panel no longer apply.
+
+## Amendment — partially superseded by the single-Playhead increment (2026-11-03)
+
+Partially superseded by [ADR-0013](./0013-mix-tab-cohesion-and-the-single-playhead-readout.md) (amendment "Mix Tab cohesion and the single Playhead readout" of `.scratch/mix-rail-tidy-up/spec.md`, tickets `06`–`10`): what no longer applies is the Mix Tab's rail order and the two competing `mm:ss` readouts — one Playhead now feeds spine, Strips and readout alike, the only visible clock is the **Transport**'s, and the spine's own readout group is dead outright while its header label and "Overview" chip survive. What still applies exactly as shipped: the single **Play/Pause toggle** Transport, the spine as the timeline (scrub) surface, the four-Tab Shell, and the inline Export panel fed through the Transport bridge.

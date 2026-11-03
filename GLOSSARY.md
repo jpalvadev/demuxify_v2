@@ -76,6 +76,18 @@ _Avoid_: Modal, popup, overlay, dialog, Listen tab
 The row of dedicated playback controls inside the Stem Player: a single Play/Pause toggle whose icon shows the action coming next, time readout, and Master Volume.
 _Avoid_: Separate Play and Pause buttons, seek-to-start button, pill button
 
+**Playhead**:
+The single current playback position of a Session, shared by the Master Waveform spine, the Stem strips and the Transport readout: one value, one clock, never two readouts that disagree. Counted in canonical seconds of the Source Mix, invariant under Time-Stretch.
+_Avoid_: Timestamp, position marker, progress bar, play marker, current time
+
+**Rail**:
+A self-contained control group inside a Tab carrying its own identity and controls (e.g. the Click Track rail: its own on/off, its own volume, its own readout). Distinct from the **Tab Rail**, the chrome's navigation row, which keeps its compound name so the two never collide.
+_Avoid_: Panel, card, section, toolbar
+
+**Stem Strip**:
+The per-Stem row in the Mix Tab carrying that Stem's volume, mute and solo controls, with its own waveform and its share of the Playhead. The mixer block is four Stem Strips plus at most one lane that is not a Stem (the Click Track).
+_Avoid_: Track row, channel, stem card
+
 **Tempo Detector**:
 The estimate of a Source Mix's dominant tempo in beats per minute, reported as a top candidate plus ranked alternatives because a true pulse and its metric doubling are genuinely ambiguous, and user-correctable.
 _Avoid_: BPM counter, tempo meter, DJ analyzer, beat app
@@ -89,5 +101,5 @@ A synthesized metronome accompaniment locked to the Beat Grid, played alongside 
 _Avoid_: Metronome, fifth stem, drum loop, time track
 
 **Hand Calibration**:
-The user's own four-tap reading of a groove — taps struck on the waveform spine from which the engine derives pulse (median of the inter-tap deltas) and the Beat Grid anchor (first tap), then re-anchors the Beat Grid through the same re-lock machinery with the derived BPM as hint. The guaranteed escape hatch when every automatic Tempo Detector reading misses: the rail says "calibrated by hand", never "auto".
+The user's own four-tap reading of a groove — taps struck on the waveform spine from which the engine derives pulse (median of the inter-tap deltas) and the Beat Grid anchor (first tap), then re-anchors the Beat Grid through the same re-lock machinery with the derived BPM as hint. The guaranteed escape hatch when every automatic Tempo Detector reading misses: the rail says "calibrated by hand", never "auto". The _decision_ it produces is a Hand Calibration; the _surface_ that asks for it is the Click Track's calibration tool, named "Calibrate the Click" — the tool name and the decision are one sentence apart, never two features.
 _Avoid_: Manual BPM, tap meter, auto calibration, beat adjustment

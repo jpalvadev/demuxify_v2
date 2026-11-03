@@ -1,0 +1,17 @@
+# 08: Mix stage rail order and the candidate picker's own Rail
+
+**What to build:** the Mix stage reads in the order the work is done — hear it, mix it, then bend its rate and key. Top-down, one order at every breakpoint: **Master Waveform** spine → **Hand Calibration** tap lane (its order already exists at the app level; the collapse is ticket 09) → the **Tempo Detector** candidate picker lifted out of the **Click Track** **Rail** into its own **Rail** → **Transport** row (the "Multi-Track Stem Player" title, its Layers mark and tagline surviving at the row's head) → the four **Stem Strips** → the **Click Track Rail** last of the five lanes → **Time-Stretch & Pitch-Shift** as the final rail. The picker keeps its identity when it moves: its own `role="group"` with an accessible name, its four chips with the "Re-lock Beat Grid to … BPM" / "Beat Grid locked to … BPM" names and `aria-pressed` lock state, its confidence line, and the honest-ranking copy verbatim. The **Click Track** **Rail** keeps only its on/off switch, its volume fader, and its one readout of the **Beat Grid** it is locked to — which is what makes the lane's zero-button shape pin meaningful: the chips' move out is one change with the lane's shape assertion, not two. Everything with a volume slider is one block; the rate knobs come last.
+
+**Blocked by:** 06 (the **Rail** and **Stem Strip** vocabulary and ADR-0013's picker-relocation record must exist first).
+
+**Status:** ready-for-agent
+
+- [ ] Rail order asserted off the composed region's children at the whole-app Mix Tab seam, and the same order holds at every breakpoint — no Mix-Tab-specific mobile block, no new breakpoint fork.
+- [ ] The picker's four chips assert **outside** the **Click Track** **Rail** root; the lane asserts zero buttons inside its root and exactly one switch + one slider plus its **Beat Grid** readout (the retargeted rail-shape pins).
+- [ ] The picker **Rail**: `role="group"` with its own accessible name; the pinned testids for the picker, the confidence line and the readout keep resolving; the honest-ranking copy ("readings ranked · pick the feel you hear", "calibrated by hand") survives verbatim; the re-lock pass and the **Beat Grid** machinery stay exactly where they work (behaviour untouched — names, `aria-pressed`, and the swap stay green).
+- [ ] The heading survives: the app seam's title pins resolve at the head of the **Transport** row; the four **Stem Strips** are four `role="group"` named `/stem$/` above the fold, above the rate knobs.
+- [ ] The **Time-Stretch & Pitch-Shift** section stays intact as the final rail: the **Vocal Formant Preservation** chip button ticket 02 re-homed survives inside it untouched.
+- [ ] The **Master Volume** fader keeps its `lg`-only hiding and the **Transport** row keeps stacking below `md` — the flattening increment's responsive truths survive as class tokens (the DOM seam cannot see media queries).
+- [ ] Ownership stays put: the picker, the lane and the **Time-Stretch** section remain children of the **Stem Player** component; only the spine and the tap lane are composed at the app level, and only their order changes there. No rail changes owner, no new component.
+- [ ] Export parity guard: the **Export Bundle** rule and the Export Tab's view of the mixer state untouched — those seams green without edits.
+- [ ] Look is agent-authored: OpenDesign MCP answered nothing this session (documented dead-MCP fallback) — the reordered stage's look recorded here, no OpenDesign run paid.
