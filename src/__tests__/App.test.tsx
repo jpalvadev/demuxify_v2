@@ -687,6 +687,86 @@ describe("App UI Shell", () => {
     expect(railClasses).toContain("border border-primary/30");
   });
 
+  it("keeps the Formant pill-slider dead in the composed Mix stage and homes the Mic chip on its label row", async () => {
+    // Mix Rail Tidy-Up (ticket 02): the whole-app seam proves no pill-slider
+    // marker (track span, translating knob, white-knob ring) survives
+    // anywhere in the composed stage, the re-homed switch lives inline on
+    // its label row inside the Pitch Transposition box, and the "Vocals
+    // Stem" copy chip beside the label stays verbatim.
+    vi.spyOn(webgpuModule, "detectWebGPUCapability").mockResolvedValue({
+      supported: true,
+      isFallback: false,
+    });
+    vi.spyOn(InferenceClient.prototype, "init").mockResolvedValue({
+      backend: "webgpu",
+    });
+    vi.spyOn(InferenceClient.prototype, "separate").mockResolvedValue({
+      stems: {
+        vocals: [new Float32Array(500), new Float32Array(500)],
+        drums: [new Float32Array(500), new Float32Array(500)],
+        bass: [new Float32Array(500), new Float32Array(500)],
+        other: [new Float32Array(500), new Float32Array(500)],
+      },
+      duration: 180,
+    });
+
+    render(<App />);
+
+    const file = new File(["audio"], "song_master.mp3", { type: "audio/mp3" });
+    const fileInput = screen.getByLabelText(/select source mix file/i, {
+      selector: "input",
+    });
+    fireEvent.change(fileInput, { target: { files: [file] } });
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: /separate stems|start separation/i })
+      ).toBeInTheDocument();
+    });
+
+    const separateBtn = screen.getByRole("button", {
+      name: /separate stems|start separation/i,
+    });
+    fireEvent.click(separateBtn);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("region", { name: /stem player/i })
+      ).toBeInTheDocument();
+    });
+
+    const stemPlayerRegion = screen.getByRole("region", {
+      name: /stem player/i,
+    });
+
+    // The re-homed control: one switch, announced state, square chip.
+    const formantSwitch = within(stemPlayerRegion).getByRole("switch", {
+      name: /vocal formant preservation/i,
+    });
+    expect(formantSwitch).toHaveAttribute("aria-checked", "true");
+    const switchClasses = formantSwitch.getAttribute("class") ?? "";
+    expect(switchClasses).toContain("h-8");
+    expect(switchClasses).toContain("w-8");
+    expect(switchClasses).not.toMatch(/translate-x|cursor-pointer/);
+    expect(formantSwitch.querySelectorAll("span")).toHaveLength(0);
+
+    // No pill-slider markup marker anywhere in the composed page.
+    expect(document.querySelectorAll('[class*="translate-x-4"]').length).toBe(
+      0
+    );
+    expect(document.querySelectorAll('[class*="translate-x-5"]').length).toBe(
+      0
+    );
+    expect(document.querySelectorAll('[class*="ring-0"]').length).toBe(0);
+
+    // The label-row copy chip stays verbatim next to the label.
+    const vocalsChip = within(stemPlayerRegion).getByText("Vocals Stem");
+    expect(vocalsChip.getAttribute("class") ?? "").toContain("bg-primary/10");
+    expect(vocalsChip.getAttribute("class") ?? "").toContain(
+      "border-primary/20"
+    );
+  });
+
   it("detects a saved session on startup and presents the recovery banner", async () => {
     vi.spyOn(webgpuModule, "detectWebGPUCapability").mockResolvedValue({
       supported: true,

@@ -9,6 +9,7 @@ import {
   Download,
   Gauge,
   Music,
+  Mic,
   Plus,
   Minus,
 } from "lucide-react";
@@ -1022,18 +1023,13 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
                 aria-checked={formantPreservation}
                 onClick={handleToggleFormant}
                 className={cn(
-                  "relative inline-flex h-5 w-9 sm:h-6 sm:w-11 shrink-0 cursor-pointer rounded-none border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden",
-                  formantPreservation ? "bg-primary" : "bg-muted"
+                  "h-8 w-8 rounded-none border text-xs font-bold transition-all flex items-center justify-center",
+                  formantPreservation
+                    ? "border-primary/70 bg-primary text-primary-foreground shadow-xs font-black"
+                    : "border-border/70 bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground"
                 )}
               >
-                <span
-                  className={cn(
-                    "pointer-events-none inline-block h-4 w-4 sm:h-5 sm:w-5 transform rounded-none bg-white shadow-lg ring-0 transition duration-200 ease-in-out",
-                    formantPreservation
-                      ? "translate-x-4 sm:translate-x-5"
-                      : "translate-x-0"
-                  )}
-                />
+                <Mic className="h-4 w-4" />
               </button>
             </div>
           </div>

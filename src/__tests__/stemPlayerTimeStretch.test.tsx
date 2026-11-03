@@ -297,10 +297,41 @@ describe("StemPlayer Time-Stretch & Pitch Controls", () => {
     // Click to toggle off
     fireEvent.click(formantToggle);
     expect(formantToggle).toHaveAttribute("aria-checked", "false");
+    // Re-homed (Mix Rail Tidy-Up ticket 02): OFF wears the rail-button
+    // family's unpressed chip treatment, not a shadcn pill track.
+    const offClasses = formantToggle.getAttribute("class") ?? "";
+    expect(offClasses).toContain("border-border/70");
+    expect(offClasses).toContain("bg-secondary/60");
 
     // Click to toggle back on
     fireEvent.click(formantToggle);
     expect(formantToggle).toHaveAttribute("aria-checked", "true");
+
+    // Mix Rail Tidy-Up (ticket 02): the control is a member of the existing
+    // square rail-button family (the ♪/M/S chips' pressed token pair), so
+    // nothing of it can overhang the panel border at any viewport.
+    const onClasses = formantToggle.getAttribute("class") ?? "";
+    for (const token of [
+      "h-8",
+      "w-8",
+      "rounded-none",
+      "border",
+      "flex items-center justify-center",
+      "transition-all",
+    ]) {
+      expect(onClasses).toContain(token);
+    }
+    expect(onClasses).toContain("border-primary/70");
+    expect(onClasses).toContain("bg-primary");
+    expect(onClasses).toContain("text-primary-foreground");
+    expect(onClasses).toContain("shadow-xs");
+
+    // The pill-slider markup died outright: no track span, no translating
+    // knob span, no white knob ring — and the button carries exactly one
+    // lucide glyph (the Mic the Vocals Stem Strip also uses).
+    expect(onClasses).not.toMatch(/translate-x|ring-0|cursor-pointer/);
+    expect(formantToggle.querySelectorAll("span")).toHaveLength(0);
+    expect(formantToggle.querySelectorAll("svg")).toHaveLength(1);
   });
 
   it("anchors Master Waveform duration display to canonical duration during time-stretch playback", () => {
