@@ -34,3 +34,5 @@
 **Dead-MCP look records:** the scan finds the agent-authored fallback record on tickets `07`, `08` and `09` (the only three tickets with a look to claim — `06` is a record and `10` is verification), as required by `AGENTS.md`'s OpenDesign mandate and `docs/agents/open-design-mcp.md`: the MCP answered nothing this session, its first light `list_projects` call errored, and no doomed design call was re-paid per ticket.
 
 **spec.md:** the Amendment's Status line flipped `ready-for-agent` → `resolved-in-full`, and the spec header's parenthetical about the Amendment flipped with it so the file cannot claim an open increment over a closed set of tickets.
+
+**Review-pass addendum (same branch, one later commit):** the inline Standards + Spec review of `main...HEAD` found the mirror test short on two Testing-Decisions pins at the whole-app Mix seam — the spine block's clock absence and its `aria-valuetext` face. Both were added **inside the existing mirror test** (suite shape untouched: 359, still one net-new) and committed as the review pass; the spine face pin records the sibling trap: `0:03` on the spine against the Transport's `00:03`.
