@@ -60,7 +60,7 @@ Always use canonical domain terms defined in `GLOSSARY.md`.
 ## 9. Affordance Retirement Turns DOM Assertions into Absence Assertions, Surviving Readouts Stay Pinned
 
 - When a UI affordance is retired (e.g. the Click Track rail's −/+ pair, Meter selector and phase readouts, per the ADR-0011 Amendment), every test that pinned its DOM is rewritten as an ABSENCE assertion: `queryByTestId`/`queryAllByRole` expected `null`/empty, never just deleting the test — a silent deletion blinds the suite to the affordance coming back.
-- Readouts that survive the retirement (BPM label, lane on/off, mute, volume) keep their pinned DOM assertions; a retirement must not weaken what the suite sees around it.
+- Readouts that survive the retirement (BPM label, lane on/off, mute, volume — scoped to where they still exist: the Stem lanes' mute is live, while the Click Track lane's mute died per the ADR-0010 Amendment) keep their pinned DOM assertions; a retirement must not weaken what the suite sees around it.
 - `getAllByRole` THROWS when empty — absence checks must use the `query*` variants.
 - Before touching any rail control, grep `src/__tests__` for its `data-testid`: test files pin these attributes across the suite (see `docs/agents/navigation.md`).
 - That pin is gated, not remembered: `npm run check:testids` fails when a PRESENCE accessor (`getByTestId`/`getAllByTestId`/`findByTestId`/`findAllByTestId`) names an id no component renders. The ABSENCE half (`queryByTestId`, `queryAllByTestId`, `filterByTestId`) is exempt on principle — it is the pin that proves a retirement held, so it legitimately names something that no longer exists.

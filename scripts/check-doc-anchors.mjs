@@ -10,6 +10,13 @@ import * as path from "path";
 // plain lowercase words) — that drift stays a judgement call — and whole
 // sections/lines that explicitly mark names as retired/deleted/history,
 // because ADRs legitimately record what used to exist.
+//
+// There is also a reverse pass: a docs/<path> citation inside SHIPPED CODE
+// (src/ and scripts/) must point at a doc that exists. Comments and gate
+// ban-reasons are what agents follow, and a citation gesturing at a doc
+// without naming one misleads every run after it; wrapped comment lines
+// are rejoined before matching so a path split across `//` lines resolves
+// whole.
 
 const ADR_DIR = path.resolve(process.cwd(), "docs", "adr");
 const DOC_TARGETS = ["CODING_STANDARDS.md"];
@@ -193,6 +200,78 @@ for (const docPath of docsToScan) {
     }
   });
 }
+
+// Reverse pass: docs/<path> citations inside shipped code (src/ + scripts/)
+// must resolve to an existing file. Comment paragraphs wrapped across lines
+// are rejoined with a sentinel, and each wrap point is also a candidate CUT:
+// a path split mid-name by the wrap still resolves whole, while a completed
+// citation followed by prose on the next line is not glued onto that prose.
+// A dangling ellipsis (unwrapped, or a wrapped one whose cut lands on a bare
+// directory) names a doc without naming it — red.
+const commentWrap = /\r?\n\s*(?:\/\/+\s?|\*+\s?)/g;
+const docsCitation = /docs\/(?:[A-Za-z0-9_./-]|\u0000(?=[A-Za-z0-9_./-]))+/g;
+
+function citationCandidates(span) {
+  const candidates = [];
+  let joinedHead = "";
+  let segment = "";
+  for (const ch of span) {
+    if (ch === "\u0000") {
+      candidates.push(joinedHead + segment);
+      joinedHead += segment;
+      segment = "";
+    } else {
+      segment += ch;
+    }
+  }
+  candidates.push(joinedHead + segment);
+  return candidates;
+}
+
+function citationResolves(candidate, isMaximal) {
+  const span = candidate.replace(/([^\.])\.$/, "$1"); // strip a sentence dot
+  // a wrap-cut must land on a real file, never a bare directory
+  if (!isMaximal && !/\.[a-z]{2,4}$/.test(span)) return false;
+  return fs.existsSync(path.resolve(process.cwd(), span));
+}
+
+function checkDocsCitations(dir) {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const fullPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      checkDocsCitations(fullPath);
+      continue;
+    }
+    if (!/\.(ts|tsx|mjs)$/.test(entry.name)) continue;
+    const joined = fs
+      .readFileSync(fullPath, "utf8")
+      .replace(commentWrap, "\u0000");
+    const relative = path.relative(process.cwd(), fullPath).replace(/\\/g, "/");
+    for (const m of joined.matchAll(docsCitation)) {
+      const candidates = citationCandidates(m[0]);
+      const last = candidates.length - 1;
+      let resolved = false;
+      for (let k = 0; k <= last; k += 1) {
+        if (citationResolves(candidates[k], k === last)) {
+          resolved = true;
+          break;
+        }
+      }
+      if (resolved) continue;
+      console.error(`❌ Dangling docs citation in ${relative}`);
+      console.error(
+        `   \`${candidates[last].replace(/([^\.])\.$/, "$1")}\` — no doc file resolves at this path`
+      );
+      console.error(
+        "   👉 Name a doc that exists, or cite the tracker spec + ticket — never a bare ellipsis.\n"
+      );
+      hasErrors = true;
+    }
+  }
+}
+
+checkDocsCitations(path.resolve(process.cwd(), "src"));
+checkDocsCitations(path.resolve(process.cwd(), "scripts"));
 
 if (hasErrors) {
   console.error(

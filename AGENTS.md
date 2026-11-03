@@ -38,7 +38,7 @@ Test files pin DOM `data-testid` attributes across `src/__tests__`; grep the pin
 
 ### Model provisioning
 
-ONNX models and lightweight weights are provisioned by `scripts/provision_htdemucs.py` (htdemucs) or `scripts/provision_open_unmix.py` (Open-Unmix UMX-HQ); the exported graphs are patched for the ORT-Web WebGPU EP by `scripts/normalize_axes.py` (negative `axis` attrs) and `scripts/webgpu_friendly.py` (Split/Concat kept under Chrome's 8-storage-buffer limit). See `public/models/`.
+The `scripts/provision_*.py` pair provisions ONNX models and lightweight weights (one script per profile) into `public/models/`. The exported graphs need patching before ORT-Web's WebGPU EP runs them: negative `axis` attrs via `scripts/normalize_axes.py`, and Split/Concat kept under Chrome's 8-storage-buffer limit via `scripts/webgpu_friendly.py`.
 
 ### Verification replays
 
@@ -54,7 +54,7 @@ When working on Windows, avoid cross-drive NTFS junctions to `node_modules` beca
 
 ### Check cycle
 
-Every commit must pass the gate wired in `.husky/pre-commit`: `npx lint-staged` → `npm run check:glossary` → `npm run check:doc-anchors` → `npm run check:test-fixtures` → `npm run check:testids` → `npm run check:retired-affordances` → `npm run typecheck` → `npm run test`. Never stage and commit without running it; the hook re-runs the full suite (~22–33 s) on every `git commit`.
+Every commit must pass the chain wired in `.husky/pre-commit` (read it for the current gate list). Never stage and commit blind to it: the hook re-runs the whole chain (~22–33 s) on every `git commit`.
 
 When the suite fails, do NOT re-read raw vitest output (thousands of tokens of DOM dumps). Run `npm run test:report` (`scripts/vitest-summary.mjs`) and work from its compact failure list.
 
