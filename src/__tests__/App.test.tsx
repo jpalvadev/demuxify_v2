@@ -2143,10 +2143,20 @@ describe("App UI Shell", () => {
       await waitFor(() => {
         expect(spine).toHaveAttribute("aria-valuenow", "3");
       });
+      // The spine's accessible text moves on the same channel — the face is
+      // the spine's own m:ss face, one second wider than the Transport's mm:ss.
+      expect(spine).toHaveAttribute("aria-valuetext", "0:03");
 
       // One Playhead: the Transport shows the same 3 s the spine walked to.
       const transportReadout = within(mixTab).getByTestId("stem-player-time");
       expect(transportReadout.textContent).toContain("00:03");
+
+      // And the spine block itself carries no clock at the whole-app seam: the
+      // deleted header group's absence survives here, so one Playhead keeps
+      // exactly one visible readout (the canvas graduations are drawn, not
+      // DOM text, so the only digits the block could hold are a live clock's).
+      const spineBlock = spine.parentNode as HTMLElement;
+      expect(spineBlock.textContent).not.toMatch(/\d{1,2}:\d{2}/);
     } finally {
       // Hand the globals back so the rest of the suite keeps jsdom's shape.
       window.AudioContext = OrigAudioContext as any;
