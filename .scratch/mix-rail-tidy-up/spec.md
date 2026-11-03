@@ -1,6 +1,6 @@
 # Spec: Mix Rail Tidy-Up — Mobile Container Flattening, Formant Chip Button, Click Track Mute Death, Solo/Mute Exclusivity
 
-Status: resolved-in-full (tickets `01`–`05` all resolved). Carries one **Amendment** below: "Mix Tab cohesion and the single Playhead readout" (`ready-for-agent`, tickets `06`–`10`).
+Status: resolved-in-full (tickets `01`–`05` all resolved). Carries one **Amendment** below: "Mix Tab cohesion and the single Playhead readout" — **resolved-in-full** (tickets `06`–`10` all resolved).
 
 Recorded on the tracker 2026-11-02. Supersedes nothing outright: it amends the Click Track lane state recorded in `docs/adr/0010-client-side-tempo-detection-and-click-track.md`, and an ADR-0012 "Solo and Mute are per-Stem exclusive" is authored with this increment; an ADR-0009-style removals-and-re-home exception applies (no OpenDesign run). Glossary terms used throughout: **Stem Player**, **Stems**, **Click Track**, **Beat Grid**, **Session**, **Export Bundle**, **Time-Stretch**, **Pitch-Shift**, **Formant Preservation**, **Tab Shell**, **Tab**, **Master Waveform**, **Transport**.
 
@@ -107,7 +107,7 @@ Visual language is unchanged: same Grizzlython ramp, same tokens, same square-bu
 
 # Amendment: Mix Tab cohesion and the single Playhead readout
 
-Status: ready-for-agent
+Status: resolved-in-full (tickets `06`–`10` all resolved on branch `mix-tab-cohesion`; the increment's green is promised at ticket `10`).
 
 Recorded on the tracker 2026-11-03, as an amendment of the above spec rather than a new feature: the increment re-homes rails this spec already touched and retires a readout surface it never visited. It partially supersedes `docs/adr/0008-four-tab-shell-and-single-toggle-transport.md` (the Mix Tab's rail order and its two competing readouts); a new **ADR-0013 "Mix Tab cohesion and the single Playhead readout"** is authored at porting start. The **OpenDesign** mandate runs in its documented dead-MCP fallback: the MCP answered nothing this session, so the reordered Mix stage's look is agent-authored and recorded as such on tickets `07`–`09`. Glossary terms used throughout: **Playhead**, **Rail**, **Stem Strip**, **Master Waveform**, **Transport**, **Stem Player**, **Click Track**, **Beat Grid**, **Hand Calibration**, **Tempo Detector**, **Session**, **Source Mix**, **Time-Stretch**, **Pitch-Shift**, **Formant Preservation**, **Tab Shell**, **Tab**.
 
