@@ -280,7 +280,7 @@ export const MasterWaveform: React.FC<MasterWaveformProps> = ({
           <span className="font-sans text-[10px] text-st-ink-dim">
             Overview
           </span>
-          <span className="bg-zinc-800 px-1.5 py-0.5 rounded text-[9px] uppercase tracking-wider text-st-ink-dim shrink-0">
+          <span className="px-2 py-1 rounded bg-st-surface border border-st-hairline text-[9px] uppercase tracking-wider text-zinc-400 hover:text-zinc-200 shrink-0">
             Stereo Mix
           </span>
         </div>

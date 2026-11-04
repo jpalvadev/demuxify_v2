@@ -110,7 +110,7 @@ const tabPanelClass = (gated: boolean, active: boolean) =>
   // display-hidden inside the stage.
   gated || !active
     ? "hidden"
-    : "absolute inset-0 overflow-y-auto overflow-x-hidden rounded border border-muted-foreground/60 bg-card/80 p-4 sm:px-6 sm:py-6 transition-colors";
+    : "absolute inset-0 overflow-y-auto overflow-x-hidden rounded border border-st-hairline bg-st-canvas p-4 sm:px-6 sm:py-6 transition-colors";
 
 export const App: React.FC = () => {
   // Dark-only contract (ticket 09): no theme state — html keeps `dark` forever
@@ -847,7 +847,7 @@ export const App: React.FC = () => {
             stage content from ghosting through. */}
         <nav
           aria-label="Tab Band"
-          className="sticky top-0 z-30 flex flex-col gap-2 md:flex-row md:items-center md:justify-between py-2 pb-3.5 sm:py-2.5 sm:pb-4 overflow-hidden w-full backdrop-blur-md bg-background/95 md:bg-card/50"
+          className="sticky top-0 z-30 flex flex-col gap-2 md:flex-row md:items-center md:justify-between py-2 pb-3.5 sm:py-2.5 sm:pb-4 overflow-hidden w-full border-b border-st-hairline bg-st-panel"
         >
           <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-6 shrink-0">
             <BrandUnit />
