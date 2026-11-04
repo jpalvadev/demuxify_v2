@@ -848,7 +848,7 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
               <div className="flex items-center justify-between pb-2 border-b border-st-hairline/60">
                 <span className="font-mono text-[11px] font-bold text-st-ink uppercase flex items-center gap-2">
                   <Gauge className="h-3.5 w-3.5 text-primary" />
-                  Tempo / Speed
+                  Time-Stretch & Speed
                 </span>
                 <span
                   data-testid="current-tempo-label"
