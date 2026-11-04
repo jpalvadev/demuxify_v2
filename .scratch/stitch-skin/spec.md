@@ -1,6 +1,6 @@
 # Spec: Stitch Skin — Coral-on-Black Reskin of the Whole Tab Shell
 
-Status: ready-for-agent
+Status: resolved-in-full
 
 Recorded on the tracker 2026-11-03. Supersedes visual-language claims in `docs/adr/0007-tab-shell-ui.md` (acid-lime accent, its font contract), the chrome placement of `docs/adr/0009-rail-hosted-chrome-and-inline-notices.md` (vertical rail column at md+), and the Mix rail order of `docs/adr/0013-mix-tab-cohesion-and-the-single-playhead-readout.md`; it must not resurrect anything `docs/adr/0010`/`docs/adr/0011` Amendments retired. Design source: the user's Google Stitch Mix-Tab mockup plus desktop/mobile screenshots, extrapolated to the other Tabs by the agent — the OpenDesign MCP was NOT called (forbidden for this effort); the look is recorded on the tickets as agent-authored via the documented fallback route (`docs/agents/open-design-mcp.md`). ADR-0014 is authored with this increment. Glossary terms used throughout: **Tab Shell**, **Tab**, **Tab Band**, **Brand Unit**, **Transport**, **Stem Player**, **Stem Strip**, **Master Waveform**, **Playhead**, **Hand Calibration**, **Tempo Detector**, **Beat Grid**, **Click Track**, **Time-Stretch**, **Pitch-Shift**, **Formant Preservation**, **Source Mix**, **Stems**, **Session**, **Model Profile**, **Model Cache**, **Inference Engine**, **Export Bundle**, **Custom Mixdown**, **BPM Candidate**.
 

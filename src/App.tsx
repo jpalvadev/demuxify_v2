@@ -92,6 +92,12 @@ const TAB_REGISTRY: TabEntry[] = [
   { id: "system", title: "System", gatedUntilStems: false },
 ];
 
+// Tab Band chip metrics, recorded in docs/adr/0014-coral-on-black-stitch-skin-
+// and-the-tab-band.md (anchor discipline: every ADR number is a named const).
+// The compact chip: JetBrains-Mono at 11px on a 44px touch target.
+const TAB_CHIP_TYPE_PX = 11;
+const TAB_CHIP_MIN_TARGET_PX = 44;
+
 const TAB_GATING_REASON = "no Stems yet";
 
 const tabPanelClass = (gated: boolean, active: boolean) =>
@@ -831,7 +837,7 @@ export const App: React.FC = () => {
                     aria-current={active ? "true" : undefined}
                     aria-disabled={gated ? true : undefined}
                     onClick={() => handleSelectTab(tab.id)}
-                    className={`flex flex-col items-center justify-center gap-0.5 px-3 py-1 min-h-[44px] min-w-[44px] rounded uppercase font-mono text-[11px] tracking-wide transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${active ? "bg-primary text-white font-bold shadow-chip-glow" : "font-medium text-st-ink-dim hover:text-st-ink"} ${gated ? "opacity-50 text-muted-foreground" : ""}`.trim()}
+                    className={`flex flex-col items-center justify-center gap-0.5 px-3 py-1 min-h-[${TAB_CHIP_MIN_TARGET_PX}px] min-w-[${TAB_CHIP_MIN_TARGET_PX}px] rounded uppercase font-mono text-[${TAB_CHIP_TYPE_PX}px] tracking-wide transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${active ? "bg-primary text-white font-bold shadow-chip-glow" : "font-medium text-st-ink-dim hover:text-st-ink"} ${gated ? "opacity-50 text-muted-foreground" : ""}`.trim()}
                   >
                     <span className="whitespace-nowrap">{tab.title}</span>
                     {gated && (

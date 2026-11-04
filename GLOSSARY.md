@@ -64,8 +64,12 @@ _Avoid_: Timeline bar, progress bar, audio visualizer
 The persistent application frame that hosts the Brand Unit and organizes the tools into fixed, mutually exclusive tabs, replacing the single-column card flow and all modal overlays.
 _Avoid_: Workspace, menu, dashboard, card stack
 
+**Tab Band**:
+The Tab Shell's one sticky top chrome at every breakpoint — the Brand Unit row over the four Tab chips, one merged block pinned while scrolling — which replaced the desktop rail column and the two-block mobile split with a single mechanism.
+_Avoid_: Tab Rail, rail column, header, top strip
+
 **Brand Unit**:
-The identity lockup (icon mark, wordmark, status dot, mono tagline) carried inside the Tab Shell chrome — at the head of the rail on desktop and in the top band on mobile — never as a separate page header.
+The identity lockup (icon mark, wordmark, status dot, mono tagline) carried inside the Tab Shell chrome — at the head of the **Tab Band** at every breakpoint — never as a separate page header.
 _Avoid_: Header, top bar, sidebar, masthead, logo row
 
 **Tab**:
@@ -81,7 +85,7 @@ The single current playback position of a Session, shared by the Master Waveform
 _Avoid_: Timestamp, position marker, progress bar, play marker, current time
 
 **Rail**:
-A self-contained control group inside a Tab carrying its own identity and controls (e.g. the Click Track rail: its own on/off, its own volume, its own readout). Distinct from the **Tab Rail**, the chrome's navigation row, which keeps its compound name so the two never collide.
+A self-contained control group inside a Tab carrying its own identity and controls (e.g. the Click Track rail: its own on/off, its own volume, its own readout). Distinct from the **Tab Band**, the chrome's sticky navigation row, which keeps its compound name so the two never collide.
 _Avoid_: Panel, card, section, toolbar
 
 **Stem Strip**:

@@ -44,6 +44,21 @@ import * as path from "path";
 // decision that reverses painfully, ADR-0008/0009 exception). The Stem Strip's M/S
 // buttons stay live, so the mute bans name the Click Track lane only.
 
+// Stitch Skin (2026-11-04 user override): the Google Stitch mockup shows
+// phantom controls the app never had — undo/redo/gear icons, an engine badge
+// (DSP WebAudio / LATENCY / BUFFERS), loop/seek-to-start/ff/TAP transport
+// glyphs, Stereo VU pips with a 0 dB readout, beat-dot pips with a BAR
+// counter, a 4/4 Beat chip and a phantom third DSP-rack card (Click Track /
+// Metronome). The override renders these VERBATIM as DEAD PLACEHOLDERS:
+// marked data-mockup-placeholder="true", aria-hidden, wired to no behavior,
+// to be erased by a later cleanup commit when this exemption goes back to a
+// hard ban. So PLACEHOLDER_EXEMPT_IN_SRC below retires that phantom chrome in
+// LIVE markup while SKIPPING every line inside a placeholder subtree — one
+// scoped exemption, covering exactly this drop list. The strict BANNED_IN_SRC
+// list above stays strict everywhere, placeholders included: a grz class, a
+// Downbeat symbol or a Formant pill-slider may not hide behind a
+// data-mockup-placeholder either.
+
 const SRC_DIR = path.resolve(process.cwd(), "src");
 
 const BANNED_IN_SRC = [
@@ -156,7 +171,93 @@ const BANNED_IN_SRC = [
   },
 ];
 
+// Phantom chrome the 2026-11-04 override admits ONLY inside a placeholder
+// subtree (see placeholderRanges below). Same identity convention as above:
+// every pattern names the mockup control it retires from LIVE markup.
+const PLACEHOLDER_EXEMPT_IN_SRC = [
+  {
+    pattern: /p-1\.5 rounded border border-transparent/,
+    reason:
+      "Stitch Skin drop list: the mockup's undo/redo/gear icon cluster is " +
+      "phantom chrome — the app has no undo/redo or settings buttons. Renders " +
+      'only inside an element marked data-mockup-placeholder="true".',
+  },
+  {
+    pattern: /BUFFERS: SYNCED|LATENCY: <1\.8ms|DSP WebAudio/,
+    reason:
+      "the mockup's engine badge (DSP WebAudio / LATENCY: <1.8ms / " +
+      "BUFFERS: SYNCED) is a fake telemetry readout the app never had. " +
+      "Placeholder-only.",
+  },
+  {
+    pattern: /Loop Section|M4 4v5h\.582/,
+    reason:
+      "the mockup's Loop toggle (Loop Section button + the M4 4v5h.582 loop " +
+      "glyph) is phantom transport chrome — playback looping is not a shipped " +
+      "control. Placeholder-only.",
+  },
+  {
+    pattern: /M8\.445 14\.832|M4\.555 5\.168/,
+    reason:
+      "the mockup's Seek-to-start and Fast-forward transport glyphs (the " +
+      "M8.445…/M4.555… skip-path families) never shipped. Placeholder-only.",
+  },
+  {
+    pattern: /\bTAP\b/,
+    reason:
+      "the mockup's all-caps transport TAP button is phantom — the live " +
+      "Hand Calibration asks for lowercase beat taps, never an all-caps TAP " +
+      "button on any rail. Placeholder-only.",
+  },
+  {
+    pattern: /0 dB\b|bg-emerald-\d{3}/,
+    reason:
+      "the mockup's Stereo VU Peak Output Meters (emerald pips + 0 dB " +
+      "readout) are phantom chrome — the app has no VU meter anywhere. " +
+      "Placeholder-only.",
+  },
+  {
+    pattern: /\bBAR \d/,
+    reason:
+      "the mockup's BAR + beat-number counter is a phantom Click Track " +
+      "readout — the shipped Click Track shows no BAR display. " +
+      "Placeholder-only.",
+  },
+  {
+    pattern: /4\/4 Beat/,
+    reason:
+      "the mockup's 4/4 Beat chip on its phantom metronome card; the shipped " +
+      "DSP rack has two cards, never a third. Placeholder-only.",
+  },
+];
+
 let hasErrors = false;
+
+// A data-mockup-placeholder="true" element and its whole subtree. The marker
+// usually sits on an attribute line below the opening tag, so walk back to the
+// line that opens the tag; then walk forward adding opens minus closes minus
+// self-closes until depth returns to zero.
+function placeholderRanges(lines) {
+  const found = [];
+  for (let i = 0; i < lines.length; i++) {
+    if (!lines[i].includes('data-mockup-placeholder="true"')) continue;
+    let start = i;
+    while (start > 0 && !/<[A-Za-z]/.test(lines[start])) start--;
+    let depth = 0;
+    let end = start;
+    for (let j = start; j < lines.length; j++) {
+      const opens = (lines[j].match(/<(?!\/)[A-Za-z][A-Za-z0-9-]*/g) || [])
+        .length;
+      const closes = (lines[j].match(/<\/[A-Za-z][A-Za-z0-9-]*/g) || []).length;
+      const selfCloses = (lines[j].match(/\/>/g) || []).length;
+      depth += opens - closes - selfCloses;
+      end = j;
+      if (depth <= 0) break;
+    }
+    found.push([start, end]);
+  }
+  return found;
+}
 
 function scanDir(dir) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -172,6 +273,7 @@ function scanDir(dir) {
     if (!entry.name.endsWith(".ts") && !entry.name.endsWith(".tsx")) continue;
 
     const lines = fs.readFileSync(fullPath, "utf8").split("\n");
+    const exemptLines = placeholderRanges(lines);
 
     lines.forEach((line, lineIdx) => {
       // Comments record history legitimately; code does not.
@@ -195,6 +297,23 @@ function scanDir(dir) {
         console.error(`   👉 ${reason}\n`);
         hasErrors = true;
       }
+
+      for (const { pattern, reason } of PLACEHOLDER_EXEMPT_IN_SRC) {
+        if (
+          exemptLines.some(([start, end]) => lineIdx >= start && lineIdx <= end)
+        )
+          continue;
+        if (!pattern.test(line)) continue;
+        const relative = path
+          .relative(process.cwd(), fullPath)
+          .replace(/\\/g, "/");
+        console.error(
+          `❌ Stitch mockup phantom chrome revived outside a placeholder in ${relative}:${lineIdx + 1}`
+        );
+        console.error(`   "${trimmed}"`);
+        console.error(`   👉 ${reason}\n`);
+        hasErrors = true;
+      }
     });
   }
 }
@@ -212,7 +331,10 @@ if (hasErrors) {
   console.log(
     "✅ Retired affordances stay gone: no Downbeat axis, no Meter selector, " +
       "no Click Track mute control, no Formant pill-slider, no spine time " +
-      "readout in src/.\n"
+      "readout; the Stitch mockup's phantom chrome (undo/redo/gear, engine " +
+      "badge, loop/ff/TAP transport, VU meters, BAR counters, the third DSP-rack " +
+      "card) renders only inside a data-mockup-placeholder dead placeholder in " +
+      "src/.\n"
   );
   process.exit(0);
 }
