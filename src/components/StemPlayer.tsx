@@ -913,17 +913,17 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
           </button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 pt-1">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
           {/* Tempo Section */}
-          <div className="rounded border border-border/50 bg-card/60 p-3.5 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+          <div className="rounded border border-st-hairline bg-st-panel p-3 flex flex-col justify-between space-y-3">
+            <div className="flex items-center justify-between pb-2 border-b border-st-hairline/60">
+              <span className="font-mono text-[11px] font-bold text-st-ink uppercase flex items-center gap-2">
                 <Gauge className="h-3.5 w-3.5 text-primary" />
                 Tempo / Speed
               </span>
               <span
                 data-testid="current-tempo-label"
-                className="font-mono text-xs font-bold text-primary bg-primary/10 px-2 py-0.5 rounded border border-primary/20"
+                className="font-mono text-[11px] font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded"
               >
                 {tempo.toFixed(2)}x
               </span>
@@ -986,10 +986,10 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
                     aria-pressed={isSelected}
                     onClick={() => handleTempoChange(preset)}
                     className={cn(
-                      "flex-1 py-1 rounded text-[10px] sm:text-[11px] font-semibold border transition-all",
+                      "flex-1 py-1 rounded font-mono text-[10px] sm:text-[11px] font-semibold border transition-all",
                       isSelected
-                        ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                        : "bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground border-border/60"
+                        ? "bg-primary text-white font-bold shadow-chip-glow"
+                        : "bg-st-surface text-zinc-400 hover:text-white hover:border-zinc-500 border-st-hairline"
                     )}
                   >
                     {label}
@@ -1000,15 +1000,15 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
           </div>
 
           {/* Pitch Section */}
-          <div className="rounded border border-border/50 bg-card/60 p-3.5 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+          <div className="rounded border border-st-hairline bg-st-panel p-3 flex flex-col justify-between space-y-3">
+            <div className="flex items-center justify-between pb-2 border-b border-st-hairline/60">
+              <span className="font-mono text-[11px] font-bold text-st-ink uppercase flex items-center gap-2">
                 <Music className="h-3.5 w-3.5 text-accent" />
                 Pitch Transposition
               </span>
               <span
                 data-testid="current-pitch-label"
-                className="font-mono text-xs font-bold text-foreground bg-secondary px-2 py-0.5 rounded border border-border"
+                className="font-mono text-[11px] font-bold text-zinc-300 bg-st-surface px-1.5 py-0.5 rounded border border-st-hairline"
               >
                 {pitch === 0
                   ? "0 st"
@@ -1099,6 +1099,70 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
               >
                 <Mic className="h-4 w-4" />
               </button>
+            </div>
+          </div>
+          {/* Mockup phantom chrome (06e, data-mockup-placeholder): the stitch
+              DSP rack invents a third card, a Click Track / Metronome readout
+              with beat dots and a BAR counter. The app has no click track (the
+              mute control was retired long before this skin), so the card is a
+              VERBATIM DEAD PLACEHOLDER - aria-hidden divs, no handlers, no
+              state; a later cleanup commit erases it. */}
+          <div
+            data-mockup-placeholder="true"
+            aria-hidden="true"
+            className="rounded border border-st-hairline bg-st-panel p-3 flex flex-col justify-between space-y-3"
+          >
+            <div className="flex items-center justify-between pb-2 border-b border-st-hairline/60">
+              <div className="flex items-center gap-2 font-mono text-[11px] font-bold text-st-ink uppercase">
+                <svg
+                  className="w-3.5 h-3.5 text-zinc-400"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                  />
+                </svg>
+                <span>Click Track / Metronome</span>
+              </div>
+              <div className="flex items-center gap-1 font-mono text-[10px]">
+                <span className="inline-block w-2 h-2 rounded-full bg-st-coral animate-pulse" />
+                <span className="text-zinc-300 font-bold">118.0 BPM</span>
+              </div>
+            </div>
+            <div className="py-2.5 flex items-center gap-3">
+              <div className="px-2.5 py-1 rounded bg-st-surface border border-st-hairline text-zinc-300 font-mono text-[10px] flex items-center shrink-0">
+                4/4 Beat
+              </div>
+              <div className="flex-1 flex items-center gap-2">
+                <svg
+                  className="w-3 h-3 text-zinc-500"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
+                  <path d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217z" />
+                </svg>
+                <div className="w-full h-1 rounded bg-st-hairline relative">
+                  <span className="absolute left-[70%] top-[-2px] w-1.5 h-2 rounded bg-st-surface-light" />
+                </div>
+                <span className="font-mono text-[10px] text-zinc-400">70%</span>
+              </div>
+            </div>
+            <div className="flex items-center justify-between text-[10px] pt-1">
+              <div className="flex items-center gap-1.5 font-mono">
+                <span className="inline-block w-2 h-2 rounded-full bg-st-coral" />
+                <span className="inline-block w-2 h-2 rounded-full bg-zinc-700" />
+                <span className="inline-block w-2 h-2 rounded-full bg-zinc-700" />
+                <span className="inline-block w-2 h-2 rounded-full bg-zinc-700" />
+                <span className="ml-1 text-[9px] text-zinc-500">BAR 14.1</span>
+              </div>
+              <div className="text-st-coral underline text-[10px] font-mono">
+                Reset Pitch & Tempo
+              </div>
             </div>
           </div>
         </div>

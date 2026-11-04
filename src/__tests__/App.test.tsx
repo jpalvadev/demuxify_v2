@@ -674,18 +674,19 @@ describe("App UI Shell", () => {
     }
 
     // Deliberate untouched neighbors: the Tempo/Speed and Pitch Transposition
-    // sub-boxes keep their shipped base-border frames at every viewport, and
+    // sub-boxes keep their ruled frames at every viewport (06e ports the mockup
+    // hairline token: border-st-hairline replaces border-border/50), and
     // the Click Track rail keeps its bordered lane look.
     const tempoSubBoxClasses =
       screen
         .getByTestId("current-tempo-label")
         .parentElement?.parentElement?.getAttribute("class") ?? "";
-    expect(tempoSubBoxClasses).toContain("border border-border/50");
+    expect(tempoSubBoxClasses).toContain("border border-st-hairline");
     const pitchSubBoxClasses =
       screen
         .getByTestId("current-pitch-label")
         .parentElement?.parentElement?.getAttribute("class") ?? "";
-    expect(pitchSubBoxClasses).toContain("border border-border/50");
+    expect(pitchSubBoxClasses).toContain("border border-st-hairline");
 
     await waitFor(() => {
       expect(screen.getByTestId("click-track-rail")).toBeInTheDocument();
