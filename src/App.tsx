@@ -860,33 +860,26 @@ export const App: React.FC = () => {
             className={tabPanelClass(false, activeTab === "separate")}
           >
             <section className="relative space-y-4">
-              {/* Grizzlython header zone (grz-03, OpenDesign run 7 `separate-header-grizzly.html`
-                  via the design-system-bold plugin): the band is an IN-FLOW slim rule, never a
-                  wash behind the words. Mobile portrait: a 44px coral→0 gradient strip with a 1px
-                  DASHED tan hairline seam that carries NO type. Desktop (sm+): FLAT SOLID 40px
-                  coral rule carrying only a 9px ink mono tagline (tracking 0.14em) plus a 6×12
-                  ink tick — the active rail chip's `bg-primary` + cream pairing flipped to ink-on-coral.
-                  The UPPERCASE display title is the card's FIRST LINE OF TYPE under the seam:
-                  15px / leading-18 / 0.07em mobile, 22px / leading-26 / 0.06em desktop, cream on
-                  canvas. Below it a tan-2 mono meta line (10px / 0.14em) with a peach state pip,
-                  then the subtitle as cream body copy (13/leading-20 mobile, 15/leading-23 desktop,
-                  660px measure). Vertical rhythm per the sheet: 40 · 1 · 16 · 26 · 12 · 13 · 14 ·
-                  46 · 20 desktop, 44 · 1 · 14 · 18 · 6 · 11 · 10 · 60 · 14 mobile. */}
-              <div className="border-t-[1px] border-dashed sm:border-solid border-muted-foreground/60 px-3.5 sm:px-4 pt-3.5 sm:pt-4 pb-4.5 sm:pb-5">
+              {/* Title zone (Stitch skin 03, agent fallback design from the spec mockup):
+                  uppercase display title + tiny sans caption + bordered micro-chip carrying
+                  the shipped mono meta line. The Grizzlython header zone's seam band - the
+                  dashed hairline and the solid rule at sm+ - is DEAD (no wash-style rule
+                  behind the words); copy survives verbatim. */}
+              <div className="px-3.5 sm:px-4 pt-3.5 sm:pt-4 pb-4.5 sm:pb-5">
                 <h2
-                  className="font-display text-[15px] leading-[18px] font-bold uppercase tracking-[0.07em] text-foreground sm:text-[22px] sm:leading-[26px] sm:tracking-[0.06em]"
+                  className="font-display text-[15px] leading-[18px] font-bold uppercase tracking-[0.07em] text-st-ink sm:text-[22px] sm:leading-[26px] sm:tracking-[0.06em]"
                   style={BANNER_FONT}
                 >
                   Separate Music Into Stems
                 </h2>
-                <div className="mt-1.5 sm:mt-3 font-mono text-[10px] leading-[11px] sm:leading-[13px] uppercase tracking-[0.14em] text-muted-foreground">
-                  HT-DEMUCS 4-STEM <span className="text-status-ok">·</span>{" "}
-                  local onnx
-                </div>
-                <p className="mt-2.5 sm:mt-3.5 text-[13px] leading-[20px] text-foreground sm:text-[15px] sm:leading-[23px] sm:max-w-[660px]">
+                <p className="mt-1.5 sm:mt-2.5 text-[13px] leading-[20px] text-st-ink-dim sm:text-[15px] sm:leading-[23px] sm:max-w-[660px]">
                   Extract Vocals, Drums, Bass, and Other instruments locally in
                   your browser using neural network models.
                 </p>
+                <div className="mt-1.5 sm:mt-3 rounded-full bg-st-surface border border-st-hairline px-2.5 py-0.5 font-mono text-[9px] sm:text-[10px] leading-[11px] sm:leading-[13px] uppercase tracking-[0.14em] text-st-ink-dim">
+                  HT-DEMUCS 4-STEM <span className="text-status-ok">·</span>{" "}
+                  local onnx
+                </div>
               </div>
 
               {/* Decoding Error Alert */}
@@ -1034,7 +1027,9 @@ export const App: React.FC = () => {
                             key={stem}
                             className="flex items-center gap-2 rounded border border-border bg-card/80 p-3 shadow-xs"
                           >
-                            <Music className="h-4 w-4 text-primary shrink-0" />
+                            <Music
+                              className={`h-4 w-4 shrink-0 text-stem-${stem}`}
+                            />
                             <div>
                               <div className="text-xs font-semibold capitalize text-foreground">
                                 {stem}
