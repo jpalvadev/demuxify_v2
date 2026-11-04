@@ -212,6 +212,25 @@ export const App: React.FC = () => {
     seek: () => {},
   });
 
+  // Stitch skin 08d: the footer bar's coral disc is the app's one live
+  // Play/Pause control (the hosted player's own transport row was erased,
+  // ADR-0013). This mirrors the engine's play-state channel; the disc's icon,
+  // aria-pressed and which bridge action a click sends all follow it.
+  const [footerTransportPlaying, setFooterTransportPlaying] = useState(false);
+
+  const handleFooterTransportStateChange = (playing: boolean) => {
+    setFooterTransportPlaying(playing);
+  };
+
+  const handleFooterPlayPause = () => {
+    const actions = transportActionsRef.current;
+    if (footerTransportPlaying) {
+      actions.pause();
+    } else {
+      actions.play();
+    }
+  };
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const inferenceClientRef = useRef<InferenceClient | null>(null);
   // Tempo Detector client ref (ADR-0010): cancelled and nulled when the
@@ -1216,6 +1235,10 @@ export const App: React.FC = () => {
                   // the engine's one position subscription, not by the mixer
                   // bridge — press play with no mixer event and it walks.
                   onPlayheadChange={(timeSec) => setCurrentTime(timeSec)}
+                  // Stitch skin 08d: the same engine also reports play/pause
+                  // truth, which feeds the footer disc's icon, aria-pressed
+                  // and click dispatch.
+                  onPlayStateChange={handleFooterTransportStateChange}
                   sourceMixTitle={decodedSourceMix.metadata.fileName}
                   exportDialogHosted
                   onExportDialogState={handleExportDialogStateChange}
@@ -1348,17 +1371,21 @@ export const App: React.FC = () => {
         </div>
       </main>
 
-      {/* Footer transport (06c stitch.html port): the mockup master transport
-          bar renders verbatim as a DEAD PLACEHOLDER — data-mockup-placeholder
-          + aria-hidden on the bar itself; no handlers, no state; a later
-          cleanup commit erases it. The flat tan hairline cap (ticket 05) is
-          its border-t, same token as the Band chip dividers. */}
-      <footer
-        data-mockup-placeholder="true"
-        aria-hidden="true"
-        className="w-full flex items-center justify-between shrink-0 z-30 border-t border-st-hairline bg-st-panel px-3 sm:px-6 py-3 sm:py-2 sm:h-16"
-      >
-        <div className="flex items-center gap-4 w-72 shrink-0">
+      {/* Footer transport (06c stitch.html port, 08d wiring): the bar's flat
+          tan hairline cap stays (ticket 05), and its coral disc is now the
+          app's live Play/Pause control — a real button dispatching play or
+          pause through the transport bridge by the engine's play-state mirror,
+          icon and aria-pressed flipping with it. The mockup's phantom clusters
+          around it (the clock readout, the SYNC pip, the loop / skip / fast-
+          forward glyphs, the beat-tap chip, the stereo peak pips and the
+          master-volume slider) keep their INDIVIDUAL data-mockup-placeholder +
+          aria-hidden marks, still dead until the cleanup commit erases them. */}
+      <footer className="w-full flex items-center justify-between shrink-0 z-30 border-t border-st-hairline bg-st-panel px-3 sm:px-6 py-3 sm:py-2 sm:h-16">
+        <div
+          data-mockup-placeholder="true"
+          aria-hidden="true"
+          className="flex items-center gap-4 w-72 shrink-0"
+        >
           <div className="font-mono bg-st-canvas px-3 py-1.5 rounded border border-st-hairline flex items-baseline gap-1.5">
             <span className="text-white text-base font-bold tracking-wider">
               00:51
@@ -1377,7 +1404,11 @@ export const App: React.FC = () => {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <div className="p-2 text-zinc-400 bg-st-surface rounded border border-st-hairline flex items-center justify-center">
+          <div
+            data-mockup-placeholder="true"
+            aria-hidden="true"
+            className="p-2 text-zinc-400 bg-st-surface rounded border border-st-hairline flex items-center justify-center"
+          >
             <svg
               className="w-4 h-4"
               fill="none"
@@ -1392,30 +1423,61 @@ export const App: React.FC = () => {
               />
             </svg>
           </div>
-          <div className="p-2 text-zinc-300 bg-st-surface rounded border border-st-hairline flex items-center justify-center">
+          <div
+            data-mockup-placeholder="true"
+            aria-hidden="true"
+            className="p-2 text-zinc-300 bg-st-surface rounded border border-st-hairline flex items-center justify-center"
+          >
             <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
               <path d="M8.445 14.832A1 1 0 0010 14v-2.798l5.445 3.63A1 1 0 0017 14V6a1 1 0 00-1.555-.832L10 8.798V6a1 1 0 00-1.555-.832l-6 4a1 1 0 000 1.664l6 4z" />
             </svg>
           </div>
-          <div className="w-11 h-11 rounded-full bg-st-coral text-white flex items-center justify-center shadow-play-glow">
-            <svg
-              className="w-5 h-5 ml-0.5"
-              fill="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <polygon points="6 4 20 12 6 20 6 4" />
-            </svg>
-          </div>
-          <div className="p-2 text-zinc-300 bg-st-surface rounded border border-st-hairline flex items-center justify-center">
+          <button
+            type="button"
+            data-testid="footer-play-pause"
+            title="Play/Pause the Mix transport"
+            aria-label="Play/Pause"
+            aria-pressed={footerTransportPlaying}
+            onClick={handleFooterPlayPause}
+            className="w-11 h-11 rounded-full bg-st-coral text-white flex items-center justify-center shadow-play-glow transition-all active:scale-95"
+          >
+            {footerTransportPlaying ? (
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                <rect x="7" y="4" width="3.5" height="16" rx="1.25" />
+                <rect x="13.5" y="4" width="3.5" height="16" rx="1.25" />
+              </svg>
+            ) : (
+              <svg
+                className="w-5 h-5 ml-0.5"
+                fill="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <polygon points="6 4 20 12 6 20 6 4" />
+              </svg>
+            )}
+          </button>
+          <div
+            data-mockup-placeholder="true"
+            aria-hidden="true"
+            className="p-2 text-zinc-300 bg-st-surface rounded border border-st-hairline flex items-center justify-center"
+          >
             <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
               <path d="M4.555 5.168A1 1 0 003 6v8a1 1 0 001.555.832L10 11.202V14a1 1 0 001.555.832l6-4a1 1 0 000-1.664l-6-4A1 1 0 0010 6v2.798L4.555 5.168z" />
             </svg>
           </div>
-          <div className="px-2.5 py-1.5 bg-st-surface border border-st-hairline rounded text-zinc-400 font-mono text-[10px] font-semibold flex items-center justify-center">
+          <div
+            data-mockup-placeholder="true"
+            aria-hidden="true"
+            className="px-2.5 py-1.5 bg-st-surface border border-st-hairline rounded text-zinc-400 font-mono text-[10px] font-semibold flex items-center justify-center"
+          >
             TAP
           </div>
         </div>
-        <div className="flex items-center gap-4 w-72 shrink-0 justify-end">
+        <div
+          data-mockup-placeholder="true"
+          aria-hidden="true"
+          className="flex items-center gap-4 w-72 shrink-0 justify-end"
+        >
           <div className="flex items-center gap-1">
             <div className="flex flex-col gap-0.5">
               <span className="inline-block w-1.5 h-1 bg-zinc-700" />

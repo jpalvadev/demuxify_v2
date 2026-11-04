@@ -2167,9 +2167,14 @@ describe("App UI Shell", () => {
         name: /master waveform timeline/i,
       });
 
-      // Stitch skin 07j erased the transport row: press play via the
-      // keyboard channel (Space), which Stem Player still owns.
-      fireEvent.keyDown(window, { code: "Space", key: " " });
+      // Stitch skin 07j erased the transport row and 08d wired the footer
+      // bar's coral disc as the live transport control: click it and the
+      // engine starts (the Space keyboard channel Stem Player owns stays a
+      // fallback, exercised by its own test).
+      const footerDisc = screen.getByRole("button", {
+        name: /^play\/pause$/i,
+      });
+      fireEvent.click(footerDisc);
 
       // Each tick re-schedules itself, so the queue keeps refilling while the
       // pump walks the mock clock forward half a second at a time.
@@ -2186,9 +2191,18 @@ describe("App UI Shell", () => {
       await waitFor(() => {
         expect(spine).toHaveAttribute("aria-valuenow", "3");
       });
+      // The disc's pressed state follows the engine's play-state channel.
+      expect(footerDisc).toHaveAttribute("aria-pressed", "true");
       // The spine's accessible text moves on the same channel — the face is
       // the spine's own m:ss face, one second wider than the Transport's mm:ss.
       expect(spine).toHaveAttribute("aria-valuetext", "0:03");
+
+      // Press it again: pause is the same control, and the playhead freezes
+      // (pumping the mock clock forward moves nothing).
+      fireEvent.click(footerDisc);
+      pump(4);
+      expect(spine).toHaveAttribute("aria-valuenow", "3");
+      expect(footerDisc).toHaveAttribute("aria-pressed", "false");
 
       // One Playhead: the hosted Mix Tab no longer carries a Transport
       // readout at all (Stitch skin 07j erased the strip); the spine's
@@ -2255,8 +2269,9 @@ describe("App UI Shell", () => {
     ).not.toBeInTheDocument();
 
     // Flat footer (ticket 05 + 06c mockup transport bar): one tan hairline cap;
-    // the 06c bar renders verbatim as aria-hidden dead placeholder chrome, still
-    // no copy lines under the hairline (100% absent).
+    // 08d makes the bar LIVE chrome — its coral disc is the real Play/Pause
+    // control — while the mockup phantom clusters inside keep their own marks,
+    // still no copy lines under the hairline (100% absent).
     const footer = document.querySelectorAll("footer")[0];
     const footerClasses = (footer.getAttribute("class") ?? "").split(" ");
     expect(footerClasses).toContain("border-t");
@@ -2266,9 +2281,17 @@ describe("App UI Shell", () => {
       false
     );
     expect(footer.getAttribute("style") ?? "").not.toContain("gradient");
-    // 06c fidelity contract: the transport bar is marked dead placeholder.
-    expect(footer.getAttribute("data-mockup-placeholder")).toBe("true");
-    expect(footer.getAttribute("aria-hidden")).toBe("true");
+    // 08d wiring contract: the bar itself is no longer marked dead; the coral
+    // disc is a real accessible button, and the phantom clusters around it
+    // carry their individual placeholder marks.
+    expect(footer.getAttribute("data-mockup-placeholder")).toBeNull();
+    expect(footer.getAttribute("aria-hidden")).toBeNull();
+    expect(
+      screen.getByRole("button", { name: /^play\/pause$/i })
+    ).toBeInTheDocument();
+    expect(
+      footer.querySelectorAll('[data-mockup-placeholder="true"]').length
+    ).toBeGreaterThanOrEqual(6);
     expect(screen.queryByText(/powered by/i)).toBeNull();
     expect(
       screen.queryByText(/client-side audio source separation/i)

@@ -83,6 +83,13 @@ export interface StemPlayerProps {
   // position subscription. The mixer-and-Session bridge keeps its own meaning
   // and is never fired per frame.
   onPlayheadChange?: (timeSec: number) => void;
+  // Stitch skin 08d: the footer bar's coral disc is the Mix Tab's live
+  // Play/Pause control — the hosted player's own transport row was erased
+  // (ADR-0013), so the shell needs the engine's play-state truth to bind the
+  // disc's icon, aria-pressed and which action a click sends to. Fires at the
+  // play/pause transitions and on the position ticks mirroring engine.isPlaying
+  // (end-of-track stops are visible through it).
+  onPlayStateChange?: (playing: boolean) => void;
   // Tab Shell (ADR-0007): the shell hosts the shared Master Waveform spine in
   // Listen and Mix, so the player's own overview waveform stays hidden.
   masterWaveformHosted?: boolean;
@@ -154,6 +161,7 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
   onExportDialogState,
   onTransportControls,
   onPlayheadChange,
+  onPlayStateChange,
   masterWaveformHosted,
   beatGrid,
   initialClickTrack,
@@ -223,6 +231,7 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
     const unsubPos = engine.subscribePosition((time) => {
       setCurrentTime(time);
       setIsPlaying(engine.isPlaying());
+      onPlayStateChange?.(engine.isPlaying());
       // Mix Tab cohesion (ADR-0013): the same subscription feeds the app's one
       // Playhead channel — the spine mirrors the live position, no second
       // subscriber and no per-frame mixer bridge.
@@ -294,14 +303,16 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
     if (!engine || engine.isPlaying()) return;
     await engine.play();
     setIsPlaying(true);
-  }, []);
+    onPlayStateChange?.(true);
+  }, [onPlayStateChange]);
 
   const handlePause = useCallback(() => {
     const engine = engineRef.current;
     if (!engine || !engine.isPlaying()) return;
     engine.pause();
     setIsPlaying(false);
-  }, []);
+    onPlayStateChange?.(false);
+  }, [onPlayStateChange]);
 
   // Transport toggle (ADR-0008): one button, icon bound to the action coming
   // next; it calls play or pause depending on state through the bridge actions.
