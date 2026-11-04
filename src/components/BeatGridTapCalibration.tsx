@@ -183,7 +183,7 @@ export const BeatGridTapCalibration: React.FC<BeatGridTapCalibrationProps> = ({
           className={cn(
             // Stitch skin 07i: mockup Reset chip — zinc surface, hairline rim,
             // dim ink lifting to ink on hover.
-            "px-2 py-1 rounded bg-st-surface border border-st-hairline text-st-ink-dim hover:text-st-ink font-mono font-semibold text-[10px] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            "px-2 py-1 rounded bg-st-surface border border-st-hairline text-st-ink-dim hover:text-zinc-200 font-mono font-semibold text-[10px] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           )}
         >
           Reset taps

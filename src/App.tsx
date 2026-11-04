@@ -874,7 +874,7 @@ export const App: React.FC = () => {
                     aria-current={active ? "true" : undefined}
                     aria-disabled={gated ? true : undefined}
                     onClick={() => handleSelectTab(tab.id)}
-                    className={`flex flex-col items-center justify-center gap-0.5 px-3 py-1 min-h-[${TAB_CHIP_MIN_TARGET_PX}px] min-w-[${TAB_CHIP_MIN_TARGET_PX}px] rounded uppercase font-mono text-[${TAB_CHIP_TYPE_PX}px] tracking-wide transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${active ? "bg-primary text-white font-bold shadow-chip-glow" : "font-medium text-st-ink-dim hover:text-st-ink"} ${gated ? "opacity-50 text-muted-foreground" : ""}`.trim()}
+                    className={`flex flex-col items-center justify-center gap-0.5 px-3 py-1 min-h-[${TAB_CHIP_MIN_TARGET_PX}px] min-w-[${TAB_CHIP_MIN_TARGET_PX}px] rounded uppercase font-mono text-[${TAB_CHIP_TYPE_PX}px] tracking-wide transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${active ? "bg-primary text-white font-bold shadow-chip-glow" : "font-medium text-st-ink-dim hover:text-white"} ${gated ? "opacity-50 text-muted-foreground" : ""}`.trim()}
                   >
                     <span className="whitespace-nowrap">{tab.title}</span>
                     {gated && (

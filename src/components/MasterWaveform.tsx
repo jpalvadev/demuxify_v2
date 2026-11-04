@@ -281,13 +281,11 @@ export const MasterWaveform: React.FC<MasterWaveformProps> = ({
           mm:ss / mm:ss group died — the Transport is the Mix Tab's clock) */}
       <div className="flex items-center justify-between font-mono text-[11px] pb-1 border-b border-st-hairline/60 mb-2.5">
         <div className="flex items-center gap-2">
-          <span className="font-bold tracking-wider uppercase text-st-ink">
+          <span className="font-bold tracking-wider uppercase text-zinc-200">
             Master Waveform
           </span>
-          <span className="font-sans text-[10px] text-st-ink-dim">
-            Overview
-          </span>
-          <span className="px-2 py-1 rounded bg-st-surface border border-st-hairline text-[9px] uppercase tracking-wider text-zinc-400 hover:text-zinc-200 shrink-0">
+          <span className="font-sans text-[10px] text-zinc-500">Overview</span>
+          <span className="px-2 py-1 rounded bg-zinc-800 text-[9px] uppercase tracking-wider text-zinc-400 hover:text-zinc-200 shrink-0">
             Stereo Mix
           </span>
         </div>

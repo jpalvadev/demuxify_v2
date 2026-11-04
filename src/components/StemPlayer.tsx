@@ -605,9 +605,9 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
                     className={cn(
                       "px-2 py-1 rounded border text-[10px] font-mono flex items-center justify-between transition-all disabled:opacity-40 disabled:cursor-not-allowed",
                       locked
-                        ? "border-st-coral/50 bg-st-coral/20 text-st-ink cursor-default"
+                        ? "border-st-coral/50 bg-st-coral/15 text-white cursor-default"
                         : isLeader
-                          ? "border-st-coral/50 bg-st-coral/10 text-zinc-100 hover:border-st-coral cursor-pointer"
+                          ? "border-st-coral/40 bg-st-coral/15 text-st-coral hover:bg-primary hover:text-white cursor-pointer"
                           : "border-st-hairline bg-st-surface text-zinc-400 hover:border-zinc-500 cursor-pointer"
                     )}
                   >

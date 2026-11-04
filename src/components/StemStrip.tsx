@@ -284,7 +284,7 @@ export const StemStrip: React.FC<StemStripProps> = ({
             glowing stem dot + mono bold stem-tinted name + ISO identity tag. The
             grizzly-era lucide stem icons are gone; the dot carries the identity. */}
       <div
-        className="flex w-32 shrink-0 items-center px-3 justify-between rounded-none border-e border-st-hairline/80"
+        className="flex w-32 shrink-0 items-center px-3 justify-between rounded-none border-e border-st-hairline"
         style={{ backgroundColor: config.badgeBg }}
       >
         <div className="flex items-center gap-2">
@@ -320,7 +320,7 @@ export const StemStrip: React.FC<StemStripProps> = ({
       {/* Channel Controls Rack (Stitch skin): the mockup's w-64 rack welded to
             the field with a hairline; compact mono M/S caps, speaker, slider,
             and a w-8 percent readout. Behavior, aria, and handlers untouched. */}
-      <div className="flex items-center px-3 space-x-3 w-64 shrink-0 bg-st-panel rounded-none border-s border-st-hairline/80">
+      <div className="flex items-center px-3 space-x-3 w-64 shrink-0 bg-st-panel rounded-none border-s border-st-hairline">
         <div className="flex items-center gap-1">
           <button
             type="button"

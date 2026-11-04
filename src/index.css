@@ -33,19 +33,19 @@
     --card-foreground: 216 12.2% 83.9%;
     --popover: 240 11.1% 14.1%;
     --popover-foreground: 216 12.2% 83.9%;
-    --primary: 359 92.3% 64.5%;
+    --primary: 359.4 92.3% 64.5%;
     --primary-foreground: 240 20% 7%;
     --secondary: 240 12.7% 10.8%;
-    --secondary-foreground: 217 10.6% 66.7%;
+    --secondary-foreground: 240 5.03% 64.9%;
     --muted: 240 12.7% 10.8%;
-    --muted-foreground: 217 10.6% 66.7%;
-    --accent: 359 92.3% 64.5%;
+    --muted-foreground: 240 5.03% 64.9%;
+    --accent: 359.4 92.3% 64.5%;
     --accent-foreground: 240 20% 7%;
-    --destructive: 359 92.3% 64.5%;
+    --destructive: 359.4 92.3% 64.5%;
     --destructive-foreground: 240 20% 7%;
     --border: 240 10% 15.7%;
     --input: 240 12.7% 10.8%;
-    --ring: 359 92.3% 64.5%;
+    --ring: 359.4 92.3% 64.5%;
     --radius: 0.5rem;
 
     /* Stitch chrome ramp: the named surfaces behind the Tab Band, stage panels
@@ -58,10 +58,11 @@
     --st-surface-light: 240 11.1% 14.1%;
     --st-hairline: 240 10% 15.7%;
     --st-highlight: 240 10.7% 22%;
-    --st-coral: 359 92.3% 64.5%;
+    --st-coral: 359.4 92.3% 64.5%;
     --st-coral-hover: 359 100% 69.2%;
     --st-ink: 216 12.2% 83.9%;
-    --st-ink-dim: 217 10.6% 66.7%;
+    --st-ink-dim: 240 5.03% 64.9%;
+    --st-ink-faint: 240 3.83% 46.08%;
     --st-ok: 158 64.4% 51.6%;
     --st-warn: 43 96.4% 56.3%;
     --st-waveform-box: 240 13% 4.5%;
