@@ -56,6 +56,10 @@ import {
   calibrateClickGrid,
   reanchorBeatGridToAnchor,
 } from "./lib/stemPlayerEngine";
+import {
+  createDebugSessionFixture,
+  isDebugModeRequested,
+} from "./lib/debugSession";
 import { DISPLAY_FONT_STACK, MONO_FONT_STACK } from "./lib/typography";
 
 // Bold pairing (ticket 10): the bundled display face paints the focal Tab banners and
@@ -111,6 +115,17 @@ const tabPanelClass = (gated: boolean, active: boolean) =>
 export const App: React.FC = () => {
   // Dark-only contract (ticket 09): no theme state — html keeps `dark` forever
   // and there is no light-token override block to switch into.
+
+  // Debug mode (ticket 08, user 2026-11-04): `#debug` in the URL boots a
+  // synthetic session so every Tab — Mix, Export — renders its full
+  // composition without waiting for an upload + WebGPU separation pass.
+  // The fixture is synthetic media only (lib/debugSession.ts): real UI code
+  // paths paint it, and the auto-saver is disarmed while the flag is on, so
+  // debug can never poison the IndexedDB slot a later boot resumes from.
+  const debugSession = isDebugModeRequested()
+    ? createDebugSessionFixture()
+    : null;
+
   const [capability, setCapability] = useState<WebGPUCapability | null>(null);
   const [isDetectingWebGPU, setIsDetectingWebGPU] = useState(true);
 
@@ -128,17 +143,20 @@ export const App: React.FC = () => {
   // Source Mix State
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [decodedSourceMix, setDecodedSourceMix] =
-    useState<DecodedSourceMix | null>(null);
+    useState<DecodedSourceMix | null>(debugSession?.decodedSourceMix ?? null);
   const [waveformPeaks, setWaveformPeaks] = useState<WaveformPeaks | null>(
-    null
+    debugSession?.waveformPeaks ?? null
   );
-  const [currentTime, setCurrentTime] = useState(0);
+  const [currentTime, setCurrentTime] = useState(
+    debugSession?.currentTime ?? 0
+  );
   const [isDecoding, setIsDecoding] = useState(false);
   const [decodeError, setDecodeError] = useState<string | null>(null);
 
   // Inference Separation State
-  const [separationPhase, setSeparationPhase] =
-    useState<SeparationPhase>("idle");
+  const [separationPhase, setSeparationPhase] = useState<SeparationPhase>(
+    debugSession ? "completed" : "idle"
+  );
   const [downloadProgress, setDownloadProgress] =
     useState<DownloadProgress | null>(null);
   const [chunkProgress, setChunkProgress] = useState<ChunkProgress | null>(
@@ -149,13 +167,13 @@ export const App: React.FC = () => {
   const [separatedStems, setSeparatedStems] = useState<Record<
     StemName,
     Float32Array[]
-  > | null>(null);
+  > | null>(debugSession?.separatedStems ?? null);
 
   // Tempo Detector (ADR-0010): ranked BPM candidates + Beat Grid for the
   // Click Track. Domain-separate from the four StemName identities and never
   // a Stem of its own.
   const [tempoAnalysis, setTempoAnalysis] =
-    useState<TempoAnalysisResult | null>(null);
+    useState<TempoAnalysisResult | null>(debugSession?.tempoAnalysis ?? null);
 
   // Calibrate the Click (ticket 08): the by-hand reading the rail reports —
   // domain-separate from tempoAnalysis, a hand decision is never dressed
@@ -202,7 +220,18 @@ export const App: React.FC = () => {
   // Session snapshot can persist it (ticket 05). Never part of the Stem mixer.
   const clickTrackStateRef = useRef<ClickTrackMixerState | null>(null);
   const cachedSessionRef = useRef<DemuxifySession | null>(null);
-  const autoSaverRef = useRef(createSessionAutoSaver(600));
+  // Debug mode never writes the Session slot: the flag is a preview of the
+  // composition, so the auto-saver is swapped for a silent stand-in while it
+  // is on — a debug pass cannot poison what Session Recovery resumes from.
+  const autoSaverRef = useRef(
+    debugSession
+      ? {
+          cancel: () => {},
+          debounceSave: (_: DemuxifySession, __?: (err: unknown) => void) => {},
+          saveImmediately: async (_: DemuxifySession) => {},
+        }
+      : createSessionAutoSaver(600)
+  );
 
   useEffect(() => {
     const uninstallInterceptors = diagnostics.installGlobalInterceptors();
@@ -822,6 +851,14 @@ export const App: React.FC = () => {
         >
           <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-6 shrink-0">
             <BrandUnit />
+            {/* Debug mode marker (ticket 08): the flag is honest chrome — while
+                the synthetic fixture is on the stage, the Band says so, so a
+                preview can never be mistaken for a real upload. */}
+            {debugSession && (
+              <span className="font-mono text-[10px] tracking-widest uppercase text-st-coral whitespace-nowrap">
+                Debug · synthetic media
+              </span>
+            )}
             <div
               data-testid="tab-band-chips"
               className="grid grid-cols-4 gap-1 w-full md:inline-grid md:w-auto md:gap-2 rounded border border-st-hairline bg-st-canvas p-1"
