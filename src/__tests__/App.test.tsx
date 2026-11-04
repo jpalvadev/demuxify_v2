@@ -656,14 +656,14 @@ describe("App UI Shell", () => {
     }
 
     // The DSP rack: the mockup has no container behind the rack (Stitch skin
-    // 07k unbuilt it), so the wrapper is transparent — bare layout tokens, no
-    // border, no fill — and its cards carry the rule instead. Locator: two
-    // levels up from the rack's Reset control is the rack root itself.
-    const resetControl = within(stemPlayerRegion).getByRole("button", {
-      name: /reset time-stretch/i,
-    });
+    // 07k unbuilt it; 07n deleted its heading row), so the wrapper is
+    // transparent — bare layout tokens, no border, no fill. Locator: the
+    // rack root carries its own testid (the reset chip moved to the Tempo
+    // card's foot, so the parentElement chain no longer lands on the rack).
     const rackClasses =
-      resetControl.parentElement?.parentElement?.getAttribute("class") ?? "";
+      within(stemPlayerRegion)
+        .getByTestId("dsp-rack-root")
+        .getAttribute("class") ?? "";
     expect(rackClasses).not.toContain("border");
     expect(rackClasses).not.toContain("bg-secondary");
     for (const token of ["w-full", "flex", "flex-col", "gap-3", "sm:gap-4"]) {

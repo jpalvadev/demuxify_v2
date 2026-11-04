@@ -828,36 +828,15 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
           workspace surface whose cards are the parts. So the outer wrapper is
           transparent (no border, no fill, no padding) and each card carries
           its own mockup rule. */}
-        <div className="w-full flex flex-col gap-3 sm:gap-4">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <div className="flex h-7 w-7 items-center justify-center rounded bg-primary/10 text-primary border border-primary/20">
-                <Gauge className="h-4 w-4" />
-              </div>
-              <div>
-                <h4 className="text-sm font-semibold text-foreground">
-                  Time-Stretch & Pitch
-                </h4>
-                <p className="text-[11px] text-muted-foreground">
-                  Independent real-time tempo (0.5x–2.0x) and pitch
-                  transposition (-12 to +12 st)
-                </p>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              aria-label="Reset Time-Stretch"
-              title="Reset pitch to 0 and tempo to 1.0x"
-              onClick={handleResetTimeStretch}
-              disabled={Math.abs(tempo - 1.0) < 0.001 && pitch === 0}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-border/80 bg-secondary/80 text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-secondary transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              <RotateCcw className="h-3.5 w-3.5" />
-              <span>Reset Pitch & Tempo</span>
-            </button>
-          </div>
-
+        {/* DSP rack (Stitch skin 07n): the mockup has NO rack heading — the
+          trio of cards sits straight on the workspace surface. The old
+          title row (badge, h4, description, reset chip) is gone and the live
+          Reset Time-Stretch chip is homed at the foot of the Tempo card, so
+          the rack stays a bare grid of exactly three mockup cards. */}
+        <div
+          data-testid="dsp-rack-root"
+          className="w-full flex flex-col gap-3 sm:gap-4"
+        >
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
             {/* Tempo Section */}
             <div className="rounded-lg border border-st-hairline bg-st-panel p-3 flex flex-col justify-between space-y-3">
@@ -942,6 +921,22 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
                   );
                 })}
               </div>
+
+              {/* Reset chip (Stitch skin 07n): the rack heading row is gone
+                with the mockup, so the live Reset Time-Stretch chip lives at
+                the foot of the Tempo card — same button, same contract, a
+                quieter zinc mockup chip. */}
+              <button
+                type="button"
+                aria-label="Reset Time-Stretch"
+                title="Reset pitch to 0 and tempo to 1.0x"
+                onClick={handleResetTimeStretch}
+                disabled={Math.abs(tempo - 1.0) < 0.001 && pitch === 0}
+                className="w-full flex items-center justify-between gap-2 px-2 py-1 rounded border border-st-hairline bg-st-surface text-[10px] font-mono text-st-ash hover:text-st-ink transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <RotateCcw className="h-3 w-3 text-st-ink" />
+                <span>Reset Pitch & Tempo</span>
+              </button>
             </div>
 
             {/* Pitch Section */}
