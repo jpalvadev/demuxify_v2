@@ -605,24 +605,40 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
           seams can pin what comes before it. */}
       <div
         data-testid="transport-row"
-        className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 sm:gap-4 border-b border-st-hairline pb-3 sm:pb-4"
+        className="flex flex-col justify-between gap-2 border-b border-st-hairline pb-2 sm:pb-3"
       >
-        <div className="flex items-center gap-2.5">
-          <div className="flex h-9 w-9 items-center justify-center rounded bg-primary/10 border border-primary/20 text-primary">
-            <Layers className="h-5 w-5" />
-          </div>
-          <div>
+        {/* Section header (Stitch skin, ticket 06c of the mix pass): the mockup
+            masthead — bare coral Layers mark, uppercase wordmark (the h3 stays
+            the Mix banner the typography seam pins in Inter, so the mockup's
+            mono masthead font is ported as Inter-bold), inline subtitle, and
+            the solo/mute hint at the right — welded under a hairline. */}
+        <div className="flex items-center justify-between font-mono text-[11px] pb-1 border-b border-st-hairline/60">
+          <div className="flex items-center gap-2">
+            <Layers className="h-3.5 w-3.5 text-st-coral shrink-0" />
             <h3
-              className="font-display text-lg font-bold tracking-tight text-foreground"
+              className="inline-block font-display font-bold uppercase tracking-wide text-st-ink"
               style={{ fontFamily: DISPLAY_FONT_STACK }}
             >
               Multi-Track Stem Player
             </h3>
-            <p className="text-xs text-muted-foreground">
-              Synchronized 4-Stem playback with solo, mute, and level controls
-            </p>
+            <span className="text-[10px] text-st-ink-dim">
+              Synchronized 4-Stem real-time playback
+            </span>
           </div>
+          <span
+            aria-hidden="true"
+            className="hidden flex items-center gap-1 text-[10px] text-st-ink-dim sm:inline"
+          >
+            Solo (<span className="text-st-ink">s</span>) isolates · Mute (
+            <span className="text-st-ink">m</span>) silences track
+          </span>
         </div>
+
+        {/* Live transport strip (Stitch skin): the mockup keeps the master
+            transport in the page footer, but our footer chrome is dead
+            placeholder copy and the rail-order seam pins this live cluster
+            above the first strip — so the live clock, Play/Pause, status,
+            and master slider ride as a mono strip under the masthead. */}
 
         {/* Global Transport Bar */}
         <div className="flex flex-wrap items-center justify-between md:justify-end gap-3 sm:gap-4">
@@ -737,13 +753,6 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
           after the Transport row and before the Click Track lane — the stage
           reads in the order the work is done. */}
       <div className="space-y-2.5">
-        <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-muted-foreground px-1">
-          <span>Stems</span>
-          <span className="hidden sm:inline font-normal lowercase text-[11px] text-muted-foreground/80">
-            Solo (S) isolations mute unselected stems • Mute (M) silences stem
-          </span>
-        </div>
-
         {STEM_NAMES.map((stem) => {
           const state = mixerStates[stem];
           const isSilenced = hasAnySolo
