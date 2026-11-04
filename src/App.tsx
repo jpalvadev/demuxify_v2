@@ -1307,7 +1307,7 @@ export const App: React.FC = () => {
         className="w-full flex items-center justify-between shrink-0 z-30 border-t border-st-hairline bg-st-panel px-3 sm:px-6 py-3 sm:py-2 sm:h-16"
       >
         <div className="flex items-center gap-4 w-72 shrink-0">
-          <div className="font-mono bg-st-canvas px-3 py-1.5 rounded border border-st-hairline flex items-baseline px-1.5">
+          <div className="font-mono bg-st-canvas px-3 py-1.5 rounded border border-st-hairline flex items-baseline gap-1.5">
             <span className="text-white text-base font-bold tracking-wider">
               00:51
             </span>
@@ -1390,7 +1390,7 @@ export const App: React.FC = () => {
               Master
             </span>
             <div className="w-20 h-1 rounded bg-st-hairline relative">
-              <span className="absolute right-0 top-[-2px] w-1.5 h-2 rounded bg-st-surface-light" />
+              <span className="absolute right-0 top-[-2px] w-2 h-2 rounded-full bg-st-coral" />
             </div>
             <span className="font-mono text-[10px] text-zinc-200 font-bold w-7 text-right">
               100%
