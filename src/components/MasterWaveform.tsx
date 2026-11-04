@@ -175,12 +175,10 @@ export const MasterWaveform: React.FC<MasterWaveformProps> = ({
         const yBottom = midY - minVal * halfHeight;
         const barHeight = Math.max(1, yBottom - yTop);
 
-        // Highlight played portion (electric lime) / unplayed (--fg-2 dim)
-        if (x <= playheadX) {
-          ctx.fillStyle = "#39ff14"; // electric lime trace: hsl(95 100% 54%)
-        } else {
-          ctx.fillStyle = "rgba(179, 180, 188, 0.35)"; // fg-2: hsl(232 6% 72%)
-        }
+        // Stitch skin 07h: the mockup renders the master with ONE neon-lime
+        // trace across the whole field (`drawDetailedAudioWaveform(…,
+        // '#39ff14')`) — no played/unplayed split.
+        ctx.fillStyle = "#39ff14"; // neon lime master
 
         ctx.fillRect(x, yTop, Math.max(1, binWidth - 0.5), barHeight);
       }
