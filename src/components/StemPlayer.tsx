@@ -618,8 +618,8 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
 
       {/* Section masthead: the "Multi-Track Stem Player" title, its Layers mark
           and tagline at the head of the Mix panel. The live master transport
-          that used to ride under it moved to the section foot (Stitch skin 07f),
-          where the mockup puts its master transport bar. */}
+          that used to ride under it is erased from the hosted stage (Stitch
+          skin 07j): the mockup has no such strip inside the section. */}
       {/* Section header (Stitch skin, ticket 06c of the mix pass): the mockup
             masthead — bare coral Layers mark, uppercase wordmark (the h3 stays
             the Mix banner the typography seam pins in Inter, so the mockup's
@@ -639,8 +639,10 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
           </span>
         </div>
         <span
+          data-testid="stem-solo-mute-hint"
           aria-hidden="true"
-          className="hidden flex items-center gap-1 text-[10px] text-st-ink-dim sm:inline"
+          className="hidden flex items-center gap-1 text-[10px] text-st-ink-dim sm:inline font-mono"
+          style={{ fontFamily: MONO_FONT_STACK }}
         >
           Solo (<span className="text-st-ink">s</span>) isolates · Mute (
           <span className="text-st-ink">m</span>) silences track
@@ -1075,120 +1077,127 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
         </div>
       </div>
 
-      {/* Master transport bar (Stitch skin 07f): the mockup puts the timecode,
-          Play/Pause and master fader at the foot of the Mix composition, below
-          the DSP rack — so the live cluster rides as the section's last
-          block, welded to the panel by a hairline. The rail-order seam pins
-          it after the Time-Stretch panel. */}
-      <div
-        data-testid="transport-row"
-        className="w-full flex flex-wrap items-center justify-between shrink-0 border-t border-st-hairline pt-2 sm:pt-3 gap-3 sm:gap-4 md:justify-end"
-      >
-        {/* Time Display: strong mono readout (Bold port of the .tread row) */}
+      {/* The hosted Mix Tab renders NO live transport strip (Stitch skin
+          07j): the mockup's section foot is the DSP rack and the user erased
+          the timecode / Play-Pause / master-fader cluster from the screen.
+          Keyboard Space still toggles the shared engine (the window keydown
+          handler above survives the erasure) and the Master Waveform spine
+          stays the scrub surface. The standalone component harness form
+          (exportDialogHosted false) keeps the full cluster so its behavior
+          contract stays pinned. */}
+      {!exportDialogHosted && (
         <div
-          data-testid="stem-player-time"
-          className="flex items-baseline gap-1.5 font-mono text-[11px] bg-st-canvas px-3 py-1 rounded border border-st-hairline"
-          style={{ fontFamily: MONO_FONT_STACK }}
+          data-testid="transport-row"
+          className="w-full flex flex-wrap items-center justify-between shrink-0 border-t border-st-hairline pt-2 sm:pt-3 gap-3 sm:gap-4 md:justify-end"
         >
-          <span className="text-white font-bold tracking-wider">
-            {formatTime(currentTime)}
-          </span>
-          <span className="text-zinc-500 text-xs">/</span>
-          <span className="text-zinc-400 text-xs">{formatTime(duration)}</span>
-        </div>
-
-        {/* Transport: single Play/Pause toggle (ADR-0008). Icon shows the
-              action coming next: ▶ while paused, ⏸ while playing; one stable
-              accessible name plus aria-pressed for assistive tech. The Seek-to-
-              start button is gone; the Master Waveform spine is the timeline. */}
-        <div className="flex items-center gap-2">
-          <div className="relative flex flex-col items-center gap-1 shrink-0">
-            <button
-              type="button"
-              aria-label="Play/Pause"
-              aria-pressed={isPlaying}
-              title="Play/Pause (Space)"
-              onClick={togglePlayPause}
-              className={cn(
-                "relative flex h-11 w-11 items-center justify-center rounded-full border transition-all font-semibold shadow-sm active:scale-95",
-                isPlaying
-                  ? "bg-st-coral text-white border-st-coral shadow-play-glow hover:bg-st-coral"
-                  : "bg-st-panel text-zinc-300 border-st-hairline hover:bg-st-surface hover:text-white"
-              )}
-            >
-              {isPlaying ? (
-                <Pause className="h-4 w-4 fill-current" />
-              ) : (
-                <Play className="h-4 w-4 fill-current" />
-              )}
-              <span className="hidden sm:inline font-mono uppercase text-[10px] font-bold">
-                Play/Pause
-              </span>
-            </button>
-
-            {/* Honest transport status (Stitch skin): how many stems are wired
-                and whether the Beat Grid is latched. Never claims a number the
-                engine has not reported; sm+ only, decorative. */}
-            <span
-              aria-hidden="true"
-              className="hidden flex items-center gap-2 text-[9px] font-medium uppercase tracking-[0.18em] shrink-0 sm:flex"
-            >
-              {beatGrid ? (
-                <>
-                  <span className="rounded-full h-1.5 w-1.5 bg-st-ok shrink-0" />
-                  <span className="text-st-ink-dim">
-                    4 stems · phase-locked
-                  </span>
-                </>
-              ) : (
-                <span className="text-st-ink-dim">4 stems · phase open</span>
-              )}
+          {/* Time Display: strong mono readout (Bold port of the .tread row) */}
+          <div
+            data-testid="stem-player-time"
+            className="flex items-baseline gap-1.5 font-mono text-[11px] bg-st-canvas px-3 py-1 rounded border border-st-hairline"
+            style={{ fontFamily: MONO_FONT_STACK }}
+          >
+            <span className="text-white font-bold tracking-wider">
+              {formatTime(currentTime)}
+            </span>
+            <span className="text-zinc-500 text-xs">/</span>
+            <span className="text-zinc-400 text-xs">
+              {formatTime(duration)}
             </span>
           </div>
 
-          {/* ADR-0008 (ticket 04): the trash / Purge Session button is dead —
+          {/* Transport: single Play/Pause toggle (ADR-0008). Icon shows the
+              action coming next: ▶ while paused, ⏸ while playing; one stable
+              accessible name plus aria-pressed for assistive tech. The Seek-to-
+              start button is gone; the Master Waveform spine is the timeline. */}
+          <div className="flex items-center gap-2">
+            <div className="relative flex flex-col items-center gap-1 shrink-0">
+              <button
+                type="button"
+                aria-label="Play/Pause"
+                aria-pressed={isPlaying}
+                title="Play/Pause (Space)"
+                onClick={togglePlayPause}
+                className={cn(
+                  "relative flex h-11 w-11 items-center justify-center rounded-full border transition-all font-semibold shadow-sm active:scale-95",
+                  isPlaying
+                    ? "bg-st-coral text-white border-st-coral shadow-play-glow hover:bg-st-coral"
+                    : "bg-st-panel text-zinc-300 border-st-hairline hover:bg-st-surface hover:text-white"
+                )}
+              >
+                {isPlaying ? (
+                  <Pause className="h-4 w-4 fill-current" />
+                ) : (
+                  <Play className="h-4 w-4 fill-current" />
+                )}
+                <span className="hidden sm:inline font-mono uppercase text-[10px] font-bold">
+                  Play/Pause
+                </span>
+              </button>
+
+              {/* Honest transport status (Stitch skin): how many stems are wired
+                and whether the Beat Grid is latched. Never claims a number the
+                engine has not reported; sm+ only, decorative. */}
+              <span
+                aria-hidden="true"
+                className="hidden flex items-center gap-2 text-[9px] font-medium uppercase tracking-[0.18em] shrink-0 sm:flex"
+              >
+                {beatGrid ? (
+                  <>
+                    <span className="rounded-full h-1.5 w-1.5 bg-st-ok shrink-0" />
+                    <span className="text-st-ink-dim">
+                      4 stems · phase-locked
+                    </span>
+                  </>
+                ) : (
+                  <span className="text-st-ink-dim">4 stems · phase open</span>
+                )}
+              </span>
+            </div>
+
+            {/* ADR-0008 (ticket 04): the trash / Purge Session button is dead —
                 nothing destructive sits in the playback surface. The full purge
                 is the Separate Tab's Session Recovery Discard. */}
 
-          {/* Export Stems Action — standalone form only. The hosted app
+            {/* Export Stems Action — standalone form only. The hosted app
                 form (exportDialogHosted) keeps the Export panel inline in the
                 Export Tab, so the Mix Tab never carries this action. */}
-          {!exportDialogHosted && (
-            <button
-              type="button"
-              aria-label="Export Stems"
-              title="Export isolated stems (WAV/MP3/ZIP)"
-              onClick={() => setIsExportDialogOpen(true)}
-              className="px-3 py-1 rounded border border-st-hairline bg-st-surface text-zinc-400 hover:text-white font-mono font-semibold text-[10px] flex items-center gap-2 transition-colors"
-            >
-              <Download className="h-4 w-4 text-primary" />
-              <span>Export Stems</span>
-            </button>
-          )}
-        </div>
+            {!exportDialogHosted && (
+              <button
+                type="button"
+                aria-label="Export Stems"
+                title="Export isolated stems (WAV/MP3/ZIP)"
+                onClick={() => setIsExportDialogOpen(true)}
+                className="px-3 py-1 rounded border border-st-hairline bg-st-surface text-zinc-400 hover:text-white font-mono font-semibold text-[10px] flex items-center gap-2 transition-colors"
+              >
+                <Download className="h-4 w-4 text-primary" />
+                <span>Export Stems</span>
+              </button>
+            )}
+          </div>
 
-        {/* Master Volume Slider */}
-        <div className="flex items-center gap-2 pl-2 border-s border-st-hairline/60">
-          <span className="font-mono text-[10px] uppercase font-semibold text-st-ink-dim shrink-0">
-            Master
-          </span>
-          <input
-            type="range"
-            min={0}
-            max={1}
-            step={0.01}
-            value={masterVolume}
-            onChange={(e) =>
-              handleMasterVolumeChange(parseFloat(e.target.value))
-            }
-            aria-label="Master Volume"
-            className="flex-1 min-w-[96px] accent-primary cursor-pointer h-1.5 bg-secondary rounded appearance-none"
-          />
-          <span className="font-mono text-[10px] font-bold text-zinc-200 w-7 text-right">
-            {Math.round(masterVolume * 100)}%
-          </span>
+          {/* Master Volume Slider */}
+          <div className="flex items-center gap-2 pl-2 border-s border-st-hairline/60">
+            <span className="font-mono text-[10px] uppercase font-semibold text-st-ink-dim shrink-0">
+              Master
+            </span>
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.01}
+              value={masterVolume}
+              onChange={(e) =>
+                handleMasterVolumeChange(parseFloat(e.target.value))
+              }
+              aria-label="Master Volume"
+              className="flex-1 min-w-[96px] accent-primary cursor-pointer h-1.5 bg-secondary rounded appearance-none"
+            />
+            <span className="font-mono text-[10px] font-bold text-zinc-200 w-7 text-right">
+              {Math.round(masterVolume * 100)}%
+            </span>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Export panel fallback — standalone form only; the hosted app form
           (exportDialogHosted) keeps the panel inline in the Export Tab. */}

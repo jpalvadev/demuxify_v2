@@ -386,13 +386,10 @@ describe("StemPlayer UI Component", () => {
       screen.queryByRole("region", { name: /export audio stems/i })
     ).toBeNull();
 
-    // Mixer, Master Volume, and Time-Stretch/Pitch-Shift/Formant tweaks still
-    // reach the Transport bridge.
+    // Mixer and Time-Stretch/Pitch-Shift/Formant tweaks still reach the
+    // Transport bridge (the master fader died with the erased strip).
     fireEvent.change(screen.getByRole("slider", { name: /drums volume/i }), {
       target: { value: "0.4" },
-    });
-    fireEvent.change(screen.getByRole("slider", { name: /master volume/i }), {
-      target: { value: "0.9" },
     });
     for (let step = 0; step < 2; step += 1) {
       fireEvent.click(screen.getByRole("button", { name: /increment tempo/i }));
@@ -403,11 +400,11 @@ describe("StemPlayer UI Component", () => {
     );
 
     await waitFor(() => {
-      expect(emittedStates.length).toBeGreaterThanOrEqual(5);
+      expect(emittedStates.length).toBeGreaterThanOrEqual(4);
     });
     const lastState = emittedStates[emittedStates.length - 1];
     expect(lastState.mixerStates.drums.volume).toBeCloseTo(0.4);
-    expect(lastState.masterVolume).toBeCloseTo(0.9);
+    expect(lastState.masterVolume).toBeCloseTo(1);
     expect(lastState.timeStretch.tempo).toBeCloseTo(1.1);
     expect(lastState.timeStretch.pitch).toBe(1);
     expect(lastState.timeStretch.formantPreservation).toBe(false);

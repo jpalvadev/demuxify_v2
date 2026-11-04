@@ -566,9 +566,13 @@ describe("App UI Shell", () => {
     const stemPlayerRegion = screen.getByRole("region", {
       name: /stem player/i,
     });
+    // Stitch skin 07j: the live Play/Pause transport row is erased from the
+    // hosted Mix Tab; the row controls anchor the "controls render" claim.
     expect(
-      within(stemPlayerRegion).getByRole("button", { name: /play/i })
-    ).toBeInTheDocument();
+      within(stemPlayerRegion).queryByRole("button", {
+        name: /^play\/pause$/i,
+      })
+    ).toBeNull();
     expect(
       within(stemPlayerRegion).getByRole("button", { name: /mute vocals/i })
     ).toBeInTheDocument();
@@ -1154,10 +1158,11 @@ describe("App UI Shell", () => {
       screen.queryByRole("button", { name: /purge session|reset session/i })
     ).toBeNull();
 
-    // The Transport row itself stays intact — the single toggle is still there
+    // Stitch skin 07j goes further: there is no live transport row at all
+    // on the hosted Mix Tab — no toggle to anchor, only absence to assert.
     expect(
-      within(mixTab).getByRole("button", { name: /^play\/pause$/i })
-    ).toBeInTheDocument();
+      within(mixTab).queryByRole("button", { name: /^play\/pause$/i })
+    ).toBeNull();
 
     // Isolation: the auto-saver may have persisted a Session during
     // separation — clear it so later renders don't see recovery prompts
@@ -1643,11 +1648,11 @@ describe("App UI Shell", () => {
     // breakpoint — the stage reads in the order the work is done. The whole-app
     // seam walks the Mix stage top-down: spine → Hand Calibration tap lane →
     // the Tempo Detector candidate picker (now its own Rail) → the Stem Strips
-    // → the Click Track lane → Time-Stretch → the master Transport row at the
-    // section foot (Stitch skin 07f, where the mockup puts its transport bar).
+    // → the Click Track lane → Time-Stretch; the master Transport row that
+    // used to close the section foot is erased from the hosted stage (Stitch
+    // skin 07j), so the chain ends at Time-Stretch.
     const tapStrip = within(mixTab).getByTestId("click-tap-calibration-strip");
     const pickerRail = within(mixTab).getByTestId("tempo-candidates-rail");
-    const transportRow = within(mixTab).getByTestId("transport-row");
     const firstStrip = within(mixTab).getAllByRole("group", {
       name: /stem$/i,
     })[0];
@@ -1661,10 +1666,15 @@ describe("App UI Shell", () => {
       [pickerRail, firstStrip],
       [firstStrip, clickRail],
       [clickRail, timeStretchPanel],
-      [timeStretchPanel, transportRow],
     ]) {
       expect(earlier.compareDocumentPosition(later) & 4).not.toBe(0);
     }
+
+    // Stitch skin 07j: the hosted Mix Tab renders no live Transport strip at
+    // all — the user erased the timecode / Play-Pause / master-fader cluster
+    // from the screen.
+    expect(within(mixTab).queryByTestId("transport-row")).toBeNull();
+    expect(within(mixTab).queryByTestId("stem-player-time")).toBeNull();
 
     // Hand Calibration collapse (ADR-0013, ticket 09): the card look is dead —
     // the lane is a thin strip welded under the spine, asserted through the
@@ -1979,7 +1989,7 @@ describe("App UI Shell", () => {
     ).toBeInTheDocument();
   });
 
-  it("renders a single Play/Pause toggle transport with mono readout on the Mix Tab", async () => {
+  it("carries no live transport strip on the hosted Mix Tab (Stitch skin 07j)", async () => {
     vi.spyOn(webgpuModule, "detectWebGPUCapability").mockResolvedValue({
       supported: true,
       isFallback: false,
@@ -1991,11 +2001,14 @@ describe("App UI Shell", () => {
 
     const mixTab = screen.getByRole("region", { name: /mix tab/i });
 
-    // One Transport toggle; no dedicated Play, Pause, or Seek-to-start buttons
-    const mixToggleBtn = within(mixTab).getByRole("button", {
-      name: /^play\/pause$/i,
-    });
-    expect(mixToggleBtn).toBeInTheDocument();
+    // The user erased the timecode / Play-Pause / master-fader cluster from
+    // the screen (Stitch skin 07j): none of its chrome renders anywhere on
+    // the hosted Mix Tab. The mockup's section foot is the DSP rack.
+    expect(within(mixTab).queryByTestId("transport-row")).toBeNull();
+    expect(within(mixTab).queryByTestId("stem-player-time")).toBeNull();
+    expect(
+      within(mixTab).queryByRole("button", { name: /^play\/pause$/i })
+    ).toBeNull();
     expect(
       within(mixTab).queryByRole("button", { name: /^play$/i })
     ).toBeNull();
@@ -2006,27 +2019,22 @@ describe("App UI Shell", () => {
       within(mixTab).queryByRole("button", { name: /seek to start/i })
     ).toBeNull();
     expect(
-      within(mixTab).getAllByText(/\d{2}:\d{2}/).length
-    ).toBeGreaterThanOrEqual(2);
+      within(mixTab).queryByRole("slider", { name: /master volume/i })
+    ).toBeNull();
 
-    // Pressing the toggle drives the shared Stem Player engine
-    expect(mixToggleBtn).toHaveAttribute("aria-pressed", "false");
-    fireEvent.click(mixToggleBtn);
-    await waitFor(() => {
-      expect(mixToggleBtn).toHaveAttribute("aria-pressed", "true");
-    });
-
-    // Pressing the same toggle again pauses
-    fireEvent.click(mixToggleBtn);
-    await waitFor(() => {
-      expect(mixToggleBtn).toHaveAttribute("aria-pressed", "false");
-    });
-
-    // Space key toggles that same control
+    // The keyboard transport survives the erasure: Space still toggles the
+    // shared engine through Stem Player's window keydown handler, and the
+    // Master Waveform spine remains the scrub surface (pinned by the spine
+    // seam below).
     fireEvent.keyDown(window, { code: "Space", key: " " });
-    await waitFor(() => {
-      expect(mixToggleBtn).toHaveAttribute("aria-pressed", "true");
+    const mixSpine = within(mixTab).getByRole("slider", {
+      name: /master waveform timeline/i,
     });
+    await waitFor(async () => {
+      expect(mixSpine).toBeInTheDocument();
+    });
+    // And no transport chrome re-mounts behind the keyboard toggle.
+    expect(within(mixTab).queryByTestId("transport-row")).toBeNull();
   });
 
   it("paints the bundled Bold faces on banners, branding and time readouts", async () => {
@@ -2052,12 +2060,15 @@ describe("App UI Shell", () => {
       /sans-serif\s*$/
     );
 
-    // Mono face: Stem Player time display (JetBrains Mono subset)
-    const stemPlayerTime = screen.getByTestId("stem-player-time");
-    expect(window.getComputedStyle(stemPlayerTime).fontFamily).toMatch(
+    // Mono face: the masthead's solo/mute hint (JetBrains Mono subset) — the
+    // transport readout this seam used to pin was erased from the hosted Mix
+    // Tab (Stitch skin 07j), so the pin rides another always-rendered mono
+    // face.
+    const soloMuteHint = screen.getByTestId("stem-solo-mute-hint");
+    expect(window.getComputedStyle(soloMuteHint).fontFamily).toMatch(
       /JetBrains Mono/
     );
-    expect(window.getComputedStyle(stemPlayerTime).fontFamily).toMatch(
+    expect(window.getComputedStyle(soloMuteHint).fontFamily).toMatch(
       /monospace\s*$/
     );
   });
@@ -2138,11 +2149,10 @@ describe("App UI Shell", () => {
       const spine = within(mixTab).getByRole("slider", {
         name: /master waveform timeline/i,
       });
-      const toggle = within(mixTab).getByRole("button", {
-        name: /^play\/pause$/i,
-      });
 
-      fireEvent.click(toggle);
+      // Stitch skin 07j erased the transport row: press play via the
+      // keyboard channel (Space), which Stem Player still owns.
+      fireEvent.keyDown(window, { code: "Space", key: " " });
 
       // Each tick re-schedules itself, so the queue keeps refilling while the
       // pump walks the mock clock forward half a second at a time.
@@ -2163,9 +2173,10 @@ describe("App UI Shell", () => {
       // the spine's own m:ss face, one second wider than the Transport's mm:ss.
       expect(spine).toHaveAttribute("aria-valuetext", "0:03");
 
-      // One Playhead: the Transport shows the same 3 s the spine walked to.
-      const transportReadout = within(mixTab).getByTestId("stem-player-time");
-      expect(transportReadout.textContent).toContain("00:03");
+      // One Playhead: the hosted Mix Tab no longer carries a Transport
+      // readout at all (Stitch skin 07j erased the strip); the spine's
+      // accessible face is the only position readout.
+      expect(within(mixTab).queryByTestId("stem-player-time")).toBeNull();
 
       // And the spine block itself carries no PLAYHEAD clock at the whole-app
       // seam: one Playhead keeps exactly one position readout (the Transport's
@@ -2329,18 +2340,6 @@ describe("App UI Shell", () => {
           .getAllByRole("button")
           .filter((entry) => entry.getAttribute("aria-current") === "true")
       ).toHaveLength(1);
-      const mixToggle = within(
-        screen.getByRole("region", { name: /mix tab/i })
-      ).getByRole("button", { name: /^play\/pause$/i });
-      expect(mixToggle).toHaveAttribute("aria-pressed", "false");
-      fireEvent.click(mixToggle);
-      await waitFor(() => {
-        expect(mixToggle).toHaveAttribute("aria-pressed", "true");
-      });
-      fireEvent.click(mixToggle);
-      await waitFor(() => {
-        expect(mixToggle).toHaveAttribute("aria-pressed", "false");
-      });
 
       // Re-picking while the pass is in flight abandons it and starts a fresh
       // one: one Tempo Detector pass at a time.
