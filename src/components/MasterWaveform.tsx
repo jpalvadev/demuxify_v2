@@ -170,12 +170,15 @@ export const MasterWaveform: React.FC<MasterWaveformProps> = ({
       ctx.lineTo(playheadX, canvasHeight);
       ctx.stroke();
 
-      // Playhead head cap
+      // Playhead head cap — Stitch skin 07s: the mockup's Playhead wears a
+      // rotated-square diamond knob at the crown (w-2.5 h-2.5 rotate-45), not
+      // a triangle; same white glow.
       ctx.fillStyle = "#ffffff";
       ctx.beginPath();
-      ctx.moveTo(playheadX - 5, 0);
-      ctx.lineTo(playheadX + 5, 0);
-      ctx.lineTo(playheadX, 8);
+      ctx.moveTo(playheadX, 3);
+      ctx.lineTo(playheadX + 7, 10);
+      ctx.lineTo(playheadX, 17);
+      ctx.lineTo(playheadX - 7, 10);
       ctx.closePath();
       ctx.fill();
     }
