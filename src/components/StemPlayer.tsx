@@ -610,228 +610,232 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
             />
           </div>
         )}
+      </section>
 
-        {/* Time-Stretch & Pitch Shift controls (Stitch skin 07k): the mockup's
-          DSP rack has NO container behind it — the rack is a bare grid on the
-          workspace surface whose cards are the parts. So the outer wrapper is
-          transparent (no border, no fill, no padding) and each card carries
-          its own mockup rule. */}
-        {/* DSP rack (Stitch skin 07n, card surgery 08b): the mockup has NO rack
-          heading — the trio of cards sits straight on the workspace surface.
-          The old title row (badge, h4, description, reset chip) is gone and the
-          live Reset Time-Stretch chip is homed at the foot of the Tempo card.
-          The third card is no longer a dead placeholder: it is the live Click
-          Track / Metronome card (the user's 08b instruction moved the real
-          click affordance INTO the card that says CLICK TRACK / METRONOME). */}
-        <div
-          data-testid="dsp-rack-root"
-          className="w-full flex flex-col gap-3 sm:gap-4"
-        >
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
-            {/* Tempo Section */}
-            <div className="rounded-lg border border-st-hairline bg-st-panel p-3 flex flex-col justify-between space-y-3">
-              <div className="flex items-center justify-between pb-2 border-b border-st-hairline/60">
-                <span className="font-mono text-[11px] font-bold text-st-ink uppercase flex items-center gap-2">
-                  <Gauge className="h-3.5 w-3.5 text-primary" />
-                  Time-Stretch & Speed
-                </span>
-                <span
-                  data-testid="current-tempo-label"
-                  className="font-mono text-[11px] font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded"
-                >
-                  {tempo.toFixed(2)}x
-                </span>
-              </div>
+      {/* Mix Tab cohesion (Stitch skin 08c, user 2026-11-04: "each
+        functionality should be OUTSIDE of the 4 stems container, and side
+        by side"): the Stem Player section closes right after the mixer
+        lanes and the DSP rack re-anchors as its sibling on the stage. The
+        mock agrees — the Multi-Track Stem Player card ends under the
+        waveform rows, and the DSP rack is a separate section sitting below
+        it on the workspace column with its cards side by side. The gutter
+        between the two is the stage's own space-y-3 seam — the mock's
+        gap-3 — so no extra margin is planted here. */}
+      {/* DSP rack (Stitch skin 07k/07n, surgeries 08b + 08c): the mockup has
+        NO container behind the rack — the trio of cards sits straight on the
+        workspace surface. 08b made the third card the live Click Track /
+        Metronome card; 08c moved the whole rack OUT of the Stem Player
+        card, so the 4-stems container now carries only its masthead and
+        the waveform rows. */}
+      <div
+        data-testid="dsp-rack-root"
+        className="w-full flex flex-col gap-3 sm:gap-4"
+      >
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          {/* Tempo Section */}
+          <div className="rounded-lg border border-st-hairline bg-st-panel p-3 flex flex-col justify-between space-y-3">
+            <div className="flex items-center justify-between pb-2 border-b border-st-hairline/60">
+              <span className="font-mono text-[11px] font-bold text-st-ink uppercase flex items-center gap-2">
+                <Gauge className="h-3.5 w-3.5 text-primary" />
+                Time-Stretch & Speed
+              </span>
+              <span
+                data-testid="current-tempo-label"
+                className="font-mono text-[11px] font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded"
+              >
+                {tempo.toFixed(2)}x
+              </span>
+            </div>
 
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  aria-label="Decrement Tempo"
-                  title="Slow down 0.05x"
-                  onClick={handleDecrementTempo}
-                  disabled={tempo <= 0.5}
-                  className="flex h-8 w-8 items-center justify-center rounded border border-border bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-all"
-                >
-                  <Minus className="h-3.5 w-3.5" />
-                </button>
-
-                <div className="flex-1 flex items-center gap-2">
-                  <span className="text-[11px] font-mono text-muted-foreground">
-                    0.50x
-                  </span>
-                  <input
-                    type="range"
-                    min="0.5"
-                    max="2"
-                    step="0.05"
-                    value={tempo}
-                    onChange={(e) =>
-                      handleTempoChange(parseFloat(e.target.value))
-                    }
-                    aria-label="Playback Tempo"
-                    className="w-full accent-primary cursor-pointer h-1.5 bg-secondary rounded appearance-none"
-                  />
-                  <span className="text-[11px] font-mono text-muted-foreground">
-                    2.00x
-                  </span>
-                </div>
-
-                <button
-                  type="button"
-                  aria-label="Increment Tempo"
-                  title="Speed up 0.05x"
-                  onClick={handleIncrementTempo}
-                  disabled={tempo >= 2.0}
-                  className="flex h-8 w-8 items-center justify-center rounded border border-border bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-all"
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                </button>
-              </div>
-
-              <div className="flex items-center justify-between gap-1 sm:gap-1.5 pt-0.5">
-                {[0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0].map((preset) => {
-                  const label = `${preset.toFixed(2)}x`;
-                  const isSelected = Math.abs(tempo - preset) < 0.01;
-                  return (
-                    <button
-                      key={preset}
-                      type="button"
-                      aria-label={`Tempo preset ${label}`}
-                      aria-pressed={isSelected}
-                      onClick={() => handleTempoChange(preset)}
-                      className={cn(
-                        "flex-1 py-1 rounded font-mono text-[10px] sm:text-[11px] font-semibold border transition-all",
-                        isSelected
-                          ? "bg-primary text-white font-bold shadow-chip-glow"
-                          : "bg-st-surface text-zinc-400 hover:text-white hover:border-zinc-500 border-st-hairline"
-                      )}
-                    >
-                      {label}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Reset chip (Stitch skin 07n): the rack heading row is gone
-                with the mockup, so the live Reset Time-Stretch chip lives at
-                the foot of the Tempo card — same button, same contract, a
-                quieter zinc mockup chip. */}
+            <div className="flex items-center gap-2">
               <button
                 type="button"
-                aria-label="Reset Time-Stretch"
-                title="Reset pitch to 0 and tempo to 1.0x"
-                onClick={handleResetTimeStretch}
-                disabled={Math.abs(tempo - 1.0) < 0.001 && pitch === 0}
-                className="w-full flex items-center justify-between gap-2 px-2 py-1 rounded border border-st-hairline bg-st-surface text-[10px] font-mono text-st-ash hover:text-st-ink transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                aria-label="Decrement Tempo"
+                title="Slow down 0.05x"
+                onClick={handleDecrementTempo}
+                disabled={tempo <= 0.5}
+                className="flex h-8 w-8 items-center justify-center rounded border border-border bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-all"
               >
-                <RotateCcw className="h-3 w-3 text-st-ink" />
-                <span>Reset Pitch & Tempo</span>
+                <Minus className="h-3.5 w-3.5" />
+              </button>
+
+              <div className="flex-1 flex items-center gap-2">
+                <span className="text-[11px] font-mono text-muted-foreground">
+                  0.50x
+                </span>
+                <input
+                  type="range"
+                  min="0.5"
+                  max="2"
+                  step="0.05"
+                  value={tempo}
+                  onChange={(e) =>
+                    handleTempoChange(parseFloat(e.target.value))
+                  }
+                  aria-label="Playback Tempo"
+                  className="w-full accent-primary cursor-pointer h-1.5 bg-secondary rounded appearance-none"
+                />
+                <span className="text-[11px] font-mono text-muted-foreground">
+                  2.00x
+                </span>
+              </div>
+
+              <button
+                type="button"
+                aria-label="Increment Tempo"
+                title="Speed up 0.05x"
+                onClick={handleIncrementTempo}
+                disabled={tempo >= 2.0}
+                className="flex h-8 w-8 items-center justify-center rounded border border-border bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+              >
+                <Plus className="h-3.5 w-3.5" />
               </button>
             </div>
 
-            {/* Pitch Section */}
-            <div className="rounded-lg border border-st-hairline bg-st-panel p-3 flex flex-col justify-between space-y-3">
-              <div className="flex items-center justify-between pb-2 border-b border-st-hairline/60">
-                <span className="font-mono text-[11px] font-bold text-st-ink uppercase flex items-center gap-2">
-                  <Music className="h-3.5 w-3.5 text-accent" />
-                  Pitch Transposition
-                </span>
-                <span
-                  data-testid="current-pitch-label"
-                  className="font-mono text-[11px] font-bold text-zinc-300 bg-st-surface px-1.5 py-0.5 rounded border border-st-hairline"
-                >
-                  {pitch === 0
-                    ? "0 st"
-                    : `${pitch > 0 ? "+" : ""}${
-                        Number.isInteger(pitch)
-                          ? pitch
-                          : pitch.toFixed(2).replace(/\.?0+$/, "")
-                      } st`}
-                </span>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  aria-label="Decrement Pitch"
-                  title="Shift pitch down 1 semitone"
-                  onClick={handleDecrementPitch}
-                  disabled={pitch <= -12}
-                  className="flex h-8 w-8 items-center justify-center rounded border border-border bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-all"
-                >
-                  <Minus className="h-3.5 w-3.5" />
-                </button>
-
-                <div className="flex-1 flex items-center gap-2">
-                  <span className="text-[11px] font-mono text-muted-foreground">
-                    -12
-                  </span>
-                  <input
-                    type="range"
-                    min="-12"
-                    max="12"
-                    step="1"
-                    value={pitch}
-                    onChange={(e) =>
-                      handlePitchChange(parseFloat(e.target.value))
-                    }
-                    aria-label="Pitch Shift"
-                    className="w-full accent-primary cursor-pointer h-1.5 bg-secondary rounded appearance-none"
-                  />
-                  <span className="text-[11px] font-mono text-muted-foreground">
-                    +12
-                  </span>
-                </div>
-
-                <button
-                  type="button"
-                  aria-label="Increment Pitch"
-                  title="Shift pitch up 1 semitone"
-                  onClick={handleIncrementPitch}
-                  disabled={pitch >= 12}
-                  className="flex h-8 w-8 items-center justify-center rounded border border-border bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-all"
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                </button>
-              </div>
-
-              <div className="flex items-center justify-between text-[11px] text-muted-foreground px-1">
-                <span>Octave Down (-12)</span>
-                <span>Original (0)</span>
-                <span>Octave Up (+12)</span>
-              </div>
-
-              {/* Vocal Formant Preservation Toggle */}
-              <div className="flex items-center justify-between pt-2 border-t border-border/40">
-                <div className="space-y-0.5">
-                  <div className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                    <span>Vocal Formant Preservation</span>
-                    <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-primary/10 text-primary border border-primary/20">
-                      Vocals Stem
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-muted-foreground">
-                    Keeps natural vocal timbre across semitone changes
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-label="Vocal Formant Preservation"
-                  aria-checked={formantPreservation}
-                  onClick={handleToggleFormant}
-                  className={cn(
-                    "h-8 w-8 rounded border text-xs font-bold transition-all flex items-center justify-center",
-                    formantPreservation
-                      ? "border-primary/70 bg-primary text-primary-foreground shadow-xs font-black"
-                      : "border-border/70 bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground"
-                  )}
-                >
-                  <Mic className="h-4 w-4" />
-                </button>
-              </div>
+            <div className="flex items-center justify-between gap-1 sm:gap-1.5 pt-0.5">
+              {[0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0].map((preset) => {
+                const label = `${preset.toFixed(2)}x`;
+                const isSelected = Math.abs(tempo - preset) < 0.01;
+                return (
+                  <button
+                    key={preset}
+                    type="button"
+                    aria-label={`Tempo preset ${label}`}
+                    aria-pressed={isSelected}
+                    onClick={() => handleTempoChange(preset)}
+                    className={cn(
+                      "flex-1 py-1 rounded font-mono text-[10px] sm:text-[11px] font-semibold border transition-all",
+                      isSelected
+                        ? "bg-primary text-white font-bold shadow-chip-glow"
+                        : "bg-st-surface text-zinc-400 hover:text-white hover:border-zinc-500 border-st-hairline"
+                    )}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
             </div>
-            {/* Click Track / Metronome card (Stitch skin 08b, the user's
+
+            {/* Reset chip (Stitch skin 07n): the rack heading row is gone
+                with the mockup, so the live Reset Time-Stretch chip lives at
+                the foot of the Tempo card — same button, same contract, a
+                quieter zinc mockup chip. */}
+            <button
+              type="button"
+              aria-label="Reset Time-Stretch"
+              title="Reset pitch to 0 and tempo to 1.0x"
+              onClick={handleResetTimeStretch}
+              disabled={Math.abs(tempo - 1.0) < 0.001 && pitch === 0}
+              className="w-full flex items-center justify-between gap-2 px-2 py-1 rounded border border-st-hairline bg-st-surface text-[10px] font-mono text-st-ash hover:text-st-ink transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <RotateCcw className="h-3 w-3 text-st-ink" />
+              <span>Reset Pitch & Tempo</span>
+            </button>
+          </div>
+
+          {/* Pitch Section */}
+          <div className="rounded-lg border border-st-hairline bg-st-panel p-3 flex flex-col justify-between space-y-3">
+            <div className="flex items-center justify-between pb-2 border-b border-st-hairline/60">
+              <span className="font-mono text-[11px] font-bold text-st-ink uppercase flex items-center gap-2">
+                <Music className="h-3.5 w-3.5 text-accent" />
+                Pitch Transposition
+              </span>
+              <span
+                data-testid="current-pitch-label"
+                className="font-mono text-[11px] font-bold text-zinc-300 bg-st-surface px-1.5 py-0.5 rounded border border-st-hairline"
+              >
+                {pitch === 0
+                  ? "0 st"
+                  : `${pitch > 0 ? "+" : ""}${
+                      Number.isInteger(pitch)
+                        ? pitch
+                        : pitch.toFixed(2).replace(/\.?0+$/, "")
+                    } st`}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                aria-label="Decrement Pitch"
+                title="Shift pitch down 1 semitone"
+                onClick={handleDecrementPitch}
+                disabled={pitch <= -12}
+                className="flex h-8 w-8 items-center justify-center rounded border border-border bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+              >
+                <Minus className="h-3.5 w-3.5" />
+              </button>
+
+              <div className="flex-1 flex items-center gap-2">
+                <span className="text-[11px] font-mono text-muted-foreground">
+                  -12
+                </span>
+                <input
+                  type="range"
+                  min="-12"
+                  max="12"
+                  step="1"
+                  value={pitch}
+                  onChange={(e) =>
+                    handlePitchChange(parseFloat(e.target.value))
+                  }
+                  aria-label="Pitch Shift"
+                  className="w-full accent-primary cursor-pointer h-1.5 bg-secondary rounded appearance-none"
+                />
+                <span className="text-[11px] font-mono text-muted-foreground">
+                  +12
+                </span>
+              </div>
+
+              <button
+                type="button"
+                aria-label="Increment Pitch"
+                title="Shift pitch up 1 semitone"
+                onClick={handleIncrementPitch}
+                disabled={pitch >= 12}
+                className="flex h-8 w-8 items-center justify-center rounded border border-border bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+              >
+                <Plus className="h-3.5 w-3.5" />
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between text-[11px] text-muted-foreground px-1">
+              <span>Octave Down (-12)</span>
+              <span>Original (0)</span>
+              <span>Octave Up (+12)</span>
+            </div>
+
+            {/* Vocal Formant Preservation Toggle */}
+            <div className="flex items-center justify-between pt-2 border-t border-border/40">
+              <div className="space-y-0.5">
+                <div className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                  <span>Vocal Formant Preservation</span>
+                  <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-primary/10 text-primary border border-primary/20">
+                    Vocals Stem
+                  </span>
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  Keeps natural vocal timbre across semitone changes
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-label="Vocal Formant Preservation"
+                aria-checked={formantPreservation}
+                onClick={handleToggleFormant}
+                className={cn(
+                  "h-8 w-8 rounded border text-xs font-bold transition-all flex items-center justify-center",
+                  formantPreservation
+                    ? "border-primary/70 bg-primary text-primary-foreground shadow-xs font-black"
+                    : "border-border/70 bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground"
+                )}
+              >
+                <Mic className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+          {/* Click Track / Metronome card (Stitch skin 08b, the user's
               card surgery): the DSP rack's third slot keeps its mockup
               header — icon, name, bottom border — and everything that was
               inside it is deleted outright: the phantom BPM meta chip, the
@@ -841,23 +845,23 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
               Stem Strips: the ranked-readings island above the ♪ switch and
               the volume fader. The lane is domain-separate — never a Stem —
               and, being live, carries no aria-hidden and no placeholder mark. */}
-            <div
-              role="group"
-              aria-label="Click Track"
-              data-testid="click-track-rail"
-              className="rounded-lg border border-st-hairline bg-st-panel p-3 flex flex-col justify-between space-y-3"
-            >
-              <div className="flex items-center justify-between pb-2 border-b border-st-hairline/60">
-                <span className="font-mono text-[11px] font-bold text-st-ink uppercase flex items-center gap-2">
-                  <Gauge
-                    className="h-3.5 w-3.5 text-primary"
-                    aria-hidden="true"
-                  />
-                  Click Track / Metronome
-                </span>
-              </div>
+          <div
+            role="group"
+            aria-label="Click Track"
+            data-testid="click-track-rail"
+            className="rounded-lg border border-st-hairline bg-st-panel p-3 flex flex-col justify-between space-y-3"
+          >
+            <div className="flex items-center justify-between pb-2 border-b border-st-hairline/60">
+              <span className="font-mono text-[11px] font-bold text-st-ink uppercase flex items-center gap-2">
+                <Gauge
+                  className="h-3.5 w-3.5 text-primary"
+                  aria-hidden="true"
+                />
+                Click Track / Metronome
+              </span>
+            </div>
 
-              {/* The picker island (ticket 06 machinery): the Tempo Detector's
+            {/* The picker island (ticket 06 machinery): the Tempo Detector's
                   ranked readings as one compact chip family. A pulse and its
                   metric doubling are genuinely indistinguishable, so the
                   picker GROUP's accessible name carries the honest ranking
@@ -867,130 +871,130 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
                   the app to re-run the Tempo Detector with that tempo as
                   hint, re-locking the Beat Grid; the chip the grid is locked
                   to stays informational. */}
-              {tempoCandidates && tempoCandidates.length > 0 && (
-                <div
-                  role="group"
-                  aria-label={
-                    clickCalibration
-                      ? `calibrated by hand · your ${clickCalibration.tapsSec.length} taps anchor the grid`
-                      : isConfidentReading(tempoCandidates)
-                        ? `solid reading · confidence ${formatConfidence(tempoCandidates[0].confidence)}`
-                        : `${tempoCandidates.length} readings ranked · pick the feel you hear`
-                  }
-                  data-testid="click-track-candidate-picker"
-                  className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-fit justify-items-center font-mono text-[10px] rounded border border-st-hairline bg-st-panel p-2"
-                >
-                  {tempoCandidates.map((candidate) => {
-                    const locked = isLockedCandidate(
-                      candidate.bpm,
-                      clickTrackBpm ?? null
-                    );
-                    const bpmLabel = `${candidate.bpm.toFixed(1)} BPM`;
-                    return (
-                      <button
-                        key={bpmLabel}
-                        type="button"
-                        aria-label={
-                          locked
-                            ? `Beat Grid locked to ${bpmLabel}`
-                            : `Re-lock Beat Grid to ${bpmLabel}`
+            {tempoCandidates && tempoCandidates.length > 0 && (
+              <div
+                role="group"
+                aria-label={
+                  clickCalibration
+                    ? `calibrated by hand · your ${clickCalibration.tapsSec.length} taps anchor the grid`
+                    : isConfidentReading(tempoCandidates)
+                      ? `solid reading · confidence ${formatConfidence(tempoCandidates[0].confidence)}`
+                      : `${tempoCandidates.length} readings ranked · pick the feel you hear`
+                }
+                data-testid="click-track-candidate-picker"
+                className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-fit justify-items-center font-mono text-[10px] rounded border border-st-hairline bg-st-panel p-2"
+              >
+                {tempoCandidates.map((candidate) => {
+                  const locked = isLockedCandidate(
+                    candidate.bpm,
+                    clickTrackBpm ?? null
+                  );
+                  const bpmLabel = `${candidate.bpm.toFixed(1)} BPM`;
+                  return (
+                    <button
+                      key={bpmLabel}
+                      type="button"
+                      aria-label={
+                        locked
+                          ? `Beat Grid locked to ${bpmLabel}`
+                          : `Re-lock Beat Grid to ${bpmLabel}`
+                      }
+                      aria-pressed={locked}
+                      title={bpmLabel}
+                      disabled={locked || !onChooseTempoCandidate}
+                      onClick={() => {
+                        if (!locked) {
+                          onChooseTempoCandidate?.(candidate.bpm);
                         }
-                        aria-pressed={locked}
-                        title={bpmLabel}
-                        disabled={locked || !onChooseTempoCandidate}
-                        onClick={() => {
-                          if (!locked) {
-                            onChooseTempoCandidate?.(candidate.bpm);
-                          }
-                        }}
+                      }}
+                      className={cn(
+                        // Mock chip rule (verbatim per the user's card): one
+                        // compact shape for every reading, pair spread
+                        // justify-between; coral stays on the locked chip only.
+                        // Compact chip rule: the shape hugs its own content, the
+                        // pair keeps a fixed gutter, and justify-items-center in
+                        // the picker grid stops a dead cell from stretching a
+                        // chip to full width (the mock's own 1fr cells do).
+                        "p-1.5 rounded border flex items-center justify-between gap-2 transition-all disabled:opacity-40 disabled:cursor-not-allowed",
+                        locked
+                          ? "border-st-coral/50 bg-st-coral/15 text-white cursor-default"
+                          : "border-st-hairline bg-st-surface text-zinc-400 hover:border-zinc-500 cursor-pointer"
+                      )}
+                    >
+                      <span
                         className={cn(
-                          // Mock chip rule (verbatim per the user's card): one
-                          // compact shape for every reading, pair spread
-                          // justify-between; coral stays on the locked chip only.
-                          // Compact chip rule: the shape hugs its own content, the
-                          // pair keeps a fixed gutter, and justify-items-center in
-                          // the picker grid stops a dead cell from stretching a
-                          // chip to full width (the mock's own 1fr cells do).
-                          "p-1.5 rounded border flex items-center justify-between gap-2 transition-all disabled:opacity-40 disabled:cursor-not-allowed",
-                          locked
-                            ? "border-st-coral/50 bg-st-coral/15 text-white cursor-default"
-                            : "border-st-hairline bg-st-surface text-zinc-400 hover:border-zinc-500 cursor-pointer"
+                          "font-medium shrink-0",
+                          locked ? "font-bold text-st-coral" : "text-zinc-300"
                         )}
                       >
-                        <span
-                          className={cn(
-                            "font-medium shrink-0",
-                            locked ? "font-bold text-st-coral" : "text-zinc-300"
-                          )}
-                        >
-                          {bpmLabel}
-                        </span>{" "}
-                        <span
-                          className={cn(
-                            "text-[9px] shrink-0",
-                            locked ? "text-white" : "text-zinc-500"
-                          )}
-                        >
-                          {formatConfidence(candidate.confidence)} match
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
+                        {bpmLabel}
+                      </span>{" "}
+                      <span
+                        className={cn(
+                          "text-[9px] shrink-0",
+                          locked ? "text-white" : "text-zinc-500"
+                        )}
+                      >
+                        {formatConfidence(candidate.confidence)} match
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
 
-              {/* Mixer controls: the ♪ enable switch (off by default) and the
+            {/* Mixer controls: the ♪ enable switch (off by default) and the
                   volume fader — like a lane, with no rate control of its own
                   (Time-Stretch owns the rate). */}
-              <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0">
-                <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-label="Click Track"
-                    aria-checked={clickTrack.enabled}
-                    title="Click Track on/off (Beat Grid metronome)"
-                    disabled={!beatGrid || beatGrid?.length === 0}
-                    onClick={handleToggleClickTrack}
-                    className={cn(
-                      "h-8 w-8 rounded border text-xs font-bold transition-all flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed",
-                      clickTrack.enabled
-                        ? "border-primary/70 bg-primary text-primary-foreground shadow-xs font-black"
-                        : "border-border/70 bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground"
-                    )}
-                  >
-                    ♪
-                  </button>
-                </div>
-
-                <div className="flex items-center gap-2 flex-1">
-                  {clickTrack.volume === 0 ? (
-                    <VolumeX className="h-4 w-4 text-muted-foreground/60 shrink-0" />
-                  ) : (
-                    <Volume2 className="h-4 w-4 text-muted-foreground shrink-0" />
+            <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0">
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  role="switch"
+                  aria-label="Click Track"
+                  aria-checked={clickTrack.enabled}
+                  title="Click Track on/off (Beat Grid metronome)"
+                  disabled={!beatGrid || beatGrid?.length === 0}
+                  onClick={handleToggleClickTrack}
+                  className={cn(
+                    "h-8 w-8 rounded border text-xs font-bold transition-all flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed",
+                    clickTrack.enabled
+                      ? "border-primary/70 bg-primary text-primary-foreground shadow-xs font-black"
+                      : "border-border/70 bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground"
                   )}
-                  <input
-                    type="range"
-                    min={0}
-                    max={1}
-                    step={0.01}
-                    value={clickTrack.volume}
-                    onChange={(e) =>
-                      handleSetClickTrackVolume(parseFloat(e.target.value))
-                    }
-                    aria-label="Click Track Volume"
-                    className="w-full accent-primary cursor-pointer h-1.5 bg-secondary rounded appearance-none"
-                  />
-                  <span className="text-[11px] font-mono text-muted-foreground w-7 text-right">
-                    {Math.round(clickTrack.volume * 100)}%
-                  </span>
-                </div>
+                >
+                  ♪
+                </button>
+              </div>
+
+              <div className="flex items-center gap-2 flex-1">
+                {clickTrack.volume === 0 ? (
+                  <VolumeX className="h-4 w-4 text-muted-foreground/60 shrink-0" />
+                ) : (
+                  <Volume2 className="h-4 w-4 text-muted-foreground shrink-0" />
+                )}
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  value={clickTrack.volume}
+                  onChange={(e) =>
+                    handleSetClickTrackVolume(parseFloat(e.target.value))
+                  }
+                  aria-label="Click Track Volume"
+                  className="w-full accent-primary cursor-pointer h-1.5 bg-secondary rounded appearance-none"
+                />
+                <span className="text-[11px] font-mono text-muted-foreground w-7 text-right">
+                  {Math.round(clickTrack.volume * 100)}%
+                </span>
               </div>
             </div>
           </div>
         </div>
+      </div>
 
-        {/* The hosted Mix Tab renders NO live transport strip (Stitch skin
+      {/* The hosted Mix Tab renders NO live transport strip (Stitch skin
           07j): the mockup's section foot is the DSP rack and the user erased
           the timecode / Play-Pause / master-fader cluster from the screen.
           Keyboard Space still toggles the shared engine (the window keydown
@@ -998,137 +1002,134 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
           stays the scrub surface. The standalone component harness form
           (exportDialogHosted false) keeps the full cluster so its behavior
           contract stays pinned. */}
-        {!exportDialogHosted && (
+      {!exportDialogHosted && (
+        <div
+          data-testid="transport-row"
+          className="w-full flex flex-wrap items-center justify-between shrink-0 border-t border-st-hairline pt-2 sm:pt-3 gap-3 sm:gap-4 md:justify-end"
+        >
+          {/* Time Display: strong mono readout (Bold port of the .tread row) */}
           <div
-            data-testid="transport-row"
-            className="w-full flex flex-wrap items-center justify-between shrink-0 border-t border-st-hairline pt-2 sm:pt-3 gap-3 sm:gap-4 md:justify-end"
+            data-testid="stem-player-time"
+            className="flex items-baseline gap-1.5 font-mono text-[11px] bg-st-canvas px-3 py-1 rounded border border-st-hairline"
+            style={{ fontFamily: MONO_FONT_STACK }}
           >
-            {/* Time Display: strong mono readout (Bold port of the .tread row) */}
-            <div
-              data-testid="stem-player-time"
-              className="flex items-baseline gap-1.5 font-mono text-[11px] bg-st-canvas px-3 py-1 rounded border border-st-hairline"
-              style={{ fontFamily: MONO_FONT_STACK }}
-            >
-              <span className="text-white font-bold tracking-wider">
-                {formatTime(currentTime)}
-              </span>
-              <span className="text-zinc-500 text-xs">/</span>
-              <span className="text-zinc-400 text-xs">
-                {formatTime(duration)}
-              </span>
-            </div>
+            <span className="text-white font-bold tracking-wider">
+              {formatTime(currentTime)}
+            </span>
+            <span className="text-zinc-500 text-xs">/</span>
+            <span className="text-zinc-400 text-xs">
+              {formatTime(duration)}
+            </span>
+          </div>
 
-            {/* Transport: single Play/Pause toggle (ADR-0008). Icon shows the
+          {/* Transport: single Play/Pause toggle (ADR-0008). Icon shows the
               action coming next: ▶ while paused, ⏸ while playing; one stable
               accessible name plus aria-pressed for assistive tech. The Seek-to-
               start button is gone; the Master Waveform spine is the timeline. */}
-            <div className="flex items-center gap-2">
-              <div className="relative flex flex-col items-center gap-1 shrink-0">
-                <button
-                  type="button"
-                  aria-label="Play/Pause"
-                  aria-pressed={isPlaying}
-                  title="Play/Pause (Space)"
-                  onClick={togglePlayPause}
-                  className={cn(
-                    "relative flex h-11 w-11 items-center justify-center rounded-full border transition-all font-semibold shadow-sm active:scale-95",
-                    isPlaying
-                      ? "bg-st-coral text-white border-st-coral shadow-play-glow hover:bg-st-coral"
-                      : "bg-st-panel text-zinc-300 border-st-hairline hover:bg-st-surface hover:text-white"
-                  )}
-                >
-                  {isPlaying ? (
-                    <Pause className="h-4 w-4 fill-current" />
-                  ) : (
-                    <Play className="h-4 w-4 fill-current" />
-                  )}
-                  <span className="hidden sm:inline font-mono uppercase text-[10px] font-bold">
-                    Play/Pause
-                  </span>
-                </button>
+          <div className="flex items-center gap-2">
+            <div className="relative flex flex-col items-center gap-1 shrink-0">
+              <button
+                type="button"
+                aria-label="Play/Pause"
+                aria-pressed={isPlaying}
+                title="Play/Pause (Space)"
+                onClick={togglePlayPause}
+                className={cn(
+                  "relative flex h-11 w-11 items-center justify-center rounded-full border transition-all font-semibold shadow-sm active:scale-95",
+                  isPlaying
+                    ? "bg-st-coral text-white border-st-coral shadow-play-glow hover:bg-st-coral"
+                    : "bg-st-panel text-zinc-300 border-st-hairline hover:bg-st-surface hover:text-white"
+                )}
+              >
+                {isPlaying ? (
+                  <Pause className="h-4 w-4 fill-current" />
+                ) : (
+                  <Play className="h-4 w-4 fill-current" />
+                )}
+                <span className="hidden sm:inline font-mono uppercase text-[10px] font-bold">
+                  Play/Pause
+                </span>
+              </button>
 
-                {/* Honest transport status (Stitch skin): how many stems are wired
+              {/* Honest transport status (Stitch skin): how many stems are wired
                 and whether the Beat Grid is latched. Never claims a number the
                 engine has not reported; sm+ only, decorative. */}
-                <span
-                  aria-hidden="true"
-                  className="hidden flex items-center gap-2 text-[9px] font-medium uppercase tracking-[0.18em] shrink-0 sm:flex"
-                >
-                  {beatGrid ? (
-                    <>
-                      <span className="rounded-full h-1.5 w-1.5 bg-st-ok shrink-0" />
-                      <span className="text-st-ink-dim">
-                        4 stems · phase-locked
-                      </span>
-                    </>
-                  ) : (
+              <span
+                aria-hidden="true"
+                className="hidden flex items-center gap-2 text-[9px] font-medium uppercase tracking-[0.18em] shrink-0 sm:flex"
+              >
+                {beatGrid ? (
+                  <>
+                    <span className="rounded-full h-1.5 w-1.5 bg-st-ok shrink-0" />
                     <span className="text-st-ink-dim">
-                      4 stems · phase open
+                      4 stems · phase-locked
                     </span>
-                  )}
-                </span>
-              </div>
+                  </>
+                ) : (
+                  <span className="text-st-ink-dim">4 stems · phase open</span>
+                )}
+              </span>
+            </div>
 
-              {/* ADR-0008 (ticket 04): the trash / Purge Session button is dead —
+            {/* ADR-0008 (ticket 04): the trash / Purge Session button is dead —
                 nothing destructive sits in the playback surface. The full purge
                 is the Separate Tab's Session Recovery Discard. */}
 
-              {/* Export Stems Action — standalone form only. The hosted app
+            {/* Export Stems Action — standalone form only. The hosted app
                 form (exportDialogHosted) keeps the Export panel inline in the
                 Export Tab, so the Mix Tab never carries this action. */}
-              {!exportDialogHosted && (
-                <button
-                  type="button"
-                  aria-label="Export Stems"
-                  title="Export isolated stems (WAV/MP3/ZIP)"
-                  onClick={() => setIsExportDialogOpen(true)}
-                  className="px-3 py-1 rounded border border-st-hairline bg-st-surface text-zinc-400 hover:text-white font-mono font-semibold text-[10px] flex items-center gap-2 transition-colors"
-                >
-                  <Download className="h-4 w-4 text-primary" />
-                  <span>Export Stems</span>
-                </button>
-              )}
-            </div>
-
-            {/* Master Volume Slider */}
-            <div className="flex items-center gap-2 pl-2 border-s border-st-hairline/60">
-              <span className="font-mono text-[10px] uppercase font-semibold text-st-ink-dim shrink-0">
-                Master
-              </span>
-              <input
-                type="range"
-                min={0}
-                max={1}
-                step={0.01}
-                value={masterVolume}
-                onChange={(e) =>
-                  handleMasterVolumeChange(parseFloat(e.target.value))
-                }
-                aria-label="Master Volume"
-                className="flex-1 min-w-[96px] accent-primary cursor-pointer h-1.5 bg-secondary rounded appearance-none"
-              />
-              <span className="font-mono text-[10px] font-bold text-zinc-200 w-7 text-right">
-                {Math.round(masterVolume * 100)}%
-              </span>
-            </div>
+            {!exportDialogHosted && (
+              <button
+                type="button"
+                aria-label="Export Stems"
+                title="Export isolated stems (WAV/MP3/ZIP)"
+                onClick={() => setIsExportDialogOpen(true)}
+                className="px-3 py-1 rounded border border-st-hairline bg-st-surface text-zinc-400 hover:text-white font-mono font-semibold text-[10px] flex items-center gap-2 transition-colors"
+              >
+                <Download className="h-4 w-4 text-primary" />
+                <span>Export Stems</span>
+              </button>
+            )}
           </div>
-        )}
 
-        {/* Export panel fallback — standalone form only; the hosted app form
+          {/* Master Volume Slider */}
+          <div className="flex items-center gap-2 pl-2 border-s border-st-hairline/60">
+            <span className="font-mono text-[10px] uppercase font-semibold text-st-ink-dim shrink-0">
+              Master
+            </span>
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.01}
+              value={masterVolume}
+              onChange={(e) =>
+                handleMasterVolumeChange(parseFloat(e.target.value))
+              }
+              aria-label="Master Volume"
+              className="flex-1 min-w-[96px] accent-primary cursor-pointer h-1.5 bg-secondary rounded appearance-none"
+            />
+            <span className="font-mono text-[10px] font-bold text-zinc-200 w-7 text-right">
+              {Math.round(masterVolume * 100)}%
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Export panel fallback — standalone form only; the hosted app form
           (exportDialogHosted) keeps the panel inline in the Export Tab. */}
-        {!exportDialogHosted && (
-          <ExportDialog
-            isOpen={isExportDialogOpen}
-            onClose={() => setIsExportDialogOpen(false)}
-            stems={stems}
-            sampleRate={sampleRate}
-            sourceMixTitle={sourceMixTitle}
-            initialMixerStates={mixerStates}
-            initialMasterVolume={masterVolume}
-            activeTimeStretch={{ tempo, pitch, formantPreservation }}
-          />
-        )}
-      </section>
+      {!exportDialogHosted && (
+        <ExportDialog
+          isOpen={isExportDialogOpen}
+          onClose={() => setIsExportDialogOpen(false)}
+          stems={stems}
+          sampleRate={sampleRate}
+          sourceMixTitle={sourceMixTitle}
+          initialMixerStates={mixerStates}
+          initialMasterVolume={masterVolume}
+          activeTimeStretch={{ tempo, pitch, formantPreservation }}
+        />
+      )}
     </>
   );
 };

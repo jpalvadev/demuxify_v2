@@ -660,15 +660,18 @@ describe("App UI Shell", () => {
     // transparent — bare layout tokens, no border, no fill. Locator: the
     // rack root carries its own testid (the reset chip moved to the Tempo
     // card's foot, so the parentElement chain no longer lands on the rack).
+    // Stitch skin 08c (user: "each functionality should be OUTSIDE of the 4
+    // stems container"): the rack is no longer inside the Stem Player card —
+    // it is the section's sibling on the stage, so the locator drops the
+    // region scope and the card keeps no rack inside it.
     const rackClasses =
-      within(stemPlayerRegion)
-        .getByTestId("dsp-rack-root")
-        .getAttribute("class") ?? "";
+      screen.getByTestId("dsp-rack-root").getAttribute("class") ?? "";
     expect(rackClasses).not.toContain("border");
     expect(rackClasses).not.toContain("bg-secondary");
     for (const token of ["w-full", "flex", "flex-col", "gap-3", "sm:gap-4"]) {
       expect(rackClasses).toContain(token);
     }
+    expect(within(stemPlayerRegion).queryByTestId("dsp-rack-root")).toBeNull();
 
     // Deliberate untouched neighbors: the Tempo/Speed and Pitch Transposition
     // sub-boxes keep their ruled frames at every viewport (06e ports the mockup
@@ -747,12 +750,14 @@ describe("App UI Shell", () => {
       ).toBeInTheDocument();
     });
 
-    const stemPlayerRegion = screen.getByRole("region", {
-      name: /stem player/i,
-    });
-
-    // The re-homed control: one switch, announced state, square chip.
-    const formantSwitch = within(stemPlayerRegion).getByRole("switch", {
+    // Stitch skin 08c: the rack chrome this test inspects sits OUTSIDE the
+    // Stem Player card, so the page itself is the right scope.
+    // The re-homed control: one switch, announced state, square chip. It
+    // lives on the rack's Pitch Transposition card, which Stitch skin 08c
+    // parked OUTSIDE the Stem Player card (the user's 4-stems container
+    // carries only its masthead and the waveform rows), so the lookups
+    // drop the region scope.
+    const formantSwitch = screen.getByRole("switch", {
       name: /vocal formant preservation/i,
     });
     expect(formantSwitch).toHaveAttribute("aria-checked", "true");
@@ -771,8 +776,9 @@ describe("App UI Shell", () => {
     );
     expect(document.querySelectorAll('[class*="ring-0"]').length).toBe(0);
 
-    // The label-row copy chip stays verbatim next to the label.
-    const vocalsChip = within(stemPlayerRegion).getByText("Vocals Stem");
+    // The label-row copy chip stays verbatim next to the label — on the
+    // rack's Pitch card, outside the Stem Player card (08c).
+    const vocalsChip = screen.getByText("Vocals Stem");
     expect(vocalsChip.getAttribute("class") ?? "").toContain("bg-primary/10");
     expect(vocalsChip.getAttribute("class") ?? "").toContain(
       "border-primary/20"
