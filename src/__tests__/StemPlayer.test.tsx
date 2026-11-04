@@ -653,9 +653,9 @@ describe("StemPlayer UI Component", () => {
     const chips = within(picker).getAllByRole("button");
     expect(chips).toHaveLength(3);
     expect(chips.map((chip) => (chip.textContent ?? "").trim())).toEqual([
-      "107.7 BPM 93%",
-      "215.4 BPM 61%",
-      "72.0 BPM 34%",
+      "107.7 BPM 93% CONFIDENCE",
+      "215.4 BPM 61% (2x Double)",
+      "72.0 BPM 34% Alternate",
     ]);
 
     // The Beat Grid is already locked to the top reading: that chip is

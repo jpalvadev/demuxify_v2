@@ -564,6 +564,24 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
                   clickTrackBpm ?? null
                 );
                 const bpmLabel = `${candidate.bpm.toFixed(1)} BPM`;
+                // Mockup chip language (stitch-skin 07m): the confidence read
+                // carries its RELATION to the top reading — CONFIDENCE on the
+                // leader, "(2x Double)" on the pulse doubling the detector
+                // cannot tell apart, "Match"/"Alternate" on the ranked rest.
+                // The words name the relation, not a fact — no chip claims
+                // one BPM as certain (the honest readout stays above).
+                const isLeader = candidate === tempoCandidates[0];
+                const ratioToLeader =
+                  tempoCandidates[0].bpm > 0
+                    ? candidate.bpm / tempoCandidates[0].bpm
+                    : 1;
+                const roleWord = isLeader
+                  ? "CONFIDENCE"
+                  : Math.abs(ratioToLeader - 2) <= 0.05
+                    ? "(2x Double)"
+                    : candidate.confidence >= 0.6
+                      ? "Match"
+                      : "Alternate";
                 return (
                   <button
                     key={bpmLabel}
@@ -585,13 +603,19 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
                       "px-2 py-1 rounded border text-[10px] font-mono flex items-center justify-between transition-all disabled:opacity-40 disabled:cursor-not-allowed",
                       locked
                         ? "border-st-coral/50 bg-st-coral/20 text-st-ink cursor-default"
-                        : "border-st-hairline bg-st-surface text-zinc-400 hover:border-zinc-500 cursor-pointer"
+                        : isLeader
+                          ? "border-st-coral/50 bg-st-coral/10 text-zinc-100 hover:border-st-coral cursor-pointer"
+                          : "border-st-hairline bg-st-surface text-zinc-400 hover:border-zinc-500 cursor-pointer"
                     )}
                   >
                     <span
                       className={cn(
                         "font-medium",
-                        locked ? "font-bold text-st-coral" : "text-zinc-300"
+                        locked
+                          ? "font-bold text-st-coral"
+                          : isLeader
+                            ? "font-bold text-st-ink"
+                            : "text-zinc-300"
                       )}
                     >
                       {bpmLabel}
@@ -601,10 +625,12 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
                         "text-[9px]",
                         locked
                           ? "px-1 py-0.5 rounded bg-st-coral/20 text-white font-bold"
-                          : "text-zinc-500"
+                          : isLeader
+                            ? "px-1 py-0.5 rounded border border-st-coral/60 text-st-coral font-bold"
+                            : "text-zinc-500"
                       )}
                     >
-                      {formatConfidence(candidate.confidence)}
+                      {formatConfidence(candidate.confidence)} {roleWord}
                     </span>
                   </button>
                 );
