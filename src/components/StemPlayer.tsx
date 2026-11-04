@@ -629,7 +629,7 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
         <div className="flex items-center gap-2">
           <Layers className="h-3.5 w-3.5 text-st-coral shrink-0" />
           <h3
-            className="inline-block font-display font-bold uppercase tracking-wide text-st-ink"
+            className="inline-block font-display font-bold uppercase tracking-wider text-st-ink"
             style={{ fontFamily: DISPLAY_FONT_STACK }}
           >
             Multi-Track Stem Player

@@ -219,10 +219,10 @@ export const StemStrip: React.FC<StemStripProps> = ({
 
         if (isSilenced) {
           ctx.fillStyle = "rgba(100, 116, 139, 0.2)"; // Grayed out when silenced
-        } else if (x <= playheadX) {
-          ctx.fillStyle = config.activeColor;
         } else {
-          ctx.fillStyle = config.inactiveColor;
+          // Stitch skin 07g: the mockup paints ONE uniform stem-tinted
+          // envelope across the whole field — no played/unplayed dimming.
+          ctx.fillStyle = config.activeColor;
         }
 
         ctx.fillRect(x, yTop, Math.max(1, binWidth - 0.5), barHeight);
@@ -231,8 +231,15 @@ export const StemStrip: React.FC<StemStripProps> = ({
 
     // Draw playhead cursor
     if (duration > 0) {
-      ctx.strokeStyle = isSilenced ? "rgba(255, 255, 255, 0.3)" : "#ffffff";
-      ctx.lineWidth = 1.5;
+      if (isSilenced) {
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.3)";
+      } else {
+        // Stitch skin 07g: the mockup's scrubber mark is the STEM's own
+        // tint at 80% (bg-purple-300/80 on Vocals), not a white hairline.
+        ctx.globalAlpha = 0.8;
+        ctx.strokeStyle = config.activeColor;
+      }
+      ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.moveTo(playheadX, 0);
       ctx.lineTo(playheadX, canvasHeight);
