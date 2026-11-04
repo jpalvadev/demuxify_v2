@@ -576,12 +576,12 @@ describe("App UI Shell", () => {
     ).toBeInTheDocument();
   });
 
-  it("flattens the Stem Player outer frames below md and re-rules them from md and up", async () => {
-    // Mix-Rail Tidy-Up (ticket 01): below md the Mix stage sits in exactly one
-    // frame — the Tab Shell stage panel — so the Stem Player root and the
-    // Time-Stretch & Pitch wrapper carry their hairline only as an md: class
-    // token pair. grz-18 precedent: the DOM seam cannot evaluate media
-    // queries, so responsive truth is asserted through class tokens.
+  it("rules the Stem Player outer frames at every width — below-md is the same skin, restacked", async () => {
+    // Stitch skin (ticket 06): the mobile sheet is the same skin re-stacked,
+    // not a different one — the flattening dies and the Stem Player root and
+    // the Time-Stretch & Pitch wrapper carry their hairline at EVERY width,
+    // with mobile-tight density. Class tokens still carry the responsive
+    // truth (the DOM seam cannot evaluate media queries; grz-18 precedent).
     vi.spyOn(webgpuModule, "detectWebGPUCapability").mockResolvedValue({
       supported: true,
       isFallback: false,
@@ -628,36 +628,44 @@ describe("App UI Shell", () => {
       name: /stem player/i,
     });
 
-    // The root region: the border pair is born at md, and nothing on the
-    // element carries a base (unprefixed) border token on mobile.
+    // The root region: ruled everywhere, no md: border birth left anywhere.
     const rootClasses = stemPlayerRegion.getAttribute("class") ?? "";
-    expect(rootClasses).toContain("md:border-border");
-    expect(rootClasses).not.toMatch(/(^|\s)border(-border)?(\/\d+)?(\s|:|$)/);
+    expect(rootClasses).toContain("border");
+    expect(rootClasses).toContain("border-st-hairline");
+    expect(rootClasses).not.toMatch(/md:border/);
     // Everything else on the root stays verbatim (no padding/spacing/bg drift).
     for (const token of [
       "w-full",
       "rounded",
       "bg-card/70",
-      "p-4",
-      "sm:p-6",
+      "p-3.5",
+      "sm:p-5",
       "shadow-md",
       "backdrop-blur-md",
-      "space-y-6",
+      "space-y-5",
+      "sm:space-y-6",
     ]) {
       expect(rootClasses).toContain(token);
     }
 
-    // The Time-Stretch & Pitch wrapper: one level above the row that hosts its
-    // Reset control. Same md line the Tempo/Pitch grid already flips on
-    // (md:grid-cols-2) — no second sm-style pair is introduced.
+    // The Time-Stretch & Pitch wrapper: same rule everywhere, its Reset
+    // control one level below; mobile-tight density via class tokens.
     const resetControl = within(stemPlayerRegion).getByRole("button", {
       name: /reset time-stretch/i,
     });
     const wrapperClasses =
       resetControl.parentElement?.parentElement?.getAttribute("class") ?? "";
-    expect(wrapperClasses).toContain("md:border-border/60");
-    expect(wrapperClasses).not.toMatch(/(^|\s)border(-border)?(\/60)?(\s|:|$)/);
-    for (const token of ["rounded", "bg-secondary/30", "p-4", "space-y-4"]) {
+    expect(wrapperClasses).toContain("border");
+    expect(wrapperClasses).toContain("border-st-hairline");
+    expect(wrapperClasses).not.toMatch(/md:border/);
+    for (const token of [
+      "rounded",
+      "bg-secondary/30",
+      "p-3",
+      "sm:p-4",
+      "space-y-3",
+      "sm:space-y-4",
+    ]) {
       expect(wrapperClasses).toContain(token);
     }
 
@@ -1380,7 +1388,7 @@ describe("App UI Shell", () => {
     // fixed 112px cells and the md vertical-column override are dead.
     expect(rail.getAttribute("class") ?? "").toContain("grid-cols-4");
     expect(rail.getAttribute("class") ?? "").not.toMatch(/grid-cols-\[/);
-    expect(rail.getAttribute("class") ?? "").toContain("md:gap-1");
+    expect(rail.getAttribute("class") ?? "").toContain("md:gap-2");
 
     const separatePanel = screen.getByRole("region", {
       name: /^Separate Tab$/,
@@ -2260,6 +2268,16 @@ describe("App UI Shell", () => {
         "aria-label",
         "Beat Grid locked to 215.4 BPM"
       );
+      // Candidate row density (stitch-skin-06): one column on mobile, two at
+      // sm, four at md — class-token truth (the DOM seam cannot evaluate media
+      // queries; grz-18 precedent).
+      const pickerClasses =
+        screen
+          .getByTestId("click-track-candidate-picker")
+          .getAttribute("class") ?? "";
+      for (const token of ["grid-cols-1", "sm:grid-cols-2", "md:grid-cols-4"]) {
+        expect(pickerClasses).toContain(token);
+      }
     } finally {
       vi.unstubAllGlobals();
     }

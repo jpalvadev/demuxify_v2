@@ -803,7 +803,7 @@ export const App: React.FC = () => {
 
       {/* Full-bleed shell (artifact `.app`: no max-width; rail + stage fill the
           viewport; at md+ the rail is a fixed column beside the fluid stage). */}
-      <main className="flex-1 w-full px-2 sm:px-6 flex flex-col gap-4 md:flex-row md:gap-5">
+      <main className="flex-1 w-full px-2 sm:px-6 flex flex-col gap-3 sm:gap-4 md:gap-5">
         {/* Tab Band (ADR-0014 supersedes ADR-0007/ADR-0009): ONE sticky 4-up band
             at every breakpoint — the mobile composition promoted to desktop. The
             brand row (col-span-4) sits over the four-chip Tab row inside the same
@@ -812,7 +812,7 @@ export const App: React.FC = () => {
             keeps scrolling stage content from ghosting through the band. */}
         <nav
           aria-label="Tab Band"
-          className="sticky top-0 z-30 grid grid-cols-4 gap-1 items-stretch py-2.5 pb-4 overflow-hidden w-full backdrop-blur-md bg-background/95 md:bg-card/50 md:gap-1"
+          className="sticky top-0 z-30 grid grid-cols-4 gap-1 items-stretch py-2 pb-3.5 sm:py-2.5 sm:pb-4 overflow-hidden w-full backdrop-blur-md bg-background/95 md:bg-card/50 md:gap-2"
         >
           {/* Brand Unit at the Band head: the wordmark cell owns its grid slot at
               every breakpoint (col-span-4 puts it on its own row above the four

@@ -519,7 +519,7 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
       role="region"
       aria-label="Stem Player"
       className={cn(
-        "w-full rounded md:border md:border-border bg-card/70 p-4 sm:p-6 shadow-md backdrop-blur-md space-y-6",
+        "w-full rounded border border-st-hairline bg-card/70 p-3.5 sm:p-5 shadow-md backdrop-blur-md space-y-5 sm:space-y-6",
         className
       )}
     >
@@ -558,7 +558,7 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
             </span>
             <div
               data-testid="click-track-candidate-picker"
-              className="grid grid-cols-1 md:grid-cols-4 gap-1"
+              className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-1"
             >
               {tempoCandidates.map((candidate) => {
                 const locked = isLockedCandidate(
@@ -605,7 +605,7 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
           seams can pin what comes before it. */}
       <div
         data-testid="transport-row"
-        className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 border-b border-border/60 pb-4"
+        className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 sm:gap-4 border-b border-st-hairline pb-3 sm:pb-4"
       >
         <div className="flex items-center gap-2.5">
           <div className="flex h-9 w-9 items-center justify-center rounded bg-primary/10 border border-primary/20 text-primary">
@@ -883,7 +883,7 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
       )}
 
       {/* Time-Stretch & Pitch Shift Controls */}
-      <div className="rounded md:border md:border-border/60 bg-secondary/30 p-4 space-y-4">
+      <div className="rounded border border-st-hairline bg-secondary/30 p-3 sm:p-4 space-y-3 sm:space-y-4">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <div className="flex h-7 w-7 items-center justify-center rounded bg-primary/10 text-primary border border-primary/20">
@@ -913,7 +913,7 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
           </button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 pt-1">
           {/* Tempo Section */}
           <div className="rounded border border-border/50 bg-card/60 p-3.5 space-y-3">
             <div className="flex items-center justify-between">
