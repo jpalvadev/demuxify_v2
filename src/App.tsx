@@ -1187,7 +1187,10 @@ export const App: React.FC = () => {
                     directly under the spine — same width, same time axis, no
                     card gap. Tapping stays a gesture against the axis the
                     user can already see; the decision contract is untouched. */}
-                <div>
+                {/* Stitch skin 07r band midsegment: the lane continues the
+                    master panel's wash and hairline sides between the wave
+                    card (band head) and the chip rail (band foot). */}
+                <div className="w-full bg-st-panel border-x border-st-hairline px-3 pb-2">
                   <BeatGridTapCalibration
                     duration={decodedSourceMix.metadata.duration}
                     onTapCalibration={handleConfirmTapCalibration}

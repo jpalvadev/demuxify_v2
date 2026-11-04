@@ -2567,7 +2567,7 @@ describe("App UI Shell", () => {
       await waitFor(() => {
         expect(
           screen.getByTestId("click-tap-calibration-readout")
-        ).toHaveTextContent("tap 4 beats on the groove");
+        ).toHaveTextContent("Tap 4 beats on the groove");
       });
     } finally {
       vi.unstubAllGlobals();

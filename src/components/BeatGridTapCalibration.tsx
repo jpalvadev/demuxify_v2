@@ -144,7 +144,8 @@ export const BeatGridTapCalibration: React.FC<BeatGridTapCalibrationProps> = ({
         {calibrationResult.kind === "calibrated"
           ? describeCalibration(calibrationResult)
           : taps.length === 0
-            ? `tap ${TAPS_REQUIRED} beats on the groove to anchor the Beat Grid by hand`
+            ? // Stitch skin 07r: mockup sentence verbatim (capital + colon).
+              `Tap ${TAPS_REQUIRED} beats on the groove to anchor the Beat Grid by hand:`
             : taps.length < 3
               ? `${taps.length} of ${TAPS_REQUIRED} taps`
               : describeRejection(calibrationResult)}
