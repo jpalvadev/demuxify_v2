@@ -597,167 +597,6 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
           })}
         </div>
 
-        {/* Click Track rail (ADR-0010, ticket 04): the last mixer lane — after
-          the four Stem Strips — and because it lives inside the Stem Player it
-          only exists once the Mix is live. Stitch skin 08a (the user's Mix-card
-          surgery): the card now OWNS its ranked readings — the picker island of
-          smaller uniform `{bpm} BPM` + `{pct}% match` chips sits above the on/off
-          switch and the volume fader — and the lane's separate Beat Grid readout
-          and badge chip are erased: the locked chip IS the readout. The locked
-          chip names its own confidence like every other — never a fabricated
-          certainty — and picking an alternative still asks the app to re-lock
-          through the Tempo Detector with that tempo as hint. Look is agent-authored
-          — the ticket-01 OpenDesign run died (see its FALLBACK RECORD) — and
-          stays on the same HSL token architecture as the rest of the Tab Shell.
-          The lane is domain-separate: never a Stem. */}
-        <div
-          role="group"
-          aria-label="Click Track"
-          data-testid="click-track-rail"
-          className={cn(
-            // Stitch skin 08a: the card sits on the blanket card rule — opaque
-            // st-panel ground under a hairline rim — while the railClasses seam
-            // keeps pinning the base border border-st-hairline/40 token and the
-            // enabled state still lifts to the mockup's surface.
-            "flex flex-col justify-between gap-3 rounded border border-st-hairline/40 bg-st-panel p-3 transition-colors shadow-xs w-fit",
-            // 08a: the card states paint the blanket rule outright (opaque
-            // ground under an opaque hairline rim), so the container the chips
-            // and click controls live in is visible on the stem card's own ground.
-            clickTrack.enabled
-              ? "border border-st-hairline rounded-lg bg-st-panel"
-              : "border border-st-hairline rounded-lg bg-st-panel opacity-80"
-          )}
-        >
-          {/* The picker island (ticket 06 machinery): the Tempo Detector's
-              ranked readings as one compact chip family. A pulse and its metric
-              doubling are genuinely indistinguishable, so the picker GROUP's
-              accessible name carries the honest ranking copy — calibrated by
-              hand, a solid reading, or the ranked count — and no chip claims
-              one BPM as certain: the locked chip shows its own confidence.
-              Picking an alternative asks the app to re-run the Tempo Detector
-              with that tempo as hint, re-locking the Beat Grid; the chip the
-              grid is locked to stays informational. */}
-          {tempoCandidates && tempoCandidates.length > 0 && (
-            <div
-              role="group"
-              aria-label={
-                clickCalibration
-                  ? `calibrated by hand · your ${clickCalibration.tapsSec.length} taps anchor the grid`
-                  : isConfidentReading(tempoCandidates)
-                    ? `solid reading · confidence ${formatConfidence(tempoCandidates[0].confidence)}`
-                    : `${tempoCandidates.length} readings ranked · pick the feel you hear`
-              }
-              data-testid="click-track-candidate-picker"
-              className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2 w-fit justify-items-center font-mono text-[10px] rounded border border-st-hairline bg-st-panel p-2"
-            >
-              {tempoCandidates.map((candidate) => {
-                const locked = isLockedCandidate(
-                  candidate.bpm,
-                  clickTrackBpm ?? null
-                );
-                const bpmLabel = `${candidate.bpm.toFixed(1)} BPM`;
-                return (
-                  <button
-                    key={bpmLabel}
-                    type="button"
-                    aria-label={
-                      locked
-                        ? `Beat Grid locked to ${bpmLabel}`
-                        : `Re-lock Beat Grid to ${bpmLabel}`
-                    }
-                    aria-pressed={locked}
-                    title={bpmLabel}
-                    disabled={locked || !onChooseTempoCandidate}
-                    onClick={() => {
-                      if (!locked) {
-                        onChooseTempoCandidate?.(candidate.bpm);
-                      }
-                    }}
-                    className={cn(
-                      // Mock chip rule (verbatim per the user's card): one
-                      // compact shape for every reading, pair spread
-                      // justify-between; coral stays on the locked chip only.
-                      // Compact chip rule: the shape hugs its own content, the
-                      // pair keeps a fixed gutter, and justify-items-center in
-                      // the picker grid stops a dead cell from stretching a chip
-                      // to full width (the mock's own 1fr cells do stretch them).
-                      "p-1.5 rounded border flex items-center justify-between gap-2 transition-all disabled:opacity-40 disabled:cursor-not-allowed",
-                      locked
-                        ? "border-st-coral/50 bg-st-coral/15 text-white cursor-default"
-                        : "border-st-hairline bg-st-surface text-zinc-400 hover:border-zinc-500 cursor-pointer"
-                    )}
-                  >
-                    <span
-                      className={cn(
-                        "font-medium shrink-0",
-                        locked ? "font-bold text-st-coral" : "text-zinc-300"
-                      )}
-                    >
-                      {bpmLabel}
-                    </span>{" "}
-                    <span
-                      className={cn(
-                        "text-[9px] shrink-0",
-                        locked ? "text-white" : "text-zinc-500"
-                      )}
-                    >
-                      {formatConfidence(candidate.confidence)} match
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-
-          {/* Mixer controls: the ♪ enable switch (off by default) and the volume
-            fader — like a lane, with no rate control of its own (Time-Stretch
-            owns the rate). */}
-          <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0">
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                role="switch"
-                aria-label="Click Track"
-                aria-checked={clickTrack.enabled}
-                title="Click Track on/off (Beat Grid metronome)"
-                disabled={!beatGrid || beatGrid?.length === 0}
-                onClick={handleToggleClickTrack}
-                className={cn(
-                  "h-8 w-8 rounded border text-xs font-bold transition-all flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed",
-                  clickTrack.enabled
-                    ? "border-primary/70 bg-primary text-primary-foreground shadow-xs font-black"
-                    : "border-border/70 bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground"
-                )}
-              >
-                ♪
-              </button>
-            </div>
-
-            <div className="flex items-center gap-2 flex-1">
-              {clickTrack.volume === 0 ? (
-                <VolumeX className="h-4 w-4 text-muted-foreground/60 shrink-0" />
-              ) : (
-                <Volume2 className="h-4 w-4 text-muted-foreground shrink-0" />
-              )}
-              <input
-                type="range"
-                min={0}
-                max={1}
-                step={0.01}
-                value={clickTrack.volume}
-                onChange={(e) =>
-                  handleSetClickTrackVolume(parseFloat(e.target.value))
-                }
-                aria-label="Click Track Volume"
-                className="w-full accent-primary cursor-pointer h-1.5 bg-secondary rounded appearance-none"
-              />
-              <span className="text-[11px] font-mono text-muted-foreground w-7 text-right">
-                {Math.round(clickTrack.volume * 100)}%
-              </span>
-            </div>
-          </div>
-        </div>
-
         {/* Master Overview Waveform: omitted when the Tab Shell owns the spine */}
         {!masterWaveformHosted && (
           <div className="space-y-1">
@@ -777,11 +616,13 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
           workspace surface whose cards are the parts. So the outer wrapper is
           transparent (no border, no fill, no padding) and each card carries
           its own mockup rule. */}
-        {/* DSP rack (Stitch skin 07n): the mockup has NO rack heading — the
-          trio of cards sits straight on the workspace surface. The old
-          title row (badge, h4, description, reset chip) is gone and the live
-          Reset Time-Stretch chip is homed at the foot of the Tempo card, so
-          the rack stays a bare grid of exactly three mockup cards. */}
+        {/* DSP rack (Stitch skin 07n, card surgery 08b): the mockup has NO rack
+          heading — the trio of cards sits straight on the workspace surface.
+          The old title row (badge, h4, description, reset chip) is gone and the
+          live Reset Time-Stretch chip is homed at the foot of the Tempo card.
+          The third card is no longer a dead placeholder: it is the live Click
+          Track / Metronome card (the user's 08b instruction moved the real
+          click affordance INTO the card that says CLICK TRACK / METRONOME). */}
         <div
           data-testid="dsp-rack-root"
           className="w-full flex flex-col gap-3 sm:gap-4"
@@ -990,60 +831,159 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
                 </button>
               </div>
             </div>
-            {/* Mockup phantom chrome (06e, data-mockup-placeholder): the stitch
-              DSP rack invents a third card, a Click Track / Metronome card —
-              header row and a volume fader. Stitch skin 08a (the user's card
-              surgery) already erased its time-signature chip and its beat-dot
-              counter readout; what remains is still a VERBATIM DEAD
-              PLACEHOLDER — aria-hidden divs, no handlers, no state, and the
-              fader moves nothing; a later cleanup commit erases the card. */}
+            {/* Click Track / Metronome card (Stitch skin 08b, the user's
+              card surgery): the DSP rack's third slot keeps its mockup
+              header — icon, name, bottom border — and everything that was
+              inside it is deleted outright: the phantom BPM meta chip, the
+              volume row that moved nothing, the coral Reset footer. The
+              app's real Click Track affordance (ADR-0010, ticket 06
+              machinery) moved in here from the mixer lane after the four
+              Stem Strips: the ranked-readings island above the ♪ switch and
+              the volume fader. The lane is domain-separate — never a Stem —
+              and, being live, carries no aria-hidden and no placeholder mark. */}
             <div
-              data-mockup-placeholder="true"
-              aria-hidden="true"
+              role="group"
+              aria-label="Click Track"
+              data-testid="click-track-rail"
               className="rounded-lg border border-st-hairline bg-st-panel p-3 flex flex-col justify-between space-y-3"
             >
               <div className="flex items-center justify-between pb-2 border-b border-st-hairline/60">
-                <div className="flex items-center gap-2 font-mono text-[11px] font-bold text-st-ink uppercase">
-                  <svg
-                    className="w-3.5 h-3.5 text-zinc-400"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="2"
-                    />
-                  </svg>
-                  <span>Click Track / Metronome</span>
-                </div>
-                <div className="flex items-center gap-1 font-mono text-[10px]">
-                  <span className="inline-block w-2 h-2 rounded-full bg-st-coral animate-pulse" />
-                  <span className="text-zinc-300 font-bold">118.0 BPM</span>
-                </div>
+                <span className="font-mono text-[11px] font-bold text-st-ink uppercase flex items-center gap-2">
+                  <Gauge
+                    className="h-3.5 w-3.5 text-primary"
+                    aria-hidden="true"
+                  />
+                  Click Track / Metronome
+                </span>
               </div>
-              <div className="py-2.5 flex items-center gap-3">
-                <div className="flex-1 flex items-center gap-2">
-                  <svg
-                    className="w-3 h-3 text-zinc-500"
-                    fill="currentColor"
-                    viewBox="0 0 20 20"
+
+              {/* The picker island (ticket 06 machinery): the Tempo Detector's
+                  ranked readings as one compact chip family. A pulse and its
+                  metric doubling are genuinely indistinguishable, so the
+                  picker GROUP's accessible name carries the honest ranking
+                  copy — calibrated by hand, a solid reading, or the ranked
+                  count — and no chip claims one BPM as certain: the locked
+                  chip shows its own confidence. Picking an alternative asks
+                  the app to re-run the Tempo Detector with that tempo as
+                  hint, re-locking the Beat Grid; the chip the grid is locked
+                  to stays informational. */}
+              {tempoCandidates && tempoCandidates.length > 0 && (
+                <div
+                  role="group"
+                  aria-label={
+                    clickCalibration
+                      ? `calibrated by hand · your ${clickCalibration.tapsSec.length} taps anchor the grid`
+                      : isConfidentReading(tempoCandidates)
+                        ? `solid reading · confidence ${formatConfidence(tempoCandidates[0].confidence)}`
+                        : `${tempoCandidates.length} readings ranked · pick the feel you hear`
+                  }
+                  data-testid="click-track-candidate-picker"
+                  className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-fit justify-items-center font-mono text-[10px] rounded border border-st-hairline bg-st-panel p-2"
+                >
+                  {tempoCandidates.map((candidate) => {
+                    const locked = isLockedCandidate(
+                      candidate.bpm,
+                      clickTrackBpm ?? null
+                    );
+                    const bpmLabel = `${candidate.bpm.toFixed(1)} BPM`;
+                    return (
+                      <button
+                        key={bpmLabel}
+                        type="button"
+                        aria-label={
+                          locked
+                            ? `Beat Grid locked to ${bpmLabel}`
+                            : `Re-lock Beat Grid to ${bpmLabel}`
+                        }
+                        aria-pressed={locked}
+                        title={bpmLabel}
+                        disabled={locked || !onChooseTempoCandidate}
+                        onClick={() => {
+                          if (!locked) {
+                            onChooseTempoCandidate?.(candidate.bpm);
+                          }
+                        }}
+                        className={cn(
+                          // Mock chip rule (verbatim per the user's card): one
+                          // compact shape for every reading, pair spread
+                          // justify-between; coral stays on the locked chip only.
+                          // Compact chip rule: the shape hugs its own content, the
+                          // pair keeps a fixed gutter, and justify-items-center in
+                          // the picker grid stops a dead cell from stretching a
+                          // chip to full width (the mock's own 1fr cells do).
+                          "p-1.5 rounded border flex items-center justify-between gap-2 transition-all disabled:opacity-40 disabled:cursor-not-allowed",
+                          locked
+                            ? "border-st-coral/50 bg-st-coral/15 text-white cursor-default"
+                            : "border-st-hairline bg-st-surface text-zinc-400 hover:border-zinc-500 cursor-pointer"
+                        )}
+                      >
+                        <span
+                          className={cn(
+                            "font-medium shrink-0",
+                            locked ? "font-bold text-st-coral" : "text-zinc-300"
+                          )}
+                        >
+                          {bpmLabel}
+                        </span>{" "}
+                        <span
+                          className={cn(
+                            "text-[9px] shrink-0",
+                            locked ? "text-white" : "text-zinc-500"
+                          )}
+                        >
+                          {formatConfidence(candidate.confidence)} match
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Mixer controls: the ♪ enable switch (off by default) and the
+                  volume fader — like a lane, with no rate control of its own
+                  (Time-Stretch owns the rate). */}
+              <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0">
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-label="Click Track"
+                    aria-checked={clickTrack.enabled}
+                    title="Click Track on/off (Beat Grid metronome)"
+                    disabled={!beatGrid || beatGrid?.length === 0}
+                    onClick={handleToggleClickTrack}
+                    className={cn(
+                      "h-8 w-8 rounded border text-xs font-bold transition-all flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed",
+                      clickTrack.enabled
+                        ? "border-primary/70 bg-primary text-primary-foreground shadow-xs font-black"
+                        : "border-border/70 bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground"
+                    )}
                   >
-                    <path d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217z" />
-                  </svg>
-                  <div className="w-full h-1 rounded bg-st-hairline relative">
-                    <span className="absolute left-[70%] top-[-2px] w-1.5 h-2 rounded bg-st-surface-light" />
-                  </div>
-                  <span className="font-mono text-[10px] text-zinc-400">
-                    70%
+                    ♪
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-2 flex-1">
+                  {clickTrack.volume === 0 ? (
+                    <VolumeX className="h-4 w-4 text-muted-foreground/60 shrink-0" />
+                  ) : (
+                    <Volume2 className="h-4 w-4 text-muted-foreground shrink-0" />
+                  )}
+                  <input
+                    type="range"
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    value={clickTrack.volume}
+                    onChange={(e) =>
+                      handleSetClickTrackVolume(parseFloat(e.target.value))
+                    }
+                    aria-label="Click Track Volume"
+                    className="w-full accent-primary cursor-pointer h-1.5 bg-secondary rounded appearance-none"
+                  />
+                  <span className="text-[11px] font-mono text-muted-foreground w-7 text-right">
+                    {Math.round(clickTrack.volume * 100)}%
                   </span>
-                </div>
-              </div>
-              <div className="flex items-center justify-end text-[10px] pt-1">
-                <div className="text-st-coral underline text-[10px] font-mono">
-                  Reset Pitch & Tempo
                 </div>
               </div>
             </div>

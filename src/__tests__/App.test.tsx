@@ -1651,12 +1651,13 @@ describe("App UI Shell", () => {
     // Mix Tab cohesion (ADR-0013, ticket 08): one rail order at every
     // breakpoint — the stage reads in the order the work is done. The whole-app
     // seam walks the Mix stage top-down: Hand Calibration chrome (inline in the
-    // spine's meta bar, Stitch skin 07y) → spine canvas → the Stem Strips → the
-    // Click Track card with its ranked readings INSIDE it (Stitch skin 08a,
-    // ADR-0013 amendment) → Time-Stretch; the standalone readings rail and the
-    // master Transport row that used to close the section foot are erased from
-    // the hosted stage (Stitch skins 07j/08a), so the chain ends at
-    // Time-Stretch.
+    // spine's meta bar, Stitch skin 07y) → spine canvas → the Stem Strips →
+    // Time-Stretch; the Click Track card with its ranked readings INSIDE it
+    // (Stitch skins 08a/08b, ADR-0013 amendments) now lives in the DSP rack's
+    // third slot, so it follows the Tempo card instead of preceding it; the
+    // standalone readings rail and the master Transport row that used to close
+    // the section foot are erased from the hosted stage (Stitch skins 07j/08a),
+    // and the chain ends at the live click card.
     const tapStrip = within(mixTab).getByTestId("click-tap-calibration-strip");
     const firstStrip = within(mixTab).getAllByRole("group", {
       name: /stem$/i,
@@ -1672,8 +1673,8 @@ describe("App UI Shell", () => {
       [tapStrip, spine],
       [tapStrip, pickerRail],
       [firstStrip, clickRail],
-      [pickerRail, timeStretchPanel],
-      [clickRail, timeStretchPanel],
+      [timeStretchPanel, pickerRail],
+      [timeStretchPanel, clickRail],
     ]) {
       expect(earlier.compareDocumentPosition(later) & 4).not.toBe(0);
     }
@@ -2320,16 +2321,19 @@ describe("App UI Shell", () => {
         "aria-label",
         "Beat Grid locked to 215.4 BPM"
       );
-      // Candidate row density (stitch-skin-06): one column on mobile, two at
-      // sm, four at md — class-token truth (the DOM seam cannot evaluate media
-      // queries; grz-18 precedent).
+      // Candidate row density (stitch-skin-06, retargeted by 08b): one column
+      // on mobile, two at sm — the island now lives inside the rack's third
+      // card (~427 px inner) and a four-across row cannot fit there, so the
+      // pair column is the density truth; md:grid-cols-4 is dead (class-token
+      // truth, the DOM seam cannot evaluate media queries; grz-18 precedent).
       const pickerClasses =
         screen
           .getByTestId("click-track-candidate-picker")
           .getAttribute("class") ?? "";
-      for (const token of ["grid-cols-1", "sm:grid-cols-2", "md:grid-cols-4"]) {
+      for (const token of ["grid-cols-1", "sm:grid-cols-2"]) {
         expect(pickerClasses).toContain(token);
       }
+      expect(pickerClasses.includes("md:grid-cols-4")).toBe(false);
     } finally {
       vi.unstubAllGlobals();
     }
