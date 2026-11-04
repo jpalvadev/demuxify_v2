@@ -515,19 +515,17 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
   const hasAnySolo = STEM_NAMES.some((s) => mixerStates[s]?.solo);
 
   return (
-    <section
-      role="region"
-      aria-label="Stem Player"
-      className={cn(
-        "w-full rounded-lg border border-st-hairline bg-st-panel p-3 space-y-2.5",
-        className
-      )}
-    >
-      {/* Tempo Detector candidate Rail (ADR-0013, ticket 08): the picker is
-          decision support for the Beat Grid, not part of the Click Track lane's
-          on/off-and-volume contract, so it owns its own Rail and sits first —
-          the Mix stage reads in the order the work is done: hear the ranked
-          readings and pick the feel, then mix, then bend the rate. */}
+    <>
+      {/* Tempo Detector candidate Rail (Stitch skin 07k, mockup composition):
+          the candidate-chip grid is its OWN part of the Mix stage — the mockup
+          puts it under the master waveform region, on the workspace surface,
+          never inside the stem-card container — so the rail renders as a root
+          sibling above the Stem Player section (which stays one container per
+          the user's rule). ADR-0013 (ticket 08) still owns its ordering: the
+          Mix stage reads spine → tap lane → ranked readings → strips → click
+          lane → DSP rack, and the rail-order seam pins exactly that. The picker
+          is still decision support for the Beat Grid, not part of the Click
+          Track lane's on/off-and-volume contract. */}
       {tempoCandidates && tempoCandidates.length > 0 && (
         <div
           role="group"
@@ -616,69 +614,77 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
         </div>
       )}
 
-      {/* Section masthead: the "Multi-Track Stem Player" title, its Layers mark
+      <section
+        role="region"
+        aria-label="Stem Player"
+        className={cn(
+          "w-full rounded-lg border border-st-hairline bg-st-panel p-3 space-y-2.5",
+          className
+        )}
+      >
+        {/* Section masthead: the "Multi-Track Stem Player" title, its Layers mark
           and tagline at the head of the Mix panel. The live master transport
           that used to ride under it is erased from the hosted stage (Stitch
           skin 07j): the mockup has no such strip inside the section. */}
-      {/* Section header (Stitch skin, ticket 06c of the mix pass): the mockup
+        {/* Section header (Stitch skin, ticket 06c of the mix pass): the mockup
             masthead — bare coral Layers mark, uppercase wordmark (the h3 stays
             the Mix banner the typography seam pins in Inter, so the mockup's
             mono masthead font is ported as Inter-bold), inline subtitle, and
             the solo/mute hint at the right — welded under a hairline. */}
-      <div className="flex items-center justify-between font-mono text-[11px] pb-1 border-b border-st-hairline/60">
-        <div className="flex items-center gap-2">
-          <Layers className="h-3.5 w-3.5 text-st-coral shrink-0" />
-          <h3
-            className="inline-block font-display font-bold uppercase tracking-wider text-st-ink"
-            style={{ fontFamily: DISPLAY_FONT_STACK }}
+        <div className="flex items-center justify-between font-mono text-[11px] pb-1 border-b border-st-hairline/60">
+          <div className="flex items-center gap-2">
+            <Layers className="h-3.5 w-3.5 text-st-coral shrink-0" />
+            <h3
+              className="inline-block font-display font-bold uppercase tracking-wider text-st-ink"
+              style={{ fontFamily: DISPLAY_FONT_STACK }}
+            >
+              Multi-Track Stem Player
+            </h3>
+            <span className="text-[10px] text-st-ink-dim">
+              Synchronized 4-Stem real-time playback
+            </span>
+          </div>
+          <span
+            data-testid="stem-solo-mute-hint"
+            aria-hidden="true"
+            className="hidden flex items-center gap-1 text-[10px] text-st-ink-dim sm:inline font-mono"
+            style={{ fontFamily: MONO_FONT_STACK }}
           >
-            Multi-Track Stem Player
-          </h3>
-          <span className="text-[10px] text-st-ink-dim">
-            Synchronized 4-Stem real-time playback
+            Solo (<span className="text-st-ink">s</span>) isolates · Mute (
+            <span className="text-st-ink">m</span>) silences track
           </span>
         </div>
-        <span
-          data-testid="stem-solo-mute-hint"
-          aria-hidden="true"
-          className="hidden flex items-center gap-1 text-[10px] text-st-ink-dim sm:inline font-mono"
-          style={{ fontFamily: MONO_FONT_STACK }}
-        >
-          Solo (<span className="text-st-ink">s</span>) isolates · Mute (
-          <span className="text-st-ink">m</span>) silences track
-        </span>
-      </div>
 
-      {/* Stem Strips (ADR-0013, ticket 08): the thing you actually mix, right
+        {/* Stem Strips (ADR-0013, ticket 08): the thing you actually mix, right
           after the Tempo Detector rail and before the Click Track lane — the stage
           reads in the order the work is done. */}
-      <div className="space-y-2.5">
-        {STEM_NAMES.map((stem) => {
-          const state = mixerStates[stem];
-          const isSilenced = hasAnySolo
-            ? !state.solo || state.muted
-            : state.muted;
-          const stemBuffer = engineRef.current?.getStemBuffer(stem);
+        <div className="space-y-2.5">
+          {STEM_NAMES.map((stem) => {
+            const state = mixerStates[stem];
+            const isSilenced = hasAnySolo
+              ? !state.solo || state.muted
+              : state.muted;
+            const stemBuffer = engineRef.current?.getStemBuffer(stem);
 
-          return (
-            <StemStrip
-              key={stem}
-              stem={stem}
-              settings={state}
-              audioBuffer={stemBuffer}
-              duration={duration}
-              currentTime={currentTime}
-              isSilenced={isSilenced}
-              onVolumeChange={(vol) => handleVolumeChange(stem, vol)}
-              onToggleMute={() => handleToggleMute(stem)}
-              onToggleSolo={() => handleToggleSolo(stem)}
-              onSeek={handleSeek}
-            />
-          );
-        })}
-      </div>
+            return (
+              <StemStrip
+                key={stem}
+                stem={stem}
+                settings={state}
+                audioBuffer={stemBuffer}
+                duration={duration}
+                currentTime={currentTime}
+                isSilenced={isSilenced}
+                onVolumeChange={(vol) => handleVolumeChange(stem, vol)}
+                onToggleMute={() => handleToggleMute(stem)}
+                onToggleSolo={() => handleToggleSolo(stem)}
+                onSeek={handleSeek}
+              />
+            );
+          })}
+        </div>
 
-      {/* Click Track rail (ADR-0010, ticket 04): the last mixer lane — after
+        {/* Click Track rail (ADR-0010, ticket 04): the last mixer lane — after
           the four Stem Strips — and because it lives inside the Stem Player it
           only exists once the Mix is live. Mix Tab cohesion (ADR-0013, ticket
           08): the lane keeps exactly its on/off switch, its volume fader and
@@ -687,397 +693,405 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
           — the ticket-01 OpenDesign run died (see its FALLBACK RECORD) — and
           stays on the same HSL token architecture as the rest of the Tab Shell.
           The lane is domain-separate: never a Stem. */}
-      <div
-        role="group"
-        aria-label="Click Track"
-        data-testid="click-track-rail"
-        className={cn(
-          "flex flex-col sm:flex-row items-stretch sm:items-center gap-3 rounded border border-primary/30 bg-secondary/40 p-3 transition-colors shadow-xs",
-          clickTrack.enabled
-            ? "border-primary/60 bg-secondary/70"
-            : "opacity-80"
-        )}
-      >
-        {/* Lane badge: same chip treatment as the Stem strips, distinct label. */}
-        <div className="flex items-center gap-2 sm:w-34 shrink-0">
-          <div
-            className={cn(
-              "flex items-center gap-2 rounded border px-2.5 py-1 text-xs font-semibold shadow-xs",
-              "border-primary/40 bg-primary/10 text-primary"
-            )}
-          >
-            <Music className="h-3.5 w-3.5 shrink-0" />
-            <span>Click Track</span>
-          </div>
-        </div>
-
-        {/* Beat Grid readout: the tempo the grid was locked at. Mono
-            micro-line, same as the Transport readouts. */}
         <div
-          data-testid="click-track-grid-label"
-          className="flex flex-col gap-1 text-[11px] font-mono text-muted-foreground shrink-0 sm:w-40"
+          role="group"
+          aria-label="Click Track"
+          data-testid="click-track-rail"
+          className={cn(
+            "flex flex-col sm:flex-row items-stretch sm:items-center gap-3 rounded border border-primary/30 bg-secondary/40 p-3 transition-colors shadow-xs",
+            clickTrack.enabled
+              ? "border-primary/60 bg-secondary/70"
+              : "opacity-80"
+          )}
         >
-          <span
-            data-testid="click-track-bpm-label"
-            className="text-xs font-bold text-foreground"
-          >
-            {clickTrackBpm !== null && clickTrackBpm !== undefined
-              ? clickCalibration
-                ? `${clickTrackBpm.toFixed(1)} BPM · calibrated by hand`
-                : `${clickTrackBpm.toFixed(1)} BPM`
-              : "No Beat Grid"}
-          </span>
-        </div>
-
-        {/* Mixer controls: enable switch (off by default), mute, volume — like a
-            lane, with no rate control of its own (Time-Stretch owns the rate). */}
-        <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0">
-          <div className="flex items-center gap-1.5">
-            <button
-              type="button"
-              role="switch"
-              aria-label="Click Track"
-              aria-checked={clickTrack.enabled}
-              title="Click Track on/off (Beat Grid metronome)"
-              disabled={!beatGrid || beatGrid?.length === 0}
-              onClick={handleToggleClickTrack}
+          {/* Lane badge: same chip treatment as the Stem strips, distinct label. */}
+          <div className="flex items-center gap-2 sm:w-34 shrink-0">
+            <div
               className={cn(
-                "h-8 w-8 rounded border text-xs font-bold transition-all flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed",
-                clickTrack.enabled
-                  ? "border-primary/70 bg-primary text-primary-foreground shadow-xs font-black"
-                  : "border-border/70 bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground"
+                "flex items-center gap-2 rounded border px-2.5 py-1 text-xs font-semibold shadow-xs",
+                "border-primary/40 bg-primary/10 text-primary"
               )}
             >
-              ♪
-            </button>
+              <Music className="h-3.5 w-3.5 shrink-0" />
+              <span>Click Track</span>
+            </div>
           </div>
 
-          <div className="flex items-center gap-2 w-32 sm:w-36">
-            {clickTrack.volume === 0 ? (
-              <VolumeX className="h-4 w-4 text-muted-foreground/60 shrink-0" />
-            ) : (
-              <Volume2 className="h-4 w-4 text-muted-foreground shrink-0" />
-            )}
-            <input
-              type="range"
-              min={0}
-              max={1}
-              step={0.01}
-              value={clickTrack.volume}
-              onChange={(e) =>
-                handleSetClickTrackVolume(parseFloat(e.target.value))
-              }
-              aria-label="Click Track Volume"
-              className="w-full accent-primary cursor-pointer h-1.5 bg-secondary rounded appearance-none"
-            />
-            <span className="text-[11px] font-mono text-muted-foreground w-7 text-right">
-              {Math.round(clickTrack.volume * 100)}%
+          {/* Beat Grid readout: the tempo the grid was locked at. Mono
+            micro-line, same as the Transport readouts. */}
+          <div
+            data-testid="click-track-grid-label"
+            className="flex flex-col gap-1 text-[11px] font-mono text-muted-foreground shrink-0 sm:w-40"
+          >
+            <span
+              data-testid="click-track-bpm-label"
+              className="text-xs font-bold text-foreground"
+            >
+              {clickTrackBpm !== null && clickTrackBpm !== undefined
+                ? clickCalibration
+                  ? `${clickTrackBpm.toFixed(1)} BPM · calibrated by hand`
+                  : `${clickTrackBpm.toFixed(1)} BPM`
+                : "No Beat Grid"}
             </span>
           </div>
-        </div>
-      </div>
 
-      {/* Master Overview Waveform: omitted when the Tab Shell owns the spine */}
-      {!masterWaveformHosted && (
-        <div className="space-y-1">
-          <MasterWaveform
-            peaks={masterPeaks}
-            audioBuffer={sourceMixBuffer}
-            duration={duration}
-            currentTime={currentTime}
-            onSeek={handleSeek}
-            height={88}
-          />
-        </div>
-      )}
-
-      {/* Time-Stretch & Pitch Shift Controls */}
-      <div className="rounded border border-st-hairline bg-secondary/30 p-3 sm:p-4 space-y-3 sm:space-y-4">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <div className="flex h-7 w-7 items-center justify-center rounded bg-primary/10 text-primary border border-primary/20">
-              <Gauge className="h-4 w-4" />
-            </div>
-            <div>
-              <h4 className="text-sm font-semibold text-foreground">
-                Time-Stretch & Pitch
-              </h4>
-              <p className="text-[11px] text-muted-foreground">
-                Independent real-time tempo (0.5x–2.0x) and pitch transposition
-                (-12 to +12 st)
-              </p>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            aria-label="Reset Time-Stretch"
-            title="Reset pitch to 0 and tempo to 1.0x"
-            onClick={handleResetTimeStretch}
-            disabled={Math.abs(tempo - 1.0) < 0.001 && pitch === 0}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-border/80 bg-secondary/80 text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-secondary transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            <RotateCcw className="h-3.5 w-3.5" />
-            <span>Reset Pitch & Tempo</span>
-          </button>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
-          {/* Tempo Section */}
-          <div className="rounded border border-st-hairline bg-st-panel p-3 flex flex-col justify-between space-y-3">
-            <div className="flex items-center justify-between pb-2 border-b border-st-hairline/60">
-              <span className="font-mono text-[11px] font-bold text-st-ink uppercase flex items-center gap-2">
-                <Gauge className="h-3.5 w-3.5 text-primary" />
-                Tempo / Speed
-              </span>
-              <span
-                data-testid="current-tempo-label"
-                className="font-mono text-[11px] font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded"
-              >
-                {tempo.toFixed(2)}x
-              </span>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                aria-label="Decrement Tempo"
-                title="Slow down 0.05x"
-                onClick={handleDecrementTempo}
-                disabled={tempo <= 0.5}
-                className="flex h-8 w-8 items-center justify-center rounded border border-border bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-all"
-              >
-                <Minus className="h-3.5 w-3.5" />
-              </button>
-
-              <div className="flex-1 flex items-center gap-2">
-                <span className="text-[11px] font-mono text-muted-foreground">
-                  0.50x
-                </span>
-                <input
-                  type="range"
-                  min="0.5"
-                  max="2"
-                  step="0.05"
-                  value={tempo}
-                  onChange={(e) =>
-                    handleTempoChange(parseFloat(e.target.value))
-                  }
-                  aria-label="Playback Tempo"
-                  className="w-full accent-primary cursor-pointer h-1.5 bg-secondary rounded appearance-none"
-                />
-                <span className="text-[11px] font-mono text-muted-foreground">
-                  2.00x
-                </span>
-              </div>
-
-              <button
-                type="button"
-                aria-label="Increment Tempo"
-                title="Speed up 0.05x"
-                onClick={handleIncrementTempo}
-                disabled={tempo >= 2.0}
-                className="flex h-8 w-8 items-center justify-center rounded border border-border bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-all"
-              >
-                <Plus className="h-3.5 w-3.5" />
-              </button>
-            </div>
-
-            <div className="flex items-center justify-between gap-1 sm:gap-1.5 pt-0.5">
-              {[0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0].map((preset) => {
-                const label = `${preset.toFixed(2)}x`;
-                const isSelected = Math.abs(tempo - preset) < 0.01;
-                return (
-                  <button
-                    key={preset}
-                    type="button"
-                    aria-label={`Tempo preset ${label}`}
-                    aria-pressed={isSelected}
-                    onClick={() => handleTempoChange(preset)}
-                    className={cn(
-                      "flex-1 py-1 rounded font-mono text-[10px] sm:text-[11px] font-semibold border transition-all",
-                      isSelected
-                        ? "bg-primary text-white font-bold shadow-chip-glow"
-                        : "bg-st-surface text-zinc-400 hover:text-white hover:border-zinc-500 border-st-hairline"
-                    )}
-                  >
-                    {label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Pitch Section */}
-          <div className="rounded border border-st-hairline bg-st-panel p-3 flex flex-col justify-between space-y-3">
-            <div className="flex items-center justify-between pb-2 border-b border-st-hairline/60">
-              <span className="font-mono text-[11px] font-bold text-st-ink uppercase flex items-center gap-2">
-                <Music className="h-3.5 w-3.5 text-accent" />
-                Pitch Transposition
-              </span>
-              <span
-                data-testid="current-pitch-label"
-                className="font-mono text-[11px] font-bold text-zinc-300 bg-st-surface px-1.5 py-0.5 rounded border border-st-hairline"
-              >
-                {pitch === 0
-                  ? "0 st"
-                  : `${pitch > 0 ? "+" : ""}${
-                      Number.isInteger(pitch)
-                        ? pitch
-                        : pitch.toFixed(2).replace(/\.?0+$/, "")
-                    } st`}
-              </span>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                aria-label="Decrement Pitch"
-                title="Shift pitch down 1 semitone"
-                onClick={handleDecrementPitch}
-                disabled={pitch <= -12}
-                className="flex h-8 w-8 items-center justify-center rounded border border-border bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-all"
-              >
-                <Minus className="h-3.5 w-3.5" />
-              </button>
-
-              <div className="flex-1 flex items-center gap-2">
-                <span className="text-[11px] font-mono text-muted-foreground">
-                  -12
-                </span>
-                <input
-                  type="range"
-                  min="-12"
-                  max="12"
-                  step="1"
-                  value={pitch}
-                  onChange={(e) =>
-                    handlePitchChange(parseFloat(e.target.value))
-                  }
-                  aria-label="Pitch Shift"
-                  className="w-full accent-primary cursor-pointer h-1.5 bg-secondary rounded appearance-none"
-                />
-                <span className="text-[11px] font-mono text-muted-foreground">
-                  +12
-                </span>
-              </div>
-
-              <button
-                type="button"
-                aria-label="Increment Pitch"
-                title="Shift pitch up 1 semitone"
-                onClick={handleIncrementPitch}
-                disabled={pitch >= 12}
-                className="flex h-8 w-8 items-center justify-center rounded border border-border bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-all"
-              >
-                <Plus className="h-3.5 w-3.5" />
-              </button>
-            </div>
-
-            <div className="flex items-center justify-between text-[11px] text-muted-foreground px-1">
-              <span>Octave Down (-12)</span>
-              <span>Original (0)</span>
-              <span>Octave Up (+12)</span>
-            </div>
-
-            {/* Vocal Formant Preservation Toggle */}
-            <div className="flex items-center justify-between pt-2 border-t border-border/40">
-              <div className="space-y-0.5">
-                <div className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                  <span>Vocal Formant Preservation</span>
-                  <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-primary/10 text-primary border border-primary/20">
-                    Vocals Stem
-                  </span>
-                </div>
-                <p className="text-[11px] text-muted-foreground">
-                  Keeps natural vocal timbre across semitone changes
-                </p>
-              </div>
+          {/* Mixer controls: enable switch (off by default), mute, volume — like a
+            lane, with no rate control of its own (Time-Stretch owns the rate). */}
+          <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0">
+            <div className="flex items-center gap-1.5">
               <button
                 type="button"
                 role="switch"
-                aria-label="Vocal Formant Preservation"
-                aria-checked={formantPreservation}
-                onClick={handleToggleFormant}
+                aria-label="Click Track"
+                aria-checked={clickTrack.enabled}
+                title="Click Track on/off (Beat Grid metronome)"
+                disabled={!beatGrid || beatGrid?.length === 0}
+                onClick={handleToggleClickTrack}
                 className={cn(
-                  "h-8 w-8 rounded border text-xs font-bold transition-all flex items-center justify-center",
-                  formantPreservation
+                  "h-8 w-8 rounded border text-xs font-bold transition-all flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed",
+                  clickTrack.enabled
                     ? "border-primary/70 bg-primary text-primary-foreground shadow-xs font-black"
                     : "border-border/70 bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground"
                 )}
               >
-                <Mic className="h-4 w-4" />
+                ♪
               </button>
             </div>
+
+            <div className="flex items-center gap-2 w-32 sm:w-36">
+              {clickTrack.volume === 0 ? (
+                <VolumeX className="h-4 w-4 text-muted-foreground/60 shrink-0" />
+              ) : (
+                <Volume2 className="h-4 w-4 text-muted-foreground shrink-0" />
+              )}
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.01}
+                value={clickTrack.volume}
+                onChange={(e) =>
+                  handleSetClickTrackVolume(parseFloat(e.target.value))
+                }
+                aria-label="Click Track Volume"
+                className="w-full accent-primary cursor-pointer h-1.5 bg-secondary rounded appearance-none"
+              />
+              <span className="text-[11px] font-mono text-muted-foreground w-7 text-right">
+                {Math.round(clickTrack.volume * 100)}%
+              </span>
+            </div>
           </div>
-          {/* Mockup phantom chrome (06e, data-mockup-placeholder): the stitch
+        </div>
+
+        {/* Master Overview Waveform: omitted when the Tab Shell owns the spine */}
+        {!masterWaveformHosted && (
+          <div className="space-y-1">
+            <MasterWaveform
+              peaks={masterPeaks}
+              audioBuffer={sourceMixBuffer}
+              duration={duration}
+              currentTime={currentTime}
+              onSeek={handleSeek}
+              height={88}
+            />
+          </div>
+        )}
+
+        {/* Time-Stretch & Pitch Shift controls (Stitch skin 07k): the mockup's
+          DSP rack has NO container behind it — the rack is a bare grid on the
+          workspace surface whose cards are the parts. So the outer wrapper is
+          transparent (no border, no fill, no padding) and each card carries
+          its own mockup rule. */}
+        <div className="w-full flex flex-col gap-3 sm:gap-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <div className="flex h-7 w-7 items-center justify-center rounded bg-primary/10 text-primary border border-primary/20">
+                <Gauge className="h-4 w-4" />
+              </div>
+              <div>
+                <h4 className="text-sm font-semibold text-foreground">
+                  Time-Stretch & Pitch
+                </h4>
+                <p className="text-[11px] text-muted-foreground">
+                  Independent real-time tempo (0.5x–2.0x) and pitch
+                  transposition (-12 to +12 st)
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              aria-label="Reset Time-Stretch"
+              title="Reset pitch to 0 and tempo to 1.0x"
+              onClick={handleResetTimeStretch}
+              disabled={Math.abs(tempo - 1.0) < 0.001 && pitch === 0}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-border/80 bg-secondary/80 text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-secondary transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+              <span>Reset Pitch & Tempo</span>
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
+            {/* Tempo Section */}
+            <div className="rounded-lg border border-st-hairline bg-st-panel p-3 flex flex-col justify-between space-y-3">
+              <div className="flex items-center justify-between pb-2 border-b border-st-hairline/60">
+                <span className="font-mono text-[11px] font-bold text-st-ink uppercase flex items-center gap-2">
+                  <Gauge className="h-3.5 w-3.5 text-primary" />
+                  Tempo / Speed
+                </span>
+                <span
+                  data-testid="current-tempo-label"
+                  className="font-mono text-[11px] font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded"
+                >
+                  {tempo.toFixed(2)}x
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  aria-label="Decrement Tempo"
+                  title="Slow down 0.05x"
+                  onClick={handleDecrementTempo}
+                  disabled={tempo <= 0.5}
+                  className="flex h-8 w-8 items-center justify-center rounded border border-border bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                >
+                  <Minus className="h-3.5 w-3.5" />
+                </button>
+
+                <div className="flex-1 flex items-center gap-2">
+                  <span className="text-[11px] font-mono text-muted-foreground">
+                    0.50x
+                  </span>
+                  <input
+                    type="range"
+                    min="0.5"
+                    max="2"
+                    step="0.05"
+                    value={tempo}
+                    onChange={(e) =>
+                      handleTempoChange(parseFloat(e.target.value))
+                    }
+                    aria-label="Playback Tempo"
+                    className="w-full accent-primary cursor-pointer h-1.5 bg-secondary rounded appearance-none"
+                  />
+                  <span className="text-[11px] font-mono text-muted-foreground">
+                    2.00x
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  aria-label="Increment Tempo"
+                  title="Speed up 0.05x"
+                  onClick={handleIncrementTempo}
+                  disabled={tempo >= 2.0}
+                  className="flex h-8 w-8 items-center justify-center rounded border border-border bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between gap-1 sm:gap-1.5 pt-0.5">
+                {[0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0].map((preset) => {
+                  const label = `${preset.toFixed(2)}x`;
+                  const isSelected = Math.abs(tempo - preset) < 0.01;
+                  return (
+                    <button
+                      key={preset}
+                      type="button"
+                      aria-label={`Tempo preset ${label}`}
+                      aria-pressed={isSelected}
+                      onClick={() => handleTempoChange(preset)}
+                      className={cn(
+                        "flex-1 py-1 rounded font-mono text-[10px] sm:text-[11px] font-semibold border transition-all",
+                        isSelected
+                          ? "bg-primary text-white font-bold shadow-chip-glow"
+                          : "bg-st-surface text-zinc-400 hover:text-white hover:border-zinc-500 border-st-hairline"
+                      )}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Pitch Section */}
+            <div className="rounded-lg border border-st-hairline bg-st-panel p-3 flex flex-col justify-between space-y-3">
+              <div className="flex items-center justify-between pb-2 border-b border-st-hairline/60">
+                <span className="font-mono text-[11px] font-bold text-st-ink uppercase flex items-center gap-2">
+                  <Music className="h-3.5 w-3.5 text-accent" />
+                  Pitch Transposition
+                </span>
+                <span
+                  data-testid="current-pitch-label"
+                  className="font-mono text-[11px] font-bold text-zinc-300 bg-st-surface px-1.5 py-0.5 rounded border border-st-hairline"
+                >
+                  {pitch === 0
+                    ? "0 st"
+                    : `${pitch > 0 ? "+" : ""}${
+                        Number.isInteger(pitch)
+                          ? pitch
+                          : pitch.toFixed(2).replace(/\.?0+$/, "")
+                      } st`}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  aria-label="Decrement Pitch"
+                  title="Shift pitch down 1 semitone"
+                  onClick={handleDecrementPitch}
+                  disabled={pitch <= -12}
+                  className="flex h-8 w-8 items-center justify-center rounded border border-border bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                >
+                  <Minus className="h-3.5 w-3.5" />
+                </button>
+
+                <div className="flex-1 flex items-center gap-2">
+                  <span className="text-[11px] font-mono text-muted-foreground">
+                    -12
+                  </span>
+                  <input
+                    type="range"
+                    min="-12"
+                    max="12"
+                    step="1"
+                    value={pitch}
+                    onChange={(e) =>
+                      handlePitchChange(parseFloat(e.target.value))
+                    }
+                    aria-label="Pitch Shift"
+                    className="w-full accent-primary cursor-pointer h-1.5 bg-secondary rounded appearance-none"
+                  />
+                  <span className="text-[11px] font-mono text-muted-foreground">
+                    +12
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  aria-label="Increment Pitch"
+                  title="Shift pitch up 1 semitone"
+                  onClick={handleIncrementPitch}
+                  disabled={pitch >= 12}
+                  className="flex h-8 w-8 items-center justify-center rounded border border-border bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between text-[11px] text-muted-foreground px-1">
+                <span>Octave Down (-12)</span>
+                <span>Original (0)</span>
+                <span>Octave Up (+12)</span>
+              </div>
+
+              {/* Vocal Formant Preservation Toggle */}
+              <div className="flex items-center justify-between pt-2 border-t border-border/40">
+                <div className="space-y-0.5">
+                  <div className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                    <span>Vocal Formant Preservation</span>
+                    <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-primary/10 text-primary border border-primary/20">
+                      Vocals Stem
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    Keeps natural vocal timbre across semitone changes
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-label="Vocal Formant Preservation"
+                  aria-checked={formantPreservation}
+                  onClick={handleToggleFormant}
+                  className={cn(
+                    "h-8 w-8 rounded border text-xs font-bold transition-all flex items-center justify-center",
+                    formantPreservation
+                      ? "border-primary/70 bg-primary text-primary-foreground shadow-xs font-black"
+                      : "border-border/70 bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground"
+                  )}
+                >
+                  <Mic className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+            {/* Mockup phantom chrome (06e, data-mockup-placeholder): the stitch
               DSP rack invents a third card, a Click Track / Metronome readout
               with beat dots and a BAR counter. The app has no click track (the
               mute control was retired long before this skin), so the card is a
               VERBATIM DEAD PLACEHOLDER - aria-hidden divs, no handlers, no
               state; a later cleanup commit erases it. */}
-          <div
-            data-mockup-placeholder="true"
-            aria-hidden="true"
-            className="rounded border border-st-hairline bg-st-panel p-3 flex flex-col justify-between space-y-3"
-          >
-            <div className="flex items-center justify-between pb-2 border-b border-st-hairline/60">
-              <div className="flex items-center gap-2 font-mono text-[11px] font-bold text-st-ink uppercase">
-                <svg
-                  className="w-3.5 h-3.5 text-zinc-400"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                  />
-                </svg>
-                <span>Click Track / Metronome</span>
-              </div>
-              <div className="flex items-center gap-1 font-mono text-[10px]">
-                <span className="inline-block w-2 h-2 rounded-full bg-st-coral animate-pulse" />
-                <span className="text-zinc-300 font-bold">118.0 BPM</span>
-              </div>
-            </div>
-            <div className="py-2.5 flex items-center gap-3">
-              <div className="px-2.5 py-1 rounded bg-st-surface border border-st-hairline text-zinc-300 font-mono text-[10px] flex items-center shrink-0">
-                4/4 Beat
-              </div>
-              <div className="flex-1 flex items-center gap-2">
-                <svg
-                  className="w-3 h-3 text-zinc-500"
-                  fill="currentColor"
-                  viewBox="0 0 20 20"
-                >
-                  <path d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217z" />
-                </svg>
-                <div className="w-full h-1 rounded bg-st-hairline relative">
-                  <span className="absolute left-[70%] top-[-2px] w-1.5 h-2 rounded bg-st-surface-light" />
+            <div
+              data-mockup-placeholder="true"
+              aria-hidden="true"
+              className="rounded-lg border border-st-hairline bg-st-panel p-3 flex flex-col justify-between space-y-3"
+            >
+              <div className="flex items-center justify-between pb-2 border-b border-st-hairline/60">
+                <div className="flex items-center gap-2 font-mono text-[11px] font-bold text-st-ink uppercase">
+                  <svg
+                    className="w-3.5 h-3.5 text-zinc-400"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                    />
+                  </svg>
+                  <span>Click Track / Metronome</span>
                 </div>
-                <span className="font-mono text-[10px] text-zinc-400">70%</span>
+                <div className="flex items-center gap-1 font-mono text-[10px]">
+                  <span className="inline-block w-2 h-2 rounded-full bg-st-coral animate-pulse" />
+                  <span className="text-zinc-300 font-bold">118.0 BPM</span>
+                </div>
               </div>
-            </div>
-            <div className="flex items-center justify-between text-[10px] pt-1">
-              <div className="flex items-center gap-1.5 font-mono">
-                <span className="inline-block w-2 h-2 rounded-full bg-st-coral" />
-                <span className="inline-block w-2 h-2 rounded-full bg-zinc-700" />
-                <span className="inline-block w-2 h-2 rounded-full bg-zinc-700" />
-                <span className="inline-block w-2 h-2 rounded-full bg-zinc-700" />
-                <span className="ml-1 text-[9px] text-zinc-500">BAR 14.1</span>
+              <div className="py-2.5 flex items-center gap-3">
+                <div className="px-2.5 py-1 rounded bg-st-surface border border-st-hairline text-zinc-300 font-mono text-[10px] flex items-center shrink-0">
+                  4/4 Beat
+                </div>
+                <div className="flex-1 flex items-center gap-2">
+                  <svg
+                    className="w-3 h-3 text-zinc-500"
+                    fill="currentColor"
+                    viewBox="0 0 20 20"
+                  >
+                    <path d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217z" />
+                  </svg>
+                  <div className="w-full h-1 rounded bg-st-hairline relative">
+                    <span className="absolute left-[70%] top-[-2px] w-1.5 h-2 rounded bg-st-surface-light" />
+                  </div>
+                  <span className="font-mono text-[10px] text-zinc-400">
+                    70%
+                  </span>
+                </div>
               </div>
-              <div className="text-st-coral underline text-[10px] font-mono">
-                Reset Pitch & Tempo
+              <div className="flex items-center justify-between text-[10px] pt-1">
+                <div className="flex items-center gap-1.5 font-mono">
+                  <span className="inline-block w-2 h-2 rounded-full bg-st-coral" />
+                  <span className="inline-block w-2 h-2 rounded-full bg-zinc-700" />
+                  <span className="inline-block w-2 h-2 rounded-full bg-zinc-700" />
+                  <span className="inline-block w-2 h-2 rounded-full bg-zinc-700" />
+                  <span className="ml-1 text-[9px] text-zinc-500">
+                    BAR 14.1
+                  </span>
+                </div>
+                <div className="text-st-coral underline text-[10px] font-mono">
+                  Reset Pitch & Tempo
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
 
-      {/* The hosted Mix Tab renders NO live transport strip (Stitch skin
+        {/* The hosted Mix Tab renders NO live transport strip (Stitch skin
           07j): the mockup's section foot is the DSP rack and the user erased
           the timecode / Play-Pause / master-fader cluster from the screen.
           Keyboard Space still toggles the shared engine (the window keydown
@@ -1085,134 +1099,137 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
           stays the scrub surface. The standalone component harness form
           (exportDialogHosted false) keeps the full cluster so its behavior
           contract stays pinned. */}
-      {!exportDialogHosted && (
-        <div
-          data-testid="transport-row"
-          className="w-full flex flex-wrap items-center justify-between shrink-0 border-t border-st-hairline pt-2 sm:pt-3 gap-3 sm:gap-4 md:justify-end"
-        >
-          {/* Time Display: strong mono readout (Bold port of the .tread row) */}
+        {!exportDialogHosted && (
           <div
-            data-testid="stem-player-time"
-            className="flex items-baseline gap-1.5 font-mono text-[11px] bg-st-canvas px-3 py-1 rounded border border-st-hairline"
-            style={{ fontFamily: MONO_FONT_STACK }}
+            data-testid="transport-row"
+            className="w-full flex flex-wrap items-center justify-between shrink-0 border-t border-st-hairline pt-2 sm:pt-3 gap-3 sm:gap-4 md:justify-end"
           >
-            <span className="text-white font-bold tracking-wider">
-              {formatTime(currentTime)}
-            </span>
-            <span className="text-zinc-500 text-xs">/</span>
-            <span className="text-zinc-400 text-xs">
-              {formatTime(duration)}
-            </span>
-          </div>
-
-          {/* Transport: single Play/Pause toggle (ADR-0008). Icon shows the
-              action coming next: ▶ while paused, ⏸ while playing; one stable
-              accessible name plus aria-pressed for assistive tech. The Seek-to-
-              start button is gone; the Master Waveform spine is the timeline. */}
-          <div className="flex items-center gap-2">
-            <div className="relative flex flex-col items-center gap-1 shrink-0">
-              <button
-                type="button"
-                aria-label="Play/Pause"
-                aria-pressed={isPlaying}
-                title="Play/Pause (Space)"
-                onClick={togglePlayPause}
-                className={cn(
-                  "relative flex h-11 w-11 items-center justify-center rounded-full border transition-all font-semibold shadow-sm active:scale-95",
-                  isPlaying
-                    ? "bg-st-coral text-white border-st-coral shadow-play-glow hover:bg-st-coral"
-                    : "bg-st-panel text-zinc-300 border-st-hairline hover:bg-st-surface hover:text-white"
-                )}
-              >
-                {isPlaying ? (
-                  <Pause className="h-4 w-4 fill-current" />
-                ) : (
-                  <Play className="h-4 w-4 fill-current" />
-                )}
-                <span className="hidden sm:inline font-mono uppercase text-[10px] font-bold">
-                  Play/Pause
-                </span>
-              </button>
-
-              {/* Honest transport status (Stitch skin): how many stems are wired
-                and whether the Beat Grid is latched. Never claims a number the
-                engine has not reported; sm+ only, decorative. */}
-              <span
-                aria-hidden="true"
-                className="hidden flex items-center gap-2 text-[9px] font-medium uppercase tracking-[0.18em] shrink-0 sm:flex"
-              >
-                {beatGrid ? (
-                  <>
-                    <span className="rounded-full h-1.5 w-1.5 bg-st-ok shrink-0" />
-                    <span className="text-st-ink-dim">
-                      4 stems · phase-locked
-                    </span>
-                  </>
-                ) : (
-                  <span className="text-st-ink-dim">4 stems · phase open</span>
-                )}
+            {/* Time Display: strong mono readout (Bold port of the .tread row) */}
+            <div
+              data-testid="stem-player-time"
+              className="flex items-baseline gap-1.5 font-mono text-[11px] bg-st-canvas px-3 py-1 rounded border border-st-hairline"
+              style={{ fontFamily: MONO_FONT_STACK }}
+            >
+              <span className="text-white font-bold tracking-wider">
+                {formatTime(currentTime)}
+              </span>
+              <span className="text-zinc-500 text-xs">/</span>
+              <span className="text-zinc-400 text-xs">
+                {formatTime(duration)}
               </span>
             </div>
 
-            {/* ADR-0008 (ticket 04): the trash / Purge Session button is dead —
+            {/* Transport: single Play/Pause toggle (ADR-0008). Icon shows the
+              action coming next: ▶ while paused, ⏸ while playing; one stable
+              accessible name plus aria-pressed for assistive tech. The Seek-to-
+              start button is gone; the Master Waveform spine is the timeline. */}
+            <div className="flex items-center gap-2">
+              <div className="relative flex flex-col items-center gap-1 shrink-0">
+                <button
+                  type="button"
+                  aria-label="Play/Pause"
+                  aria-pressed={isPlaying}
+                  title="Play/Pause (Space)"
+                  onClick={togglePlayPause}
+                  className={cn(
+                    "relative flex h-11 w-11 items-center justify-center rounded-full border transition-all font-semibold shadow-sm active:scale-95",
+                    isPlaying
+                      ? "bg-st-coral text-white border-st-coral shadow-play-glow hover:bg-st-coral"
+                      : "bg-st-panel text-zinc-300 border-st-hairline hover:bg-st-surface hover:text-white"
+                  )}
+                >
+                  {isPlaying ? (
+                    <Pause className="h-4 w-4 fill-current" />
+                  ) : (
+                    <Play className="h-4 w-4 fill-current" />
+                  )}
+                  <span className="hidden sm:inline font-mono uppercase text-[10px] font-bold">
+                    Play/Pause
+                  </span>
+                </button>
+
+                {/* Honest transport status (Stitch skin): how many stems are wired
+                and whether the Beat Grid is latched. Never claims a number the
+                engine has not reported; sm+ only, decorative. */}
+                <span
+                  aria-hidden="true"
+                  className="hidden flex items-center gap-2 text-[9px] font-medium uppercase tracking-[0.18em] shrink-0 sm:flex"
+                >
+                  {beatGrid ? (
+                    <>
+                      <span className="rounded-full h-1.5 w-1.5 bg-st-ok shrink-0" />
+                      <span className="text-st-ink-dim">
+                        4 stems · phase-locked
+                      </span>
+                    </>
+                  ) : (
+                    <span className="text-st-ink-dim">
+                      4 stems · phase open
+                    </span>
+                  )}
+                </span>
+              </div>
+
+              {/* ADR-0008 (ticket 04): the trash / Purge Session button is dead —
                 nothing destructive sits in the playback surface. The full purge
                 is the Separate Tab's Session Recovery Discard. */}
 
-            {/* Export Stems Action — standalone form only. The hosted app
+              {/* Export Stems Action — standalone form only. The hosted app
                 form (exportDialogHosted) keeps the Export panel inline in the
                 Export Tab, so the Mix Tab never carries this action. */}
-            {!exportDialogHosted && (
-              <button
-                type="button"
-                aria-label="Export Stems"
-                title="Export isolated stems (WAV/MP3/ZIP)"
-                onClick={() => setIsExportDialogOpen(true)}
-                className="px-3 py-1 rounded border border-st-hairline bg-st-surface text-zinc-400 hover:text-white font-mono font-semibold text-[10px] flex items-center gap-2 transition-colors"
-              >
-                <Download className="h-4 w-4 text-primary" />
-                <span>Export Stems</span>
-              </button>
-            )}
-          </div>
+              {!exportDialogHosted && (
+                <button
+                  type="button"
+                  aria-label="Export Stems"
+                  title="Export isolated stems (WAV/MP3/ZIP)"
+                  onClick={() => setIsExportDialogOpen(true)}
+                  className="px-3 py-1 rounded border border-st-hairline bg-st-surface text-zinc-400 hover:text-white font-mono font-semibold text-[10px] flex items-center gap-2 transition-colors"
+                >
+                  <Download className="h-4 w-4 text-primary" />
+                  <span>Export Stems</span>
+                </button>
+              )}
+            </div>
 
-          {/* Master Volume Slider */}
-          <div className="flex items-center gap-2 pl-2 border-s border-st-hairline/60">
-            <span className="font-mono text-[10px] uppercase font-semibold text-st-ink-dim shrink-0">
-              Master
-            </span>
-            <input
-              type="range"
-              min={0}
-              max={1}
-              step={0.01}
-              value={masterVolume}
-              onChange={(e) =>
-                handleMasterVolumeChange(parseFloat(e.target.value))
-              }
-              aria-label="Master Volume"
-              className="flex-1 min-w-[96px] accent-primary cursor-pointer h-1.5 bg-secondary rounded appearance-none"
-            />
-            <span className="font-mono text-[10px] font-bold text-zinc-200 w-7 text-right">
-              {Math.round(masterVolume * 100)}%
-            </span>
+            {/* Master Volume Slider */}
+            <div className="flex items-center gap-2 pl-2 border-s border-st-hairline/60">
+              <span className="font-mono text-[10px] uppercase font-semibold text-st-ink-dim shrink-0">
+                Master
+              </span>
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.01}
+                value={masterVolume}
+                onChange={(e) =>
+                  handleMasterVolumeChange(parseFloat(e.target.value))
+                }
+                aria-label="Master Volume"
+                className="flex-1 min-w-[96px] accent-primary cursor-pointer h-1.5 bg-secondary rounded appearance-none"
+              />
+              <span className="font-mono text-[10px] font-bold text-zinc-200 w-7 text-right">
+                {Math.round(masterVolume * 100)}%
+              </span>
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Export panel fallback — standalone form only; the hosted app form
+        {/* Export panel fallback — standalone form only; the hosted app form
           (exportDialogHosted) keeps the panel inline in the Export Tab. */}
-      {!exportDialogHosted && (
-        <ExportDialog
-          isOpen={isExportDialogOpen}
-          onClose={() => setIsExportDialogOpen(false)}
-          stems={stems}
-          sampleRate={sampleRate}
-          sourceMixTitle={sourceMixTitle}
-          initialMixerStates={mixerStates}
-          initialMasterVolume={masterVolume}
-          activeTimeStretch={{ tempo, pitch, formantPreservation }}
-        />
-      )}
-    </section>
+        {!exportDialogHosted && (
+          <ExportDialog
+            isOpen={isExportDialogOpen}
+            onClose={() => setIsExportDialogOpen(false)}
+            stems={stems}
+            sampleRate={sampleRate}
+            sourceMixTitle={sourceMixTitle}
+            initialMixerStates={mixerStates}
+            initialMasterVolume={masterVolume}
+            activeTimeStretch={{ tempo, pitch, formantPreservation }}
+          />
+        )}
+      </section>
+    </>
   );
 };

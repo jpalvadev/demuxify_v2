@@ -586,10 +586,11 @@ describe("App UI Shell", () => {
 
   it("rules the Stem Player outer frames at every width — below-md is the same skin, restacked", async () => {
     // Stitch skin (ticket 06): the mobile sheet is the same skin re-stacked,
-    // not a different one — the flattening dies and the Stem Player root and
-    // the Time-Stretch & Pitch wrapper carry their hairline at EVERY width,
-    // with mobile-tight density. Class tokens still carry the responsive
-    // truth (the DOM seam cannot evaluate media queries; grz-18 precedent).
+    // not a different one — the flattening dies and the Stem Player root
+    // carries its hairline at EVERY width, with mobile-tight density. Class
+    // tokens still carry the responsive truth (the DOM seam cannot evaluate
+    // media queries; grz-18 precedent). The DSP rack underneath is unbuilt as
+    // a container (07k, mockup truth): its cards do the ruling.
     vi.spyOn(webgpuModule, "detectWebGPUCapability").mockResolvedValue({
       supported: true,
       isFallback: false,
@@ -654,25 +655,19 @@ describe("App UI Shell", () => {
       expect(rootClasses).toContain(token);
     }
 
-    // The Time-Stretch & Pitch wrapper: same rule everywhere, its Reset
-    // control one level below; mobile-tight density via class tokens.
+    // The DSP rack: the mockup has no container behind the rack (Stitch skin
+    // 07k unbuilt it), so the wrapper is transparent — bare layout tokens, no
+    // border, no fill — and its cards carry the rule instead. Locator: two
+    // levels up from the rack's Reset control is the rack root itself.
     const resetControl = within(stemPlayerRegion).getByRole("button", {
       name: /reset time-stretch/i,
     });
-    const wrapperClasses =
+    const rackClasses =
       resetControl.parentElement?.parentElement?.getAttribute("class") ?? "";
-    expect(wrapperClasses).toContain("border");
-    expect(wrapperClasses).toContain("border-st-hairline");
-    expect(wrapperClasses).not.toMatch(/md:border/);
-    for (const token of [
-      "rounded",
-      "bg-secondary/30",
-      "p-3",
-      "sm:p-4",
-      "space-y-3",
-      "sm:space-y-4",
-    ]) {
-      expect(wrapperClasses).toContain(token);
+    expect(rackClasses).not.toContain("border");
+    expect(rackClasses).not.toContain("bg-secondary");
+    for (const token of ["w-full", "flex", "flex-col", "gap-3", "sm:gap-4"]) {
+      expect(rackClasses).toContain(token);
     }
 
     // Deliberate untouched neighbors: the Tempo/Speed and Pitch Transposition
