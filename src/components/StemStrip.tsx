@@ -44,29 +44,29 @@ const STEM_CONFIG: Record<
     label: "Vocals",
     icon: Mic,
     badgeClass: "bg-stem-vocals/15 text-stem-vocals border-stem-vocals/40",
-    activeColor: "#f452be", // stem-vocals: hsl(320 88% 64%)
-    inactiveColor: "rgba(244, 82, 190, 0.25)",
+    activeColor: "#c084fc", // stem-vocals: hsl(270 95.2% 75.3%)
+    inactiveColor: "rgba(192, 132, 252, 0.25)",
   },
   drums: {
     label: "Drums",
     icon: Drum,
     badgeClass: "bg-stem-drums/15 text-stem-drums border-stem-drums/40",
-    activeColor: "#a672f3", // stem-drums: hsl(264 84% 70%)
-    inactiveColor: "rgba(166, 114, 243, 0.25)",
+    activeColor: "#818cf8", // stem-drums: hsl(234 89.5% 73.9%)
+    inactiveColor: "rgba(129, 140, 248, 0.25)",
   },
   bass: {
     label: "Bass",
     icon: Radio,
     badgeClass: "bg-stem-bass/15 text-stem-bass border-stem-bass/40",
-    activeColor: "#faa638", // stem-bass: hsl(34 95% 60%)
-    inactiveColor: "rgba(250, 166, 56, 0.25)",
+    activeColor: "#f59e0b", // stem-bass: hsl(38 92.1% 50.2%)
+    inactiveColor: "rgba(245, 158, 11, 0.25)",
   },
   other: {
     label: "Other",
     icon: Music,
     badgeClass: "bg-stem-other/15 text-stem-other border-stem-other/40",
-    activeColor: "#4bc5f1", // stem-other: hsl(196 86% 62%)
-    inactiveColor: "rgba(75, 197, 241, 0.25)",
+    activeColor: "#22d3ee", // stem-other: hsl(188 85.7% 53.3%)
+    inactiveColor: "rgba(34, 211, 238, 0.25)",
   },
 };
 

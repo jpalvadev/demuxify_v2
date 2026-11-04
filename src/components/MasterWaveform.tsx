@@ -122,8 +122,8 @@ export const MasterWaveform: React.FC<MasterWaveformProps> = ({
     // Clear background
     ctx.clearRect(0, 0, width, canvasHeight);
 
-    // Background fill (--bg: hsl(232 12% 4%) = #09090b)
-    ctx.fillStyle = "#09090b";
+    // Background fill (st-waveform-box: hsl(240 13% 4.5%) = #0a0a0d, Stitch Skin)
+    ctx.fillStyle = "#0a0a0d";
     ctx.fillRect(0, 0, width, canvasHeight);
 
     // Calculate playhead pixel position
@@ -175,9 +175,9 @@ export const MasterWaveform: React.FC<MasterWaveformProps> = ({
         const yBottom = midY - minVal * halfHeight;
         const barHeight = Math.max(1, yBottom - yTop);
 
-        // Highlight played portion (accent lime) / unplayed (--fg-2 dim)
+        // Highlight played portion (electric lime) / unplayed (--fg-2 dim)
         if (x <= playheadX) {
-          ctx.fillStyle = "#8dff29"; // Bold accent: hsl(92 100% 58%)
+          ctx.fillStyle = "#39ff14"; // electric lime trace: hsl(95 100% 54%)
         } else {
           ctx.fillStyle = "rgba(179, 180, 188, 0.35)"; // fg-2: hsl(232 6% 72%)
         }
@@ -188,7 +188,9 @@ export const MasterWaveform: React.FC<MasterWaveformProps> = ({
 
     // Draw playhead cursor line
     if (duration > 0) {
-      ctx.strokeStyle = "#8dff29"; // Bold accent playhead: hsl(92 100% 58%)
+      ctx.shadowColor = "rgba(255, 255, 255, 0.85)"; // white Playhead with glow (Stitch Skin)
+      ctx.shadowBlur = 8;
+      ctx.strokeStyle = "#ffffff";
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.moveTo(playheadX, 0);
@@ -196,7 +198,7 @@ export const MasterWaveform: React.FC<MasterWaveformProps> = ({
       ctx.stroke();
 
       // Playhead head cap
-      ctx.fillStyle = "#8dff29";
+      ctx.fillStyle = "#ffffff";
       ctx.beginPath();
       ctx.moveTo(playheadX - 5, 0);
       ctx.lineTo(playheadX + 5, 0);
@@ -299,10 +301,13 @@ export const MasterWaveform: React.FC<MasterWaveformProps> = ({
           mm:ss / mm:ss group died — the Transport is the Mix Tab's clock) */}
       <div className="mb-2.5 flex items-center justify-between text-xs font-mono text-muted-foreground">
         <div className="flex items-center gap-2">
+          <span className="rounded-full bg-st-coral px-2.5 py-0.5 text-[9px] font-medium uppercase tracking-[0.18em] text-primary-foreground shrink-0">
+            Stereo Mix
+          </span>
           <span className="font-semibold text-foreground tracking-wide uppercase text-[11px]">
             Master Waveform
           </span>
-          <span className="rounded bg-secondary/80 px-2 py-0.5 text-[10px] text-muted-foreground">
+          <span className="rounded-full bg-st-surface border border-st-hairline px-2 py-0.5 text-[9px] font-medium uppercase tracking-[0.18em]">
             Overview
           </span>
         </div>

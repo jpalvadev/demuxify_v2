@@ -558,7 +558,7 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
             </span>
             <div
               data-testid="click-track-candidate-picker"
-              className="grid grid-cols-2 gap-1"
+              className="grid grid-cols-1 md:grid-cols-4 gap-1"
             >
               {tempoCandidates.map((candidate) => {
                 const locked = isLockedCandidate(
@@ -646,28 +646,49 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
               accessible name plus aria-pressed for assistive tech. The Seek-to-
               start button is gone; the Master Waveform spine is the timeline. */}
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              aria-label="Play/Pause"
-              aria-pressed={isPlaying}
-              title="Play/Pause (Space)"
-              onClick={togglePlayPause}
-              className={cn(
-                "flex h-11 px-5 items-center justify-center gap-2 rounded border transition-all font-semibold shadow-sm active:scale-95",
-                isPlaying
-                  ? "bg-primary text-primary-foreground border-primary hover:bg-primary/90"
-                  : "bg-secondary/60 text-foreground border-border hover:bg-secondary"
-              )}
-            >
-              {isPlaying ? (
-                <Pause className="h-4 w-4 fill-current" />
-              ) : (
-                <Play className="h-4 w-4 fill-current" />
-              )}
-              <span className="hidden sm:inline font-mono uppercase text-[10px] font-bold">
-                Play/Pause
+            <div className="relative flex flex-col items-center gap-1 shrink-0">
+              <button
+                type="button"
+                aria-label="Play/Pause"
+                aria-pressed={isPlaying}
+                title="Play/Pause (Space)"
+                onClick={togglePlayPause}
+                className={cn(
+                  "relative flex h-11 w-11 items-center justify-center rounded-full border transition-all font-semibold shadow-sm active:scale-95",
+                  isPlaying
+                    ? "bg-primary text-primary-foreground border-primary hover:bg-primary/90"
+                    : "bg-secondary/60 text-foreground border-border hover:bg-secondary"
+                )}
+              >
+                {isPlaying ? (
+                  <Pause className="h-4 w-4 fill-current" />
+                ) : (
+                  <Play className="h-4 w-4 fill-current" />
+                )}
+                <span className="hidden sm:inline font-mono uppercase text-[10px] font-bold">
+                  Play/Pause
+                </span>
+              </button>
+
+              {/* Honest transport status (Stitch skin): how many stems are wired
+                and whether the Beat Grid is latched. Never claims a number the
+                engine has not reported; sm+ only, decorative. */}
+              <span
+                aria-hidden="true"
+                className="hidden flex items-center gap-2 text-[9px] font-medium uppercase tracking-[0.18em] shrink-0 sm:flex"
+              >
+                {beatGrid ? (
+                  <>
+                    <span className="rounded-full h-1.5 w-1.5 bg-st-ok shrink-0" />
+                    <span className="text-st-ink-dim">
+                      4 stems · phase-locked
+                    </span>
+                  </>
+                ) : (
+                  <span className="text-st-ink-dim">4 stems · phase open</span>
+                )}
               </span>
-            </button>
+            </div>
 
             {/* ADR-0008 (ticket 04): the trash / Purge Session button is dead —
                 nothing destructive sits in the playback surface. The full purge
@@ -691,7 +712,7 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
           </div>
 
           {/* Master Volume Slider */}
-          <div className="hidden lg:flex items-center gap-2 pl-2 border-l border-border/60">
+          <div className="flex items-center gap-2 pl-2 border-l border-border/60">
             <Volume2 className="h-4 w-4 text-muted-foreground" />
             <input
               type="range"
@@ -703,7 +724,7 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
                 handleMasterVolumeChange(parseFloat(e.target.value))
               }
               aria-label="Master Volume"
-              className="w-24 accent-primary cursor-pointer h-1.5 bg-secondary rounded appearance-none"
+              className="flex-1 min-w-[96px] accent-primary cursor-pointer h-1.5 bg-secondary rounded appearance-none"
             />
             <span className="text-xs font-mono text-muted-foreground w-7 text-right">
               {Math.round(masterVolume * 100)}%
