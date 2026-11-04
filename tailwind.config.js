@@ -96,6 +96,14 @@ export default {
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
       },
+      boxShadow: {
+        // Stitch Skin (06b): coral glow ported verbatim from the mockup
+        // arbitrary shadows — chip glow on the ACTIVE Tab chip, mark glow
+        // on the Brand Unit diamond, play glow on the Transport play chip.
+        "chip-glow": "0 0 10px rgba(248, 81, 83, 0.4)",
+        "mark-glow": "0 0 8px rgba(248, 81, 83, 0.8)",
+        "play-glow": "0 0 16px rgba(248, 81, 83, 0.55)",
+      },
     },
   },
   plugins: [],

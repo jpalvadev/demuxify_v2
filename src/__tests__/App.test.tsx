@@ -132,23 +132,24 @@ describe("App UI Shell", () => {
     const brand = within(rail).getByTestId("brand-unit");
     expect(brand).toBeInTheDocument();
 
-    // The lockup paints at every breakpoint (no display-gating tokens) and its
-    // col-span-4 row is what merges brand row over chip row on the mobile grid.
+    // The lockup paints at every breakpoint (no display-gating tokens); shrink-0
+    // keeps it whole beside the chip container in the Band row at md+.
     const brandClasses = brand.getAttribute("class") ?? "";
     expect(brandClasses).not.toMatch(/(^|\s)hidden(\s|$|:)/);
-    expect(brandClasses).toContain("col-span-4");
+    expect(brandClasses).toContain("shrink-0");
 
     // The single top-level heading is the rail wordmark
     const heading = within(brand).getByRole("heading", { level: 1 });
     expect(heading).toHaveTextContent(/demuxify/i);
 
-    // Lockup parts: 8px pulsing status dot; the mono tagline line is rail-hosted
-    // only — desktop paints it (`hidden md:block`), the mobile lockup is reduced.
+    // Lockup parts: pulsing coral status dot; the mono tagline line is always
+    // visible — the mockup 9px uppercase micro-line (06b port).
     expect(
       within(brand).getByTestId("brand-unit-status-dot")
     ).toBeInTheDocument();
     const tagline = within(brand).getByText(/client-side stem separation/i);
-    expect(tagline.getAttribute("class") ?? "").toContain("md:block");
+    expect(tagline.getAttribute("class") ?? "").toContain("uppercase");
+    expect(tagline.getAttribute("class") ?? "").toContain("text-[9px]");
 
     // Stitch skin (ticket 05): the System Tab's mono identity <p> died with
     // the band — the claim rides the mobile lockup line (pinned above), so
@@ -241,9 +242,12 @@ describe("App UI Shell", () => {
 
     await waitFor(() => {
       expect(screen.getByText("song_master.mp3")).toBeInTheDocument();
-      // Metadata in SourceMixCard and MasterWaveform
+      // Metadata in SourceMixCard and MasterWaveform (getAllByText: the Band
+      // engine-badge placeholder now echoes the 44.1 kHz readout too).
       expect(screen.getAllByText(/3:00/).length).toBeGreaterThanOrEqual(1);
-      expect(screen.getByText(/44\.1\s*kHz/i)).toBeInTheDocument();
+      expect(screen.getAllByText(/44\.1\s*kHz/i).length).toBeGreaterThanOrEqual(
+        1
+      );
       expect(screen.getByText(/Stereo/i)).toBeInTheDocument();
       // Primary button
       expect(
@@ -1294,13 +1298,22 @@ describe("App UI Shell", () => {
     });
     expect(tabPanels).toHaveLength(4);
 
-    // grz-18: rail chrome is grizzly — hairline border (grz-600/40) on every
-    // chip, no rounded corner
+    // Stitch chip language (06b): compact JetBrains-Mono chips with slightly
+    // rounded corners and NO per-chip pill or border — the hairline frames the
+    // bordered tab-band-chips container instead.
     for (const entry of railEntries) {
       const classes = entry.getAttribute("class") ?? "";
-      expect(classes).toContain("rounded-full");
-      expect(classes).toContain("border-st-hairline");
+      expect(classes).toContain("rounded");
+      expect(classes).not.toMatch(/(^|\s)rounded-full/);
+      expect(classes).toContain("font-mono");
+      expect(classes).toContain("text-[11px]");
+      expect(classes).toContain("tracking-wide");
     }
+    const chipsClasses =
+      within(rail).getByTestId("tab-band-chips").getAttribute("class") ?? "";
+    expect(chipsClasses).toContain("grid-cols-4");
+    expect(chipsClasses).not.toMatch(/grid-cols-\[/);
+    expect(chipsClasses).toContain("border-st-hairline");
 
     // The Listen surface is gone: no Listen button, region, or banner anywhere
     expect(screen.queryByRole("button", { name: /^listen$/i })).toBeNull();
@@ -1384,11 +1397,14 @@ describe("App UI Shell", () => {
     render(<App />);
 
     const rail = screen.getByRole("navigation", { name: /tab band/i });
-    // Tab Band (ADR-0014): an equal four-up grid at EVERY breakpoint — the
-    // fixed 112px cells and the md vertical-column override are dead.
-    expect(rail.getAttribute("class") ?? "").toContain("grid-cols-4");
-    expect(rail.getAttribute("class") ?? "").not.toMatch(/grid-cols-\[/);
-    expect(rail.getAttribute("class") ?? "").toContain("md:gap-2");
+    // Band composition (06b): flex column below md, brand+chips row at md+;
+    // the four-up chip cells live in the bordered chips container.
+    expect(rail.getAttribute("class") ?? "").toContain("md:flex-row");
+    expect(rail.getAttribute("class") ?? "").not.toMatch(/grid-cols/);
+    const bandChips = within(rail).getByTestId("tab-band-chips");
+    expect(bandChips.getAttribute("class") ?? "").toContain("grid-cols-4");
+    expect(bandChips.getAttribute("class") ?? "").not.toMatch(/grid-cols-\[/);
+    expect(bandChips.getAttribute("class") ?? "").toContain("md:gap-2");
 
     const separatePanel = screen.getByRole("region", {
       name: /^Separate Tab$/,
