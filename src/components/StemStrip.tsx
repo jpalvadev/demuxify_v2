@@ -275,7 +275,7 @@ export const StemStrip: React.FC<StemStripProps> = ({
       role="group"
       aria-label={`${config.label} Stem`}
       className={cn(
-        "group flex flex-col sm:flex-row items-stretch sm:items-center rounded border border border-st-hairline/80 hover:border-zinc-700 transition-colors overflow-hidden bg-st-surface shadow-xs",
+        "group flex flex-col sm:flex-row items-stretch sm:items-center rounded border border border-st-hairline/80 hover:border-zinc-700 transition-colors overflow-hidden bg-st-panel shadow-xs",
         isSilenced && "opacity-65 bg-card/30",
         className
       )}
