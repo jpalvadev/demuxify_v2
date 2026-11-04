@@ -533,7 +533,7 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
           role="group"
           aria-label="Tempo Detector candidates (ranked)"
           data-testid="tempo-candidates-rail"
-          className="flex flex-col items-stretch gap-3 rounded border border-primary/30 bg-secondary/40 p-3 transition-colors shadow-xs"
+          className="flex flex-col items-stretch gap-2 rounded"
         >
           {/* Candidates readout (ticket 06): the Tempo Detector ranks a top
               reading plus ranked alternatives, each with its confidence, and a
@@ -548,7 +548,7 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
           >
             <span
               data-testid="click-track-confidence-label"
-              className="text-[11px] font-mono text-muted-foreground"
+              className="text-[10px] font-mono text-st-ink-dim"
             >
               {clickCalibration
                 ? `calibrated by hand · your ${clickCalibration.tapsSec.length} taps anchor the grid`
@@ -558,7 +558,7 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
             </span>
             <div
               data-testid="click-track-candidate-picker"
-              className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-1"
+              className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2"
             >
               {tempoCandidates.map((candidate) => {
                 const locked = isLockedCandidate(
@@ -584,13 +584,30 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
                       }
                     }}
                     className={cn(
-                      "px-2 py-1 rounded border text-[11px] font-mono font-bold transition-all flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed",
+                      "px-2 py-1 rounded border text-[10px] font-mono flex items-center justify-between transition-all disabled:opacity-40 disabled:cursor-not-allowed",
                       locked
-                        ? "border-primary/70 bg-primary/25 text-primary cursor-default"
-                        : "border-border/70 bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground"
+                        ? "border-st-coral/50 bg-st-coral/20 text-st-ink cursor-default"
+                        : "border-st-hairline bg-st-surface text-zinc-400 hover:border-zinc-500 cursor-pointer"
                     )}
                   >
-                    {`${bpmLabel} ${formatConfidence(candidate.confidence)}`}
+                    <span
+                      className={cn(
+                        "font-medium",
+                        locked ? "font-bold text-st-coral" : "text-zinc-300"
+                      )}
+                    >
+                      {bpmLabel}
+                    </span>{" "}
+                    <span
+                      className={cn(
+                        "text-[9px]",
+                        locked
+                          ? "px-1 py-0.5 rounded bg-st-coral/20 text-white font-bold"
+                          : "text-zinc-500"
+                      )}
+                    >
+                      {formatConfidence(candidate.confidence)}
+                    </span>
                   </button>
                 );
               })}

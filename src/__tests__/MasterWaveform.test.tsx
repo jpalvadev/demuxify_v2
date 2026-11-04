@@ -30,13 +30,14 @@ describe("MasterWaveform", () => {
     expect(slider).toHaveAttribute("aria-valuenow", "30");
     expect(slider).toHaveAttribute("aria-valuemax", "120");
 
-    // Mix Tab cohesion (ADR-0013): the header's mm:ss / mm:ss group died — the
-    // Transport owns the Mix Tab's only visible clock. The label and the
-    // "Overview" chip survive, and the time axis is the canvas graduations, so
-    // no DOM text carries a position anywhere on the spine.
+    // Mix Tab cohesion (ADR-0013): the header's mm:ss / mm:ss position clock is
+    // dead — the Transport owns the Mix Tab's only visible clock. The label and
+    // the "Overview" chip survive. Stitch skin (07d) adds the mockup's ruler
+    // graduations as aria-hidden axis labels, so the pin now targets the dead
+    // clock shape (a "current / total" pair) rather than any bare mm:ss text.
     expect(screen.getByText("Master Waveform")).toBeInTheDocument();
     expect(screen.getByText("Overview")).toBeInTheDocument();
-    expect(screen.queryByText(/\d{1,2}:\d{2}/)).toBeNull();
+    expect(screen.queryByText(/\d{1,2}:\d{2}\s*\/\s*\d{1,2}:\d{2}/)).toBeNull();
   });
 
   it("handles click to seek on timeline", () => {

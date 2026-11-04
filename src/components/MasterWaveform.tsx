@@ -292,23 +292,23 @@ export const MasterWaveform: React.FC<MasterWaveformProps> = ({
   return (
     <div
       className={cn(
-        "group relative w-full overflow-hidden rounded border border-border bg-card/60 p-4 shadow-sm backdrop-blur-sm transition-all select-none",
+        "group relative w-full overflow-hidden rounded-lg border border-st-hairline bg-st-panel p-3 shadow-sm transition-all select-none",
         disabled && "opacity-60 pointer-events-none",
         className
       )}
     >
       {/* Header with Title and Overview chip (ADR-0013: the spine's own
           mm:ss / mm:ss group died — the Transport is the Mix Tab's clock) */}
-      <div className="mb-2.5 flex items-center justify-between text-xs font-mono text-muted-foreground">
+      <div className="flex items-center justify-between font-mono text-[11px] pb-1 border-b border-st-hairline/60 mb-2.5">
         <div className="flex items-center gap-2">
-          <span className="rounded-full bg-st-coral px-2.5 py-0.5 text-[9px] font-medium uppercase tracking-[0.18em] text-primary-foreground shrink-0">
-            Stereo Mix
-          </span>
-          <span className="font-semibold text-foreground tracking-wide uppercase text-[11px]">
+          <span className="font-bold tracking-wider uppercase text-st-ink">
             Master Waveform
           </span>
-          <span className="rounded-full bg-st-surface border border-st-hairline px-2 py-0.5 text-[9px] font-medium uppercase tracking-[0.18em]">
+          <span className="font-sans text-[10px] text-st-ink-dim">
             Overview
+          </span>
+          <span className="bg-zinc-800 px-1.5 py-0.5 rounded text-[9px] uppercase tracking-wider text-st-ink-dim shrink-0">
+            Stereo Mix
           </span>
         </div>
       </div>
@@ -329,7 +329,7 @@ export const MasterWaveform: React.FC<MasterWaveformProps> = ({
         onPointerCancel={handlePointerUp}
         onKeyDown={handleKeyDown}
         className={cn(
-          "relative w-full rounded overflow-hidden cursor-pointer touch-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
+          "relative w-full rounded border border-st-hairline bg-[#0a0a0d] overflow-hidden cursor-pointer touch-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
           isScrubbing && "cursor-ew-resize"
         )}
         style={{ height }}
@@ -339,6 +339,18 @@ export const MasterWaveform: React.FC<MasterWaveformProps> = ({
           className="block w-full h-full"
           style={{ height: `${height}px` }}
         />
+        {/* Timeline graduations (Stitch skin): the mockup's ruler marks over
+            the field — honest labels of the spine's own time axis, aria-hidden. */}
+        <div
+          aria-hidden="true"
+          className="absolute inset-0 flex justify-between pointer-events-none px-2 pt-1 text-[9px] font-mono text-zinc-600 select-none"
+        >
+          {Array.from({ length: 8 }).map((_, mark) => (
+            <span key={mark}>
+              {`${Math.floor(((duration / 7) * mark) / 60)}:${String(Math.floor(((duration / 7) * mark) % 60)).padStart(2, "0")}`}
+            </span>
+          ))}
+        </div>
       </div>
     </div>
   );

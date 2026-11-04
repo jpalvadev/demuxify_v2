@@ -1143,7 +1143,7 @@ export const App: React.FC = () => {
                     duration={decodedSourceMix.metadata.duration}
                     currentTime={currentTime}
                     onSeek={handleSeek}
-                    height={84}
+                    height={96}
                   />
                 </div>
                 {/* Hand Calibration (ADR-0013, ticket 09): the lane welds

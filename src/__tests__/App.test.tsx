@@ -2168,12 +2168,15 @@ describe("App UI Shell", () => {
       const transportReadout = within(mixTab).getByTestId("stem-player-time");
       expect(transportReadout.textContent).toContain("00:03");
 
-      // And the spine block itself carries no clock at the whole-app seam: the
-      // deleted header group's absence survives here, so one Playhead keeps
-      // exactly one visible readout (the canvas graduations are drawn, not
-      // DOM text, so the only digits the block could hold are a live clock's).
+      // And the spine block itself carries no PLAYHEAD clock at the whole-app
+      // seam: one Playhead keeps exactly one position readout (the Transport's
+      // mm:ss pair). Stitch skin 07d ports the mockup's ruler: aria-hidden
+      // single-value graduations of the axis, never a "current / total" face —
+      // so the pin targets the dead clock shape, not any digit.
       const spineBlock = spine.parentNode as HTMLElement;
-      expect(spineBlock.textContent).not.toMatch(/\d{1,2}:\d{2}/);
+      expect(spineBlock.textContent).not.toMatch(
+        /\d{1,2}:\d{2}\s*\/\s*\d{1,2}:\d{2}/
+      );
     } finally {
       // Hand the globals back so the rest of the suite keeps jsdom's shape.
       window.AudioContext = OrigAudioContext as any;
