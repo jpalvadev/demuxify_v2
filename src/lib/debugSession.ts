@@ -53,21 +53,74 @@ export function createDebugSessionFixture(): DebugSessionFixture {
     return seed / 4294967296;
   };
 
+  // The mockup's OWN waveform recipe (view_target/stitch.html: drawDetailedAudio
+  // Waveform + renderAllWaveforms). #debug media follows it verbatim — seeded
+  // pseudo-Rand per canvas, the song-shape envelope (intro taper, verse and
+  // chorus bumps, outro fade) and the mirrored amplitude capped at 92% of the
+  // half-height — so the screenshot channel compares the app against the
+  // TARGET's shapes, not a sine placeholder.
+  const mockupRand = (canvasSeed: number) => {
+    let s = canvasSeed;
+    return () => {
+      s = (s * 9301 + 49297) % 233280;
+      return s / 233280;
+    };
+  };
+  const mockupEnvelopeAt = (progress: number) => {
+    let envelope = Math.sin(progress * Math.PI) * 0.75;
+    if (progress > 0.15 && progress < 0.45) envelope += 0.25;
+    if (progress > 0.55 && progress < 0.85) envelope += 0.35;
+    if (progress > 0.88) envelope *= Math.max(0, 1 - (progress - 0.88) / 0.12);
+    return envelope;
+  };
+  const mockupAmplitudes = (
+    bins: number,
+    canvasSeed: number,
+    density: number
+  ) => {
+    const rand = mockupRand(canvasSeed);
+    const amps = new Float32Array(bins);
+    for (let bin = 0; bin < bins; bin += 1) {
+      const noise = (rand() * 0.7 + 0.3) * density;
+      amps[bin] = Math.min(0.92, mockupEnvelopeAt(bin / bins) * noise);
+    }
+    return amps;
+  };
+
+  // Master: the mockup's lime trace is seed 101 at density 1.15
   const min = new Float32Array(DEBUG_SESSION_PEAK_BINS);
   const max = new Float32Array(DEBUG_SESSION_PEAK_BINS);
-  for (let bin = 0; bin < DEBUG_SESSION_PEAK_BINS; bin++) {
-    const swell = Math.abs(
-      Math.sin(bin * 0.031) + 0.35 * Math.sin(bin * 0.011)
-    );
-    const amp = 0.16 + 0.72 * Math.pow(swell, 1.35) * (0.45 + 0.55 * rnd());
-    min[bin] = -amp;
-    max[bin] = amp;
+  const masterAmps = mockupAmplitudes(DEBUG_SESSION_PEAK_BINS, 101, 1.15);
+  for (let bin = 0; bin < DEBUG_SESSION_PEAK_BINS; bin += 1) {
+    min[bin] = -masterAmps[bin];
+    max[bin] = masterAmps[bin];
   }
 
+  // Samples are what the engine decodes; the strips' peaks are recomputed
+  // from them, so the per-bin samples must reach the bin's amp at both ends
+  const samplesPerBin = DEBUG_SESSION_STEM_SAMPLES / DEBUG_SESSION_PEAK_BINS;
+  const fillSamples = (
+    samples: Float32Array,
+    amps: Float32Array,
+    scale: number
+  ) => {
+    let signed = 1;
+    for (let bin = 0; bin < amps.length; bin += 1) {
+      const from = Math.floor(bin * samplesPerBin);
+      const to = Math.floor((bin + 1) * samplesPerBin);
+      for (let i = from; i < to; i += 1) {
+        // Alternate sign and keep the magnitude high so the bin's max/min
+        // reach the mockup's amp (the strip re-bins these samples, and a
+        // sparse ±rand*amp spread would paint thin bars instead of the
+        // target's dense mirrored fill).
+        signed = -signed;
+        samples[i] = signed * amps[bin] * (0.62 + rnd() * 0.36) * scale;
+      }
+    }
+  };
+
   const mixSamples = new Float32Array(DEBUG_SESSION_STEM_SAMPLES);
-  for (let i = 0; i < DEBUG_SESSION_STEM_SAMPLES; i++) {
-    mixSamples[i] = (rnd() - 0.5) * 0.3;
-  }
+  fillSamples(mixSamples, masterAmps, 0.9);
   // A structural stand-in for a decoded AudioBuffer (same shape the App
   // fixtures hand to the engine: numberOfChannels/length/sampleRate/
   // duration/getChannelData); the real class only exists inside an AudioContext.
@@ -79,18 +132,23 @@ export function createDebugSessionFixture(): DebugSessionFixture {
     getChannelData: () => mixSamples,
   } as unknown as AudioBuffer;
 
-  const stemChannel = () => {
+  // Per-stem channels keep the mockup's OWN seed and density per canvas
+  // (renderAllWaveforms: vocals 202/0.85, drums 303/1.0, bass 404/0.75,
+  // other 505/0.95), so each row is shaped like its target row.
+  const stemChannel = (canvasSeed: number, density: number) => {
     const channel = new Float32Array(DEBUG_SESSION_STEM_SAMPLES);
-    for (let i = 0; i < DEBUG_SESSION_STEM_SAMPLES; i++) {
-      channel[i] = (rnd() - 0.5) * 0.4;
-    }
+    fillSamples(
+      channel,
+      mockupAmplitudes(DEBUG_SESSION_PEAK_BINS, canvasSeed, density),
+      0.95
+    );
     return [channel, channel];
   };
   const separatedStems: Record<StemName, Float32Array[]> = {
-    vocals: stemChannel(),
-    drums: stemChannel(),
-    bass: stemChannel(),
-    other: stemChannel(),
+    vocals: stemChannel(202, 0.85),
+    drums: stemChannel(303, 1.0),
+    bass: stemChannel(404, 0.75),
+    other: stemChannel(505, 0.95),
   };
 
   const stepSec = 60 / DEBUG_SESSION_ANALYZED_BPM;

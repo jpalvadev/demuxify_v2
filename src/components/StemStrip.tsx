@@ -194,8 +194,8 @@ export const StemStrip: React.FC<StemStripProps> = ({
     const playheadX = playheadRatio * width;
     const midY = canvasHeight / 2;
 
-    // Center guide line
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.04)";
+    // Center guide line (the mockup's guide: rgba(255,255,255,0.05))
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.05)";
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(0, midY);
@@ -206,7 +206,8 @@ export const StemStrip: React.FC<StemStripProps> = ({
     if (effectivePeaks && effectivePeaks.length > 0) {
       const numBins = effectivePeaks.length;
       const binWidth = width / numBins;
-      const halfHeight = (canvasHeight / 2) * 0.88;
+      // Mockup amplitude cap: bars reach 92% of the half-height (midY * 0.92)
+      const halfHeight = (canvasHeight / 2) * 0.92;
 
       for (let i = 0; i < numBins; i++) {
         const x = i * binWidth;
