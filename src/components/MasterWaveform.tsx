@@ -17,6 +17,10 @@ export interface MasterWaveformProps {
   height?: number;
   className?: string;
   disabled?: boolean;
+  // Stitch skin 07y (mock meta bar = one justify-between row): an optional
+  // inline right-side cluster — the Mix Tab welds the Beat Grid tap chrome
+  // into the spine's own title row. Pure render slot; no engine reach-in.
+  metaRight?: React.ReactNode;
 }
 
 function formatTime(totalSeconds: number): string {
@@ -41,6 +45,7 @@ export const MasterWaveform: React.FC<MasterWaveformProps> = ({
   height = 110,
   className,
   disabled = false,
+  metaRight,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -278,9 +283,12 @@ export const MasterWaveform: React.FC<MasterWaveformProps> = ({
       )}
     >
       {/* Header with Title and Overview chip (ADR-0013: the spine's own
-          mm:ss / mm:ss group died — the Transport is the Mix Tab's clock) */}
-      <div className="flex items-center justify-between font-mono text-[11px] pb-1 border-b border-st-hairline/60 mb-2.5">
-        <div className="flex items-center gap-2">
+          mm:ss / mm:ss group died — the Transport is the Mix Tab's clock).
+          Stitch skin 07y: the mock's meta bar is ONE justify-between row —
+          title cluster left, the tap chrome cluster right (flex-wrap keeps
+          the cluster legible on the narrow mobile band). */}
+      <div className="flex items-center flex-wrap justify-between gap-2 font-mono text-[11px] pb-1 border-b border-st-hairline/60 mb-2.5">
+        <div className="flex items-center gap-2 shrink-0">
           <span className="font-bold tracking-wider uppercase text-zinc-200">
             Master Waveform
           </span>
@@ -289,6 +297,7 @@ export const MasterWaveform: React.FC<MasterWaveformProps> = ({
             Stereo Mix
           </span>
         </div>
+        {metaRight}
       </div>
 
       {/* Scrubbable Canvas Area */}

@@ -1641,11 +1641,12 @@ describe("App UI Shell", () => {
 
     // Mix Tab cohesion (ADR-0013, ticket 08): one rail order at every
     // breakpoint — the stage reads in the order the work is done. The whole-app
-    // seam walks the Mix stage top-down: spine → Hand Calibration tap lane →
-    // the Tempo Detector candidate picker (now its own Rail) → the Stem Strips
-    // → the Click Track lane → Time-Stretch; the master Transport row that
-    // used to close the section foot is erased from the hosted stage (Stitch
-    // skin 07j), so the chain ends at Time-Stretch.
+    // seam walks the Mix stage top-down: Hand Calibration chrome (inline in the
+    // spine's meta bar, Stitch skin 07y) → spine → the Tempo Detector candidate
+    // picker (now its own Rail) → the Stem Strips → the Click Track lane →
+    // Time-Stretch; the master Transport row that used to close the section foot
+    // is erased from the hosted stage (Stitch skin 07j), so the chain ends at
+    // Time-Stretch.
     const tapStrip = within(mixTab).getByTestId("click-tap-calibration-strip");
     const pickerRail = within(mixTab).getByTestId("tempo-candidates-rail");
     const firstStrip = within(mixTab).getAllByRole("group", {
@@ -1656,7 +1657,7 @@ describe("App UI Shell", () => {
       name: /playback tempo/i,
     });
     for (const [earlier, later] of [
-      [spine, tapStrip],
+      [tapStrip, spine],
       [tapStrip, pickerRail],
       [pickerRail, firstStrip],
       [firstStrip, clickRail],
@@ -1671,11 +1672,13 @@ describe("App UI Shell", () => {
     expect(within(mixTab).queryByTestId("transport-row")).toBeNull();
     expect(within(mixTab).queryByTestId("stem-player-time")).toBeNull();
 
-    // Hand Calibration collapse (ADR-0013, ticket 09): the card look is dead —
-    // the lane is a thin strip welded under the spine, asserted through the
+    // Hand Calibration collapse (ADR-0013, ticket 09) + Stitch skin 07y header-
+    // row surgery: the card look and the stacked lane are both dead — the chrome
+    // is an INLINE row the spine welds into its meta bar, asserted through the
     // component's own class tokens (the DOM seam cannot see media queries):
-    // no card fill, no border rhythm, no outer padding, and the height default
-    // is now the thin lane's inline style, not the old tall card.
+    // no card fill, no border rhythm, no outer padding, right-aligned inline
+    // row, and the live strip's inline style is the phantom rail's thin height,
+    // not the old tall card.
     const tapLane = within(mixTab).getByRole("region", {
       name: /beat grid tap calibration/i,
     });
@@ -1683,8 +1686,8 @@ describe("App UI Shell", () => {
     expect(laneClasses).not.toMatch(/(^|\s)border/);
     expect(laneClasses).not.toContain("bg-card");
     expect(laneClasses).not.toMatch(/(^|\s)p[xxy]-[1-9]/);
-    expect(laneClasses).toContain("bg-transparent");
-    expect(tapStrip.getAttribute("style") ?? "").toContain("24px");
+    expect(laneClasses).toContain("justify-end");
+    expect(tapStrip.getAttribute("style") ?? "").toContain("12px");
 
     // System Tab hosts the WebGPU status badge
     const systemTab = screen.getByRole("region", { name: /system tab/i });

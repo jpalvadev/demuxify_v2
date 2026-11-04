@@ -53,8 +53,8 @@ export const BeatGridTapCalibration: React.FC<BeatGridTapCalibrationProps> = ({
   onTapCalibration,
   className,
   // Mix Tab cohesion (ADR-0013, ticket 09): the card's tall default died —
-  // the lane is a thin strip welded under the spine, same time axis.
-  height = 24,
+  // the strip is a thin rail on the spine's width and time axis.
+  height = 12,
 }) => {
   const stripRef = useRef<HTMLDivElement>(null);
   const [taps, setTaps] = useState<number[]>([]);
@@ -98,10 +98,15 @@ export const BeatGridTapCalibration: React.FC<BeatGridTapCalibrationProps> = ({
     <section
       aria-label="Beat Grid tap calibration"
       className={cn(
-        // Mix Tab cohesion (ADR-0013): the card look is dead — the lane is a
-        // thin strip on the spine's width and time axis: no border rhythm, no
-        // outer padding, no height default. The decision contract stays whole.
-        "flex flex-col gap-1 items-end rounded bg-transparent px-0 py-0",
+        // Stitch skin 07y header-row surgery: this section now renders as an
+        // INLINE chrome row (readout + Confirm + Reset) that the spine welds
+        // into its meta bar right side — the mock's tap chrome is one right
+        // row, not a stacked lane (user 2026-11-04: "check the margin between
+        // containers … it should be like this"). The section stays UN-
+        // positioned so the absolute strip below re-anchors to the positioned
+        // band head instead. Handlers, testids, aria and the decision
+        // contract are untouched.
+        "flex items-center flex-wrap justify-end gap-2",
         className
       )}
     >
@@ -114,12 +119,12 @@ export const BeatGridTapCalibration: React.FC<BeatGridTapCalibrationProps> = ({
         role="group"
         aria-label="Tap beats along the timeline"
         className={cn(
-          // Stitch skin 07p: the mockup shows NO visible lane between the
-          // waveform and the BPM chips — its tap chrome is a one-line right
-          // row, so the live gesture strip fades to a phantom hairline on a
-          // panel wash (barely-there, like the mockup's phantom strips) and
-          // the lane's lines right-align under the spine.
-          "relative w-full overflow-hidden select-none rounded border border-st-hairline/30 bg-st-panel focus-visible:outline-none",
+          // Stitch skin 07y: the strip leaves the chrome row's flow and welds
+          // ABSOLUTE to the positioned band head — bottom-0 full spine width,
+          // a phantom hairline rail standing in the head's p-3 gutter directly
+          // under the wave field (same width, same time axis: X→timeline
+          // seconds mapping is the unchanged 07p contract).
+          "absolute left-0 right-0 bottom-0 overflow-hidden select-none rounded border border-st-hairline/30 bg-st-panel focus-visible:outline-none",
           disabled && "opacity-60 pointer-events-none"
         )}
         style={{ height: `${height}px` }}

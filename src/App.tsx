@@ -1179,7 +1179,15 @@ export const App: React.FC = () => {
                 {/* Master Waveform spine (ADR-0008): the Mix Tab owns the single
                     timeline surface; scrubbing it drives the Stem Player engine
                     through the transport bridge, and its position flows back on
-                    the one Playhead channel (ADR-0013). */}
+                    the one Playhead channel (ADR-0013). Stitch skin 07y header-
+                    row surgery (user 2026-11-04: "check the margin between
+                    containers … it should be like this"): the mock's master
+                    panel meta bar is ONE justify-between row — title cluster
+                    left, tap chrome right — so the tap calibration chrome welds
+                    INTO the spine's meta bar (no stacked lane rows under the
+                    wave) and its live strip re-anchors as a phantom rail in the
+                    head's p-3 gutter directly under the wave field: same full
+                    spine width, same time axis, decision contract untouched. */}
                 <MasterWaveform
                   peaks={waveformPeaks}
                   audioBuffer={decodedSourceMix.buffer}
@@ -1187,20 +1195,13 @@ export const App: React.FC = () => {
                   currentTime={currentTime}
                   onSeek={handleSeek}
                   height={96}
+                  metaRight={
+                    <BeatGridTapCalibration
+                      duration={decodedSourceMix.metadata.duration}
+                      onTapCalibration={handleConfirmTapCalibration}
+                    />
+                  }
                 />
-                {/* Hand Calibration (ADR-0013, ticket 09): the lane welds
-                    directly under the spine — same width, same time axis, no
-                    card gap. Tapping stays a gesture against the axis the
-                    user can already see; the decision contract is untouched. */}
-                {/* Stitch skin 07r band midsegment: the lane continues the
-                    master panel's wash and hairline sides between the wave
-                    card (band head) and the chip rail (band foot). */}
-                <div className="w-full bg-st-panel border-x border-st-hairline px-3 pb-2">
-                  <BeatGridTapCalibration
-                    duration={decodedSourceMix.metadata.duration}
-                    onTapCalibration={handleConfirmTapCalibration}
-                  />
-                </div>
                 <StemPlayer
                   stems={separatedStems}
                   sampleRate={decodedSourceMix.metadata.sampleRate}
