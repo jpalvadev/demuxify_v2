@@ -77,6 +77,20 @@ const BANNED_IN_SRC = [
       "(fallback stacks start with Inter / JetBrains Mono).",
   },
   {
+    pattern: /\bheader-band\b/,
+    reason:
+      "Stitch Skin (ticket 05): the System-Tab Grizzly band chrome died — " +
+      "the header-band strip (and its header-band-face children) may never " +
+      "come back as DOM, a testid, or a rendered attr.",
+  },
+  {
+    pattern: /\b(faceElements|grzNames|grz0[12])\b/,
+    reason:
+      "Stitch Skin (ticket 05): the grizzly.ts mascot layer (grz01 Demuxer, " +
+      "grz02 Mixer faces) is retired with the module (src/lib/grizzly.ts " +
+      "deleted); no symbol from it may be revived in src/.",
+  },
+  {
     pattern: /downbeat/i,
     reason:
       "ADR-0011 Amendment retired the Click Track's accent/Downbeat axis end " +

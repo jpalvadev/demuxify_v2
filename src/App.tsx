@@ -1,10 +1,4 @@
-import React, {
-  useEffect,
-  useState,
-  useRef,
-  ChangeEvent,
-  createElement,
-} from "react";
+import React, { useEffect, useState, useRef, ChangeEvent } from "react";
 import { AlertCircle, Loader2, CheckCircle2, Music } from "lucide-react";
 import { BrandUnit } from "./components/BrandUnit";
 import { SourceMixDropzone } from "./components/SourceMixDropzone";
@@ -25,7 +19,6 @@ import {
   SeparationPhase,
 } from "./components/SeparationProgress";
 import { DiagnosticsPanel } from "./components/DiagnosticsPanel";
-import { grz01, grz02, grzNames, faceElements } from "./lib/grizzly";
 import { ModelCacheStatus } from "./components/ModelCacheStatus";
 import { ModelSelector } from "./components/ModelSelector";
 import {
@@ -1192,77 +1185,24 @@ export const App: React.FC = () => {
             aria-label="System Tab"
             className={tabPanelClass(false, activeTab === "system")}
           >
-            {activeTab === "system" ? (
-              /* System-Tab Grizzly band (grz-11/13/15/18, grizzlython-skin):
-                  the app's header band re-homed into the System Tab — it runs
-                  ONLY while this Tab is the active stage panel, is chrome
-                  (bordered in-flow strip, chrome-0 radius, grz-600 hairline),
-                  and is never a modal dialog. Two named faces flank the Tab
-                  title: grz-01 Demuxer (round ears, broad snout, lowered brows)
-                  and grz-02 Mixer (smaller ears, cocked brow, carries a machete). */
-              <div
-                data-testid="header-band"
-                className="grid items-center gap-3 rounded border border-st-hairline bg-card/40 px-3 py-2 mb-3.5"
-              >
-                <h2
-                  className="font-display text-[15px] leading-[18px] font-bold uppercase tracking-[0.07em] text-foreground sm:text-[22px] sm:leading-[26px] sm:tracking-[0.06em]"
-                  style={BANNER_FONT}
-                >
-                  System
-                </h2>
-                <span
-                  data-testid="header-band-face"
-                  aria-label={`grz-01 — ${grzNames.grz01}`}
-                  className="inline-flex w-7 h-7 pointer-events-none"
-                >
-                  <svg
-                    viewBox="0 0 100 100"
-                    className="w-full h-full"
-                    role="presentation"
-                    aria-hidden="true"
-                  >
-                    {faceElements(grz01).map((el) =>
-                      createElement(el.tag, el.attrs)
-                    )}
-                  </svg>
-                </span>
-                <span
-                  data-testid="header-band-face"
-                  aria-label={`grz-02 — ${grzNames.grz02}`}
-                  className="inline-flex w-7 h-7 pointer-events-none"
-                >
-                  <svg
-                    viewBox="0 0 100 100"
-                    className="w-full h-full"
-                    role="presentation"
-                    aria-hidden="true"
-                  >
-                    {faceElements(grz02).map((el) =>
-                      createElement(el.tag, el.attrs)
-                    )}
-                  </svg>
-                </span>
-              </div>
-            ) : (
-              <div className="flex items-center justify-between gap-2">
-                <h3 className="font-display text-base font-semibold tracking-tight text-foreground sm:text-lg">
-                  System
-                </h3>
-                <p className="text-sm text-muted-foreground">
-                  Hardware acceleration, Model Cache and on-device diagnostics.
-                </p>
-              </div>
-            )}
-            <div className="pt-1 space-y-3">
-              {/* Identity statement on mobile (ADR-0009 story 12): the pinned mobile block
-                  carries the reduced lockup without the tagline, so the System Tab carries
-                  the mono identity line instead. */}
-              <p
-                className="font-mono text-xs font-medium tracking-wide text-muted-foreground"
-                style={{ fontFamily: MONO_FONT_STACK }}
-              >
-                Client-Side Stem Separation
+            {/* System Tab title zone (Stitch skin 05): the Grizzlython
+                header band is DEAD outright — chrome strip, mascot faces,
+                and the grz accessible names are retired. The Tab wears the
+                mockup's title-zone pattern like its sibling panels; the
+                status chips below stay honest — chips survive, chrome dies. */}
+            <div className="flex flex-col gap-1.5 shrink-0">
+              <h3 className="font-display text-[15px] leading-[18px] font-bold uppercase tracking-[0.07em] text-st-ink">
+                System
+              </h3>
+              <p className="text-sm text-st-ink-dim">
+                Hardware acceleration, Model Cache and on-device diagnostics.
               </p>
+            </div>
+            <div className="pt-1 space-y-3">
+              {/* Identity statement (ADR-0009 story 12): the pinned mobile
+                  lockup line carries the reduced claim; the System Tab's mono
+                  identity <p> died outright with the band (ticket 05) — the
+                  System region must not resurrect it (absence-pinned). */}
               <WebGPUStatusBadge
                 capability={capability}
                 isLoading={isDetectingWebGPU}
@@ -1286,17 +1226,9 @@ export const App: React.FC = () => {
 
       {/* Footer (ADR-0009): the red gradient slab and the 2px warn rule died
           with the hero band; the page ends flat on one tan hairline — the
-          same token as the rail chip dividers and the System band border. */}
-      <footer className="w-full block border-t border-st-hairline py-3 text-center text-[10px] text-muted-foreground">
-        <p>
-          <span className="block">
-            Demuxify Web • 100% Client-Side Audio Source Separation
-          </span>
-          <span className="block">
-            Powered by Client Neural Inference &amp; WebGPU
-          </span>
-        </p>
-      </footer>
+          same token as the rail chip dividers. Stitch skin (ticket 05): the
+          footer's two micro lines died too — the marker is an empty element. */}
+      <footer className="w-full block border-t border-st-hairline py-3" />
     </div>
   );
 };

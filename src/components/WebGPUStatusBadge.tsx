@@ -14,7 +14,7 @@ export const WebGPUStatusBadge: React.FC<WebGPUStatusBadgeProps> = ({
   if (isLoading || !capability) {
     return (
       <div
-        className="inline-flex items-center gap-2 px-3 py-1 text-xs font-medium rounded bg-muted text-muted-foreground border border-border"
+        className="inline-flex items-center gap-2 px-3 py-1 text-xs font-medium rounded-full bg-st-surface text-st-ink-dim border border-st-hairline"
         title="Detecting graphics acceleration capabilities..."
       >
         <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -30,7 +30,7 @@ export const WebGPUStatusBadge: React.FC<WebGPUStatusBadgeProps> = ({
       "Hardware Acceleration";
     return (
       <div
-        className="inline-flex items-center gap-2 px-3 py-1 text-xs font-semibold rounded bg-status-ok/15 text-status-ok border border-status-ok/30"
+        className="inline-flex items-center gap-2 px-3 py-1 text-xs font-semibold rounded-full bg-status-ok/15 text-status-ok border border-status-ok/30"
         title={`WebGPU Active: ${deviceName}`}
       >
         <span className="relative flex h-2 w-2">
@@ -50,7 +50,7 @@ export const WebGPUStatusBadge: React.FC<WebGPUStatusBadgeProps> = ({
 
   return (
     <div
-      className="inline-flex items-center gap-2 px-3 py-1 text-xs font-semibold rounded bg-status-warn/15 text-status-warn border border-status-warn/30"
+      className="inline-flex items-center gap-2 px-3 py-1 text-xs font-semibold rounded-full bg-status-warn/15 text-status-warn border border-status-warn/30"
       title={capability.errorReason || "Running in CPU/WASM fallback mode"}
     >
       <AlertTriangle className="w-3.5 h-3.5 text-status-warn" />

@@ -150,12 +150,13 @@ describe("App UI Shell", () => {
     const tagline = within(brand).getByText(/client-side stem separation/i);
     expect(tagline.getAttribute("class") ?? "").toContain("md:block");
 
-    // The pinned mobile block drops the tagline, so the System Tab carries the
-    // identity statement instead (ADR-0009 story 12).
+    // Stitch skin (ticket 05): the System Tab's mono identity <p> died with
+    // the band — the claim rides the mobile lockup line (pinned above), so
+    // the System region must not resurrect it.
     const systemPanel = screen.getByRole("region", { name: /^System Tab$/ });
     expect(
-      within(systemPanel).getByText(/client-side stem separation/i)
-    ).toBeInTheDocument();
+      within(systemPanel).queryByText(/client-side stem separation/i)
+    ).toBeNull();
 
     await waitFor(() => {
       expect(screen.getByText(/webgpu active/i)).toBeInTheDocument();
@@ -1695,7 +1696,7 @@ describe("App UI Shell", () => {
     ).toBeNull();
   });
 
-  it("runs the Grizzly header band only in the System Tab and keeps the other Tabs chrome-free", async () => {
+  it("keeps the dead Grizzly header band absent everywhere, active System Tab included", async () => {
     vi.spyOn(webgpuModule, "detectWebGPUCapability").mockResolvedValue({
       supported: true,
       isFallback: false,
@@ -1704,13 +1705,13 @@ describe("App UI Shell", () => {
 
     render(<App />);
 
-    // Separation incomplete: the shell is parked on the Separate Tab, so the
-    // band cannot run.
+    // Stitch skin (ticket 05): the System-Tab Grizzly band is DEAD outright —
+    // absence at every size and every Tab, even while the System Tab is the
+    // active stage panel.
     expect(screen.queryByTestId("header-band")).toBeNull();
 
     await loadAndSeparate();
 
-    // Separated but parked on the Separate Tab: still nowhere.
     expect(screen.queryByTestId("header-band")).toBeNull();
 
     await clickTabButton("mix");
@@ -1719,19 +1720,19 @@ describe("App UI Shell", () => {
     await clickTabButton("export");
     expect(screen.queryByTestId("header-band")).toBeNull();
 
-    // Only the System Tab carries the band: a bordered chrome strip with the
-    // Tab title and its two named faces — chrome, never a modal.
+    // System Tab active: no band, no named faces — chrome dies, the panel
+    // survives on its title zone (title + caption) and the chips below.
     await clickTabButton("system");
-    const band = screen.getByTestId("header-band");
-    expect(band).toHaveClass("border-st-hairline");
-    expect(within(band).getByText(/^System$/i)).toBeInTheDocument();
+    expect(screen.queryByTestId("header-band")).toBeNull();
+    expect(screen.queryByTestId("header-band-face")).toBeNull();
+    const systemPanel = screen.getByRole("region", { name: /^System Tab$/ });
+    expect(within(systemPanel).getByText(/^System$/)).toBeInTheDocument();
+    expect(
+      within(systemPanel).getByText(/hardware acceleration/i)
+    ).toBeInTheDocument();
     expect(screen.queryByRole("dialog")).toBeNull();
-    const faces = screen.getAllByTestId("header-band-face");
-    expect(faces).toHaveLength(2);
-    expect(faces[0]).toHaveAccessibleName(/grz-01/);
-    expect(faces[1]).toHaveAccessibleName(/grz-02/);
 
-    // Leaving the System Tab kills the band everywhere else.
+    // Leaving the System Tab finds nothing.
     await clickTabButton("separate");
     expect(screen.queryByTestId("header-band")).toBeNull();
     expect(screen.queryByTestId("header-band-face")).toBeNull();
@@ -2198,8 +2199,8 @@ describe("App UI Shell", () => {
       screen.queryByText(/in-browser · nothing uploaded/i)
     ).not.toBeInTheDocument();
 
-    // Flat footer (ADR-0009): one tan hairline using the rail-chip token, no
-    // 2px warn rule, no gradient slab; the two centered micro lines stay.
+    // Flat footer (ticket 05): one tan hairline with NOTHING under it — the
+    // band's copy died with its chrome; the footer's lines are 100% absent.
     const footer = document.querySelectorAll("footer")[0];
     const footerClasses = (footer.getAttribute("class") ?? "").split(" ");
     expect(footerClasses).toContain("border-t");
@@ -2209,9 +2210,10 @@ describe("App UI Shell", () => {
       false
     );
     expect(footer.getAttribute("style") ?? "").not.toContain("gradient");
+    expect(screen.queryByText(/powered by/i)).toBeNull();
     expect(
-      screen.getByText(/powered by client neural inference/i)
-    ).toBeInTheDocument();
+      screen.queryByText(/client-side audio source separation/i)
+    ).toBeNull();
   });
 
   it("re-locks the Beat Grid from the Mix-tab candidate picker: the user's pick of the metric doubling replaces the grid and the rail follows it", async () => {
