@@ -4,7 +4,7 @@
 
 **Blocked by:** 01 (tokens/fonts/Tab Band).
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 ## Design source (agent-authored fallback; palette per ticket 01)
 
@@ -14,8 +14,34 @@
 
 ## Checklist
 
-- [ ] Both states render in the pattern with shipped copy verbatim.
-- [ ] Dialog class tokens retargeted in its component; existing ExportDialog test asserts keep green (only retarget pins whose classes changed).
-- [ ] No new controls anywhere in this Tab; suite green through the chain.
+- [x] Both states render in the pattern with shipped copy verbatim.
+- [x] Dialog class tokens retargeted in its component; existing ExportDialog test asserts keep green (only retarget pins whose classes changed).
+- [x] No new controls anywhere in this Tab; suite green through the chain.
 
 ## Comments
+
+### Port record - Stitch skin (agent-authored design)
+
+- Design source: spec mockup title-zone pattern extrapolated from ticket 03
+  (`stitch-skin/spec.md` Export cell); agent-authored fallback - OpenDesign MCP
+  deliberately not called this effort. One gated commit on `stitch-skin`, chain
+  green at commit time.
+- Open state: title zone = UPPERCASE display h3 (`font-display text-[15px]
+leading-[18px] font-bold uppercase tracking-[0.07em] text-st-ink`) + the
+  shipped caption verbatim ("The Export panel is always here - no action to
+  click.") + bordered micro-chip pill `rounded-full bg-st-surface
+border border-st-hairline` with the mono meta `WAV · MP3 · ZIP` -
+  an honest format line (bundleZip ships ZIP; dialog copy says WAV/MP3).
+- Gated state: same title + caption shape; `{TAB_GATING_REASON}` copy
+  untouched (four `/no Stems yet/i` pins keep resolving); NO meta chip in the
+  gated state (a formats chip next to "no Stems yet" would claim a ready
+  state) - pattern-consistent, honesty-preserving deviation from the
+  "bordered micro-chip" clause, recorded here.
+- Dialog internals: token retarget only - outer card `rounded border
+border-border bg-card` -> `rounded-lg border border-st-hairline bg-st-panel`,
+  header rule `border-b border-st-hairline/60`, icon box `rounded` ->
+  `rounded-full` with `border-primary/30`. Layout, form flow, bundle choices,
+  Custom Mixdown sliders, download progress and every pinned testid untouched
+  (`check:testids` green without test edits; ExportDialog assertions kept
+  green as-is, no retargets were needed because no pinned class changed).
+- No new controls; `tabPanelClass`/`stemsReady` gating semantics untouched.

@@ -1151,13 +1151,16 @@ export const App: React.FC = () => {
             separatedStems &&
             decodedSourceMix ? (
               <>
-                <div className="flex items-center justify-between gap-2">
-                  <h3 className="font-display text-base font-semibold tracking-tight text-foreground sm:text-lg">
+                <div className="flex flex-col gap-1.5 shrink-0">
+                  <h3 className="font-display text-[15px] leading-[18px] font-bold uppercase tracking-[0.07em] text-st-ink">
                     Export
                   </h3>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-sm text-st-ink-dim">
                     The Export panel is always here — no action to click.
                   </p>
+                  <div className="rounded-full bg-st-surface border border-st-hairline px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-st-ink-dim">
+                    WAV · MP3 · ZIP
+                  </div>
                 </div>
                 <div className="pt-1">
                   <ExportDialog
@@ -1174,13 +1177,11 @@ export const App: React.FC = () => {
                 </div>
               </>
             ) : (
-              <div className="flex items-center justify-between gap-2">
-                <h3 className="font-display text-base font-semibold tracking-tight text-foreground sm:text-lg">
+              <div className="flex flex-col gap-1.5 shrink-0">
+                <h3 className="font-display text-[15px] leading-[18px] font-bold uppercase tracking-[0.07em] text-st-ink">
                   Export
                 </h3>
-                <p className="text-sm text-muted-foreground">
-                  {TAB_GATING_REASON}
-                </p>
+                <p className="text-sm text-st-ink-dim">{TAB_GATING_REASON}</p>
               </div>
             )}
           </section>

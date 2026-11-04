@@ -572,12 +572,12 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
     <section
       role="region"
       aria-labelledby="export-dialog-title"
-      className="w-full rounded border border-border bg-card p-6 sm:p-8 space-y-6 relative"
+      className="w-full rounded-lg border border-st-hairline bg-st-panel p-6 sm:p-8 space-y-6 relative"
     >
       {/* Header */}
-      <div className="flex items-start justify-between border-b border-border/60 pb-4">
+      <div className="flex items-start justify-between border-b border-st-hairline/60 pb-4">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded bg-primary/10 border border-primary/20 text-primary">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 border border-primary/30 text-primary">
             <Download className="h-5 w-5" />
           </div>
           <div>
