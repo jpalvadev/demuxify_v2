@@ -1379,12 +1379,19 @@ export const App: React.FC = () => {
           around it (the clock readout, the SYNC pip, the loop / skip / fast-
           forward glyphs, the beat-tap chip, the stereo peak pips and the
           master-volume slider) keep their INDIVIDUAL data-mockup-placeholder +
-          aria-hidden marks, still dead until the cleanup commit erases them. */}
-      <footer className="w-full flex items-center justify-between shrink-0 z-30 border-t border-st-hairline bg-st-panel px-3 sm:px-6 py-3 sm:py-2 sm:h-16">
+          aria-hidden marks, still dead until the cleanup commit erases them.
+          08e restacks the bar for phones (390 class): the clusters can no
+          longer ride one rail, so the bar WRAPS — clock cluster and readout
+          cluster share the first row (stacked inside the left cluster,
+          flex-col until sm), the transport row takes the second row centered
+          via order-last + mx-auto, and the tiny peak caption hides until sm
+          because it does not survive the narrow rail. sm: tokens keep the
+          desktop rail byte-identical. */}
+      <footer className="w-full flex items-center justify-between shrink-0 z-30 border-t border-st-hairline bg-st-panel px-3 sm:px-6 py-3 sm:py-2 sm:h-16 flex-wrap sm:flex-nowrap gap-y-2 sm:gap-y-0">
         <div
           data-mockup-placeholder="true"
           aria-hidden="true"
-          className="flex items-center gap-4 w-72 shrink-0"
+          className="flex items-center gap-2 shrink-0 flex-col sm:gap-4 sm:w-72 sm:flex-row"
         >
           <div className="font-mono bg-st-canvas px-3 py-1.5 rounded border border-st-hairline flex items-baseline gap-1.5">
             <span className="text-white text-base font-bold tracking-wider">
@@ -1403,7 +1410,7 @@ export const App: React.FC = () => {
             </span>
           </div>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 order-last sm:order-none mx-auto sm:mx-0">
           <div
             data-mockup-placeholder="true"
             aria-hidden="true"
@@ -1476,7 +1483,7 @@ export const App: React.FC = () => {
         <div
           data-mockup-placeholder="true"
           aria-hidden="true"
-          className="flex items-center gap-4 w-72 shrink-0 justify-end"
+          className="flex items-center gap-4 shrink-0 justify-end sm:w-72"
         >
           <div className="flex items-center gap-1">
             <div className="flex flex-col gap-0.5">
@@ -1495,7 +1502,7 @@ export const App: React.FC = () => {
               <span className="inline-block w-1.5 h-1 bg-emerald-400" />
               <span className="inline-block w-1.5 h-1 bg-emerald-400" />
             </div>
-            <span className="font-mono text-[9px] text-zinc-500 ml-1">
+            <span className="font-mono text-[9px] text-zinc-500 ml-1 hidden sm:block">
               0 dB
             </span>
           </div>

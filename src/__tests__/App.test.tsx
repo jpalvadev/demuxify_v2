@@ -2277,6 +2277,9 @@ describe("App UI Shell", () => {
     expect(footerClasses).toContain("border-t");
     expect(footerClasses).toContain("border-st-hairline");
     expect(footerClasses.some((c) => c.startsWith("border-t-2"))).toBe(false);
+    // 08e mobile restack rail: wraps for phones, one rail from sm up.
+    expect(footerClasses).toContain("flex-wrap");
+    expect(footerClasses).toContain("sm:flex-nowrap");
     expect(footerClasses.some((c) => c.includes("border-status-warn"))).toBe(
       false
     );
