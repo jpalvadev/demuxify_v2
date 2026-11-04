@@ -354,7 +354,7 @@ describe("StemPlayer Time-Stretch & Pitch Controls", () => {
     expect(screen.getByText("00:05")).toBeInTheDocument();
   });
 
-  it("renders the Click Track rail in the Mix player: off by default, tempo-only readout, one volume fader and no rate control of its own", () => {
+  it("renders the Click Track rail in the Mix player: off by default, no readout of its own, one volume fader and no rate control of its own", () => {
     const beatGrid = Float64Array.from([
       0.5, 1.0572789, 1.6145578, 2.1718367, 2.7291156,
     ]);
@@ -382,11 +382,12 @@ describe("StemPlayer Time-Stretch & Pitch Controls", () => {
     const enableSwitch = screen.getByRole("switch", { name: /^click track$/i });
     expect(enableSwitch).toHaveAttribute("aria-checked", "false");
 
-    // Beat Grid readout shows the tempo the grid was locked at, and nothing
-    // else: the retired Meter/accent axis leaves no readout behind.
-    expect(screen.getByTestId("click-track-bpm-label")).toHaveTextContent(
-      "107.7 BPM"
-    );
+    // Stitch skin 08a: the card keeps no readout of its own, and this render
+    // was handed no ranked candidates, so there is no picker island either —
+    // the grid's tempo is not restated anywhere on the card. The retired
+    // accent axis leaves no readout behind either.
+    expect(screen.queryByTestId("click-track-bpm-label")).toBeNull();
+    expect(screen.queryByTestId("click-track-candidate-picker")).toBeNull();
     expect(screen.queryByTestId("click-track-meter-label")).toBeNull();
     expect(screen.queryByTestId("click-track-meter-selector")).toBeNull();
     expect(

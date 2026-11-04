@@ -273,11 +273,11 @@ export const MasterWaveform: React.FC<MasterWaveformProps> = ({
   return (
     <div
       className={cn(
-        // Stitch skin 07r band head: the mockup's master panel is ONE tall
-        // container (header bar, canvas, chip grid inside). The card is now
-        // the TOP segment of that band — open at the foot so the tap lane and
-        // the chip rail continue the same wash and hairline below it.
-        "group relative w-full overflow-hidden rounded-t-lg border-x border-t border-st-hairline bg-st-panel p-3 shadow-sm transition-all select-none",
+        // Stitch skin 08a: the band's foot rail is DELETED (the ranked readings
+        // moved inside the Click Track card), so the master head stands as ONE
+        // full card — rounded on every corner, ruled on every side, opaque
+        // st-panel ground.
+        "group relative w-full overflow-hidden rounded-lg border border-st-hairline bg-st-panel p-3 shadow-sm transition-all select-none",
         disabled && "opacity-60 pointer-events-none",
         className
       )}

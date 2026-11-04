@@ -516,134 +516,15 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
 
   return (
     <>
-      {/* Tempo Detector candidate Rail (Stitch skin 07k, mockup composition):
-          the candidate-chip grid is its OWN part of the Mix stage — the mockup
-          puts it under the master waveform region, on the workspace surface,
-          never inside the stem-card container — so the rail renders as a root
-          sibling above the Stem Player section (which stays one container per
-          the user's rule). ADR-0013 (ticket 08) still owns its ordering: the
-          Mix stage reads spine → tap lane → ranked readings → strips → click
-          lane → DSP rack, and the rail-order seam pins exactly that. The picker
-          is still decision support for the Beat Grid, not part of the Click
-          Track lane's on/off-and-volume contract. */}
-      {tempoCandidates && tempoCandidates.length > 0 && (
-        <div
-          role="group"
-          aria-label="Tempo Detector candidates (ranked)"
-          data-testid="tempo-candidates-rail"
-          // Stitch skin 07r band foot + 07z seam rhythm: the mockup's master panel ENDS on the
-          // bare BPM chip grid — the rail closes the band head's wash: same
-          // st-panel ground, hairline sides continued, rounded bottom only; the
-          // -mt-3 cancels the stage seam's space-y-3 so the weld stays snug.
-          className="w-full -mt-3 flex flex-col items-stretch gap-2 rounded-b-lg border-x border-b border-st-hairline bg-st-panel px-3 pt-1 pb-3"
-        >
-          {/* Candidates readout (ticket 06): the Tempo Detector ranks a top
-              reading plus ranked alternatives, each with its confidence, and a
-              pulse and its metric doubling are genuinely indistinguishable — so
-              nothing here claims one BPM as certain. The chips are the picker:
-              picking one asks the app to re-run the Tempo Detector with that
-              tempo as hint, which re-locks the Beat Grid. Domain-separate:
-              candidates are never Stems. */}
-          <div
-            data-testid="click-track-tempo-readout"
-            className="flex flex-col gap-1.5 shrink-0 sm:w-46"
-          >
-            <span
-              data-testid="click-track-confidence-label"
-              className="text-[10px] font-mono text-st-ink-dim"
-            >
-              {clickCalibration
-                ? `calibrated by hand · your ${clickCalibration.tapsSec.length} taps anchor the grid`
-                : isConfidentReading(tempoCandidates)
-                  ? `solid reading · confidence ${formatConfidence(tempoCandidates[0].confidence)}`
-                  : `${tempoCandidates.length} readings ranked · pick the feel you hear`}
-            </span>
-            <div
-              data-testid="click-track-candidate-picker"
-              className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2"
-            >
-              {tempoCandidates.map((candidate) => {
-                const locked = isLockedCandidate(
-                  candidate.bpm,
-                  clickTrackBpm ?? null
-                );
-                const bpmLabel = `${candidate.bpm.toFixed(1)} BPM`;
-                // Mockup chip language (stitch-skin 07m): the confidence read
-                // carries its RELATION to the top reading — CONFIDENCE on the
-                // leader, "(2x Double)" on the pulse doubling the detector
-                // cannot tell apart, "Match"/"Alternate" on the ranked rest.
-                // The words name the relation, not a fact — no chip claims
-                // one BPM as certain (the honest readout stays above).
-                const isLeader = candidate === tempoCandidates[0];
-                const ratioToLeader =
-                  tempoCandidates[0].bpm > 0
-                    ? candidate.bpm / tempoCandidates[0].bpm
-                    : 1;
-                const roleWord = isLeader
-                  ? "CONFIDENCE"
-                  : Math.abs(ratioToLeader - 2) <= 0.05
-                    ? "(2x Double)"
-                    : candidate.confidence >= 0.6
-                      ? "Match"
-                      : "Alternate";
-                return (
-                  <button
-                    key={bpmLabel}
-                    type="button"
-                    aria-label={
-                      locked
-                        ? `Beat Grid locked to ${bpmLabel}`
-                        : `Re-lock Beat Grid to ${bpmLabel}`
-                    }
-                    aria-pressed={locked}
-                    title={bpmLabel}
-                    disabled={locked || !onChooseTempoCandidate}
-                    onClick={() => {
-                      if (!locked) {
-                        onChooseTempoCandidate?.(candidate.bpm);
-                      }
-                    }}
-                    className={cn(
-                      "px-2 py-1 rounded border text-[10px] font-mono flex items-center justify-between transition-all disabled:opacity-40 disabled:cursor-not-allowed",
-                      locked
-                        ? "border-st-coral/50 bg-st-coral/15 text-white cursor-default"
-                        : isLeader
-                          ? "border-st-coral/40 bg-st-coral/15 text-st-coral hover:bg-primary hover:text-white cursor-pointer"
-                          : "border-st-hairline bg-st-surface text-zinc-400 hover:border-zinc-500 cursor-pointer"
-                    )}
-                  >
-                    <span
-                      className={cn(
-                        "font-medium",
-                        locked
-                          ? "font-bold text-st-coral"
-                          : isLeader
-                            ? "font-bold text-st-ink"
-                            : "text-zinc-300"
-                      )}
-                    >
-                      {bpmLabel}
-                    </span>{" "}
-                    <span
-                      className={cn(
-                        "text-[9px]",
-                        locked
-                          ? "px-1 py-0.5 rounded bg-st-coral/20 text-white font-bold"
-                          : isLeader
-                            ? "px-1 py-0.5 rounded border border-st-coral/60 text-st-coral font-bold"
-                            : "text-zinc-500"
-                      )}
-                    >
-                      {formatConfidence(candidate.confidence)} {roleWord}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
-
+      {/* Stitch skin 08a (user's Mix-card surgery): the standalone Tempo Detector
+          candidate Rail is DELETED — the ranked readings now live inside the
+          Click Track card below (its picker island, `{bpm} BPM` +
+          `{pct}% match` chips), so the fragment root opens straight on the
+          Stem Player section and the master band loses its welded foot rail.
+          The decision machinery is untouched: the picker still asks the app
+          for a re-lock hint through onChooseTempoCandidate, and ADR-0013's
+          amendment keeps the honest ranking copy as the picker group's
+          accessible name. */}
       <section
         role="region"
         aria-label="Stem Player"
@@ -686,8 +567,10 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
         </div>
 
         {/* Stem Strips (ADR-0013, ticket 08): the thing you actually mix, right
-          after the Tempo Detector rail and before the Click Track lane — the stage
-          reads in the order the work is done. */}
+          after the master waveform spine and before the Click Track card — the
+          stage reads in the order the work is done. Stitch skin 08a folded the
+          ranked readings into the card, so nothing of the Detector sits loose
+          between the spine and the strips anymore. */}
         <div className="space-y-2.5">
           {STEM_NAMES.map((stem) => {
             const state = mixerStates[stem];
@@ -716,10 +599,14 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
 
         {/* Click Track rail (ADR-0010, ticket 04): the last mixer lane — after
           the four Stem Strips — and because it lives inside the Stem Player it
-          only exists once the Mix is live. Mix Tab cohesion (ADR-0013, ticket
-          08): the lane keeps exactly its on/off switch, its volume fader and
-          its one readout of the Beat Grid it is locked to; the candidate picker
-          moved to its own Rail ahead of the Transport row. Look is agent-authored
+          only exists once the Mix is live. Stitch skin 08a (the user's Mix-card
+          surgery): the card now OWNS its ranked readings — the picker island of
+          smaller uniform `{bpm} BPM` + `{pct}% match` chips sits above the on/off
+          switch and the volume fader — and the lane's separate Beat Grid readout
+          and badge chip are erased: the locked chip IS the readout. The locked
+          chip names its own confidence like every other — never a fabricated
+          certainty — and picking an alternative still asks the app to re-lock
+          through the Tempo Detector with that tempo as hint. Look is agent-authored
           — the ticket-01 OpenDesign run died (see its FALLBACK RECORD) — and
           stays on the same HSL token architecture as the rest of the Tab Shell.
           The lane is domain-separate: never a Stem. */}
@@ -728,50 +615,103 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
           aria-label="Click Track"
           data-testid="click-track-rail"
           className={cn(
-            // Stitch skin 07p: the mockup renders the Click Track lane as a
-            // QUIET strip hugging the foot of the stem card (zinc surface on
-            // a hairline rim), never a coral-bordered box — the enabled state
-            // lifts to the mockup's surfaceLight instead of paying a coral
-            // frame; the enabled/disabled semantics stay in the aria state.
-            "flex flex-col sm:flex-row items-stretch sm:items-center gap-3 rounded border border-st-hairline/40 bg-st-panel/60 p-3 transition-colors shadow-xs",
+            // Stitch skin 08a: the card sits on the blanket card rule — opaque
+            // st-panel ground under a hairline rim — while the railClasses seam
+            // keeps pinning the base border border-st-hairline/40 token and the
+            // enabled state still lifts to the mockup's surface.
+            "flex flex-col justify-between gap-3 rounded border border-st-hairline/40 bg-st-panel p-3 transition-colors shadow-xs w-fit",
+            // 08a: the card states paint the blanket rule outright (opaque
+            // ground under an opaque hairline rim), so the container the chips
+            // and click controls live in is visible on the stem card's own ground.
             clickTrack.enabled
-              ? "border-st-hairline/90 bg-st-surface"
-              : "opacity-80"
+              ? "border border-st-hairline rounded-lg bg-st-panel"
+              : "border border-st-hairline rounded-lg bg-st-panel opacity-80"
           )}
         >
-          {/* Lane badge: same chip treatment as the Stem strips, distinct label. */}
-          <div className="flex items-center gap-2 sm:w-34 shrink-0">
+          {/* The picker island (ticket 06 machinery): the Tempo Detector's
+              ranked readings as one compact chip family. A pulse and its metric
+              doubling are genuinely indistinguishable, so the picker GROUP's
+              accessible name carries the honest ranking copy — calibrated by
+              hand, a solid reading, or the ranked count — and no chip claims
+              one BPM as certain: the locked chip shows its own confidence.
+              Picking an alternative asks the app to re-run the Tempo Detector
+              with that tempo as hint, re-locking the Beat Grid; the chip the
+              grid is locked to stays informational. */}
+          {tempoCandidates && tempoCandidates.length > 0 && (
             <div
-              className={cn(
-                "flex items-center gap-2 rounded border px-2.5 py-1 text-xs font-semibold shadow-xs",
-                "border-st-hairline bg-st-surface text-st-ink-dim"
-              )}
+              role="group"
+              aria-label={
+                clickCalibration
+                  ? `calibrated by hand · your ${clickCalibration.tapsSec.length} taps anchor the grid`
+                  : isConfidentReading(tempoCandidates)
+                    ? `solid reading · confidence ${formatConfidence(tempoCandidates[0].confidence)}`
+                    : `${tempoCandidates.length} readings ranked · pick the feel you hear`
+              }
+              data-testid="click-track-candidate-picker"
+              className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2 w-fit justify-items-center font-mono text-[10px] rounded border border-st-hairline bg-st-panel p-2"
             >
-              <Music className="h-3.5 w-3.5 shrink-0" />
-              <span>Click Track</span>
+              {tempoCandidates.map((candidate) => {
+                const locked = isLockedCandidate(
+                  candidate.bpm,
+                  clickTrackBpm ?? null
+                );
+                const bpmLabel = `${candidate.bpm.toFixed(1)} BPM`;
+                return (
+                  <button
+                    key={bpmLabel}
+                    type="button"
+                    aria-label={
+                      locked
+                        ? `Beat Grid locked to ${bpmLabel}`
+                        : `Re-lock Beat Grid to ${bpmLabel}`
+                    }
+                    aria-pressed={locked}
+                    title={bpmLabel}
+                    disabled={locked || !onChooseTempoCandidate}
+                    onClick={() => {
+                      if (!locked) {
+                        onChooseTempoCandidate?.(candidate.bpm);
+                      }
+                    }}
+                    className={cn(
+                      // Mock chip rule (verbatim per the user's card): one
+                      // compact shape for every reading, pair spread
+                      // justify-between; coral stays on the locked chip only.
+                      // Compact chip rule: the shape hugs its own content, the
+                      // pair keeps a fixed gutter, and justify-items-center in
+                      // the picker grid stops a dead cell from stretching a chip
+                      // to full width (the mock's own 1fr cells do stretch them).
+                      "p-1.5 rounded border flex items-center justify-between gap-2 transition-all disabled:opacity-40 disabled:cursor-not-allowed",
+                      locked
+                        ? "border-st-coral/50 bg-st-coral/15 text-white cursor-default"
+                        : "border-st-hairline bg-st-surface text-zinc-400 hover:border-zinc-500 cursor-pointer"
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "font-medium shrink-0",
+                        locked ? "font-bold text-st-coral" : "text-zinc-300"
+                      )}
+                    >
+                      {bpmLabel}
+                    </span>{" "}
+                    <span
+                      className={cn(
+                        "text-[9px] shrink-0",
+                        locked ? "text-white" : "text-zinc-500"
+                      )}
+                    >
+                      {formatConfidence(candidate.confidence)} match
+                    </span>
+                  </button>
+                );
+              })}
             </div>
-          </div>
+          )}
 
-          {/* Beat Grid readout: the tempo the grid was locked at. Mono
-            micro-line, same as the Transport readouts. */}
-          <div
-            data-testid="click-track-grid-label"
-            className="flex flex-col gap-1 text-[11px] font-mono text-muted-foreground shrink-0 sm:w-40"
-          >
-            <span
-              data-testid="click-track-bpm-label"
-              className="text-xs font-bold text-foreground"
-            >
-              {clickTrackBpm !== null && clickTrackBpm !== undefined
-                ? clickCalibration
-                  ? `${clickTrackBpm.toFixed(1)} BPM · calibrated by hand`
-                  : `${clickTrackBpm.toFixed(1)} BPM`
-                : "No Beat Grid"}
-            </span>
-          </div>
-
-          {/* Mixer controls: enable switch (off by default), mute, volume — like a
-            lane, with no rate control of its own (Time-Stretch owns the rate). */}
+          {/* Mixer controls: the ♪ enable switch (off by default) and the volume
+            fader — like a lane, with no rate control of its own (Time-Stretch
+            owns the rate). */}
           <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0">
             <div className="flex items-center gap-1.5">
               <button
@@ -793,7 +733,7 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
               </button>
             </div>
 
-            <div className="flex items-center gap-2 w-32 sm:w-36">
+            <div className="flex items-center gap-2 flex-1">
               {clickTrack.volume === 0 ? (
                 <VolumeX className="h-4 w-4 text-muted-foreground/60 shrink-0" />
               ) : (
@@ -1051,11 +991,12 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
               </div>
             </div>
             {/* Mockup phantom chrome (06e, data-mockup-placeholder): the stitch
-              DSP rack invents a third card, a Click Track / Metronome readout
-              with beat dots and a BAR counter. The app has no click track (the
-              mute control was retired long before this skin), so the card is a
-              VERBATIM DEAD PLACEHOLDER - aria-hidden divs, no handlers, no
-              state; a later cleanup commit erases it. */}
+              DSP rack invents a third card, a Click Track / Metronome card —
+              header row and a volume fader. Stitch skin 08a (the user's card
+              surgery) already erased its time-signature chip and its beat-dot
+              counter readout; what remains is still a VERBATIM DEAD
+              PLACEHOLDER — aria-hidden divs, no handlers, no state, and the
+              fader moves nothing; a later cleanup commit erases the card. */}
             <div
               data-mockup-placeholder="true"
               aria-hidden="true"
@@ -1084,9 +1025,6 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
                 </div>
               </div>
               <div className="py-2.5 flex items-center gap-3">
-                <div className="px-2.5 py-1 rounded bg-st-surface border border-st-hairline text-zinc-300 font-mono text-[10px] flex items-center shrink-0">
-                  4/4 Beat
-                </div>
                 <div className="flex-1 flex items-center gap-2">
                   <svg
                     className="w-3 h-3 text-zinc-500"
@@ -1103,16 +1041,7 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
                   </span>
                 </div>
               </div>
-              <div className="flex items-center justify-between text-[10px] pt-1">
-                <div className="flex items-center gap-1.5 font-mono">
-                  <span className="inline-block w-2 h-2 rounded-full bg-st-coral" />
-                  <span className="inline-block w-2 h-2 rounded-full bg-zinc-700" />
-                  <span className="inline-block w-2 h-2 rounded-full bg-zinc-700" />
-                  <span className="inline-block w-2 h-2 rounded-full bg-zinc-700" />
-                  <span className="ml-1 text-[9px] text-zinc-500">
-                    BAR 14.1
-                  </span>
-                </div>
+              <div className="flex items-center justify-end text-[10px] pt-1">
                 <div className="text-st-coral underline text-[10px] font-mono">
                   Reset Pitch & Tempo
                 </div>

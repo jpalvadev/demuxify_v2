@@ -534,9 +534,11 @@ describe("StemPlayer UI Component", () => {
     );
 
     expect(screen.getByTestId("click-track-rail")).toBeInTheDocument();
-    expect(screen.getByTestId("click-track-bpm-label")).toHaveTextContent(
-      "No Beat Grid"
-    );
+    // Stitch skin 08a: the lane keeps no BPM line of its own — the locked
+    // chip inside the picker is the readout — and with no Beat Grid and no
+    // ranked readings handed to this render there is no picker at all.
+    expect(screen.queryByTestId("click-track-bpm-label")).toBeNull();
+    expect(screen.queryByTestId("click-track-candidate-picker")).toBeNull();
     // The retired Meter control leaves no label behind (ADR-0011 Amendment).
     expect(screen.queryByTestId("click-track-meter-label")).toBeNull();
 
@@ -567,9 +569,9 @@ describe("StemPlayer UI Component", () => {
         onClickTrackState={(state) => {
           reported.push(state);
         }}
-        // Mix Tab cohesion (ADR-0013, ticket 08): the rail contract is pinned
-        // with ranked readings live, so a picker that slipped back into the
-        // lane would turn the absence assertions below red.
+        // Mix Tab cohesion (ADR-0013, ticket 08) + Stitch skin 08a: the rail
+        // contract is pinned with ranked readings live — the picker island
+        // rides INSIDE the lane, and the pins below name its chips.
         tempoCandidates={[
           { bpm: 107.7, confidence: 0.93 },
           { bpm: 215.4, confidence: 0.61 },
@@ -578,9 +580,13 @@ describe("StemPlayer UI Component", () => {
       />
     );
 
-    expect(screen.getByTestId("click-track-bpm-label")).toHaveTextContent(
-      "107.7 BPM"
-    );
+    // Stitch skin 08a: the card has no BPM line of its own — the locked
+    // candidate chip IS the readout of the Beat Grid.
+    expect(
+      screen.getByRole("button", {
+        name: /^beat grid locked to 107\.7 bpm$/i,
+      })
+    ).toBeInTheDocument();
     const liveSwitch = screen.getByRole("switch", { name: /^click track$/i });
     expect(liveSwitch.getAttribute("disabled")).toBeNull();
     fireEvent.click(liveSwitch);
@@ -592,17 +598,24 @@ describe("StemPlayer UI Component", () => {
     expect(
       within(railRoot).getAllByRole("switch", { name: /^click track$/i })
     ).toHaveLength(1);
-    // The dead M button would be the rail's only role-button: zero now.
-    expect(within(railRoot).queryAllByRole("button")).toHaveLength(0);
+    // Stitch skin 08a moved the ranked readings INSIDE the card, so the only
+    // role-buttons in the lane are the picker's two chips: the dead mute
+    // button would be a third.
+    const railButtons = within(railRoot).getAllByRole("button");
+    expect(railButtons).toHaveLength(2);
+    expect(railButtons.map((b) => b.getAttribute("aria-label"))).toEqual([
+      "Beat Grid locked to 107.7 BPM",
+      "Re-lock Beat Grid to 215.4 BPM",
+    ]);
     expect(
       within(railRoot).getAllByRole("slider", { name: /click track volume/i })
     ).toHaveLength(1);
-    // Mix Tab cohesion (ADR-0013, ticket 08): the candidate picker is its own
-    // Rail ahead of the Transport row, not a guest inside the lane — with the
-    // ranked readings above live, the picker island must still be absent here.
+    // Mix Tab cohesion (ADR-0013, ticket 08) + Stitch skin 08a: the picker
+    // island now rides inside the lane — the readings the card offers are the
+    // grid's own decision support, so it must be present here.
     expect(
-      within(railRoot).queryByTestId("click-track-candidate-picker")
-    ).toBeNull();
+      within(railRoot).getByTestId("click-track-candidate-picker")
+    ).toBeInTheDocument();
     const enabledRailState: ClickTrackMixerState = {
       enabled: true,
       volume: 1,
@@ -639,23 +652,30 @@ describe("StemPlayer UI Component", () => {
       />
     );
 
-    // The locked reading keeps its readout...
-    expect(screen.getByTestId("click-track-bpm-label")).toHaveTextContent(
-      "107.7 BPM"
-    );
-    // ...but the rail names the ranking rather than a certainty: a pulse and
-    // its metric doubling are indistinguishable, so the user picks the feel.
+    // The locked reading keeps its identity: the chip the Beat Grid is locked
+    // to names that lock (Stitch skin 08a erased the card's BPM line).
     expect(
-      screen.getByTestId("click-track-confidence-label")
-    ).toHaveTextContent("3 readings ranked");
+      screen.getByRole("button", {
+        name: /^beat grid locked to 107\.7 bpm$/i,
+      })
+    ).toBeInTheDocument();
+    // ...but the picker names the ranking rather than a certainty: a pulse and
+    // its metric doubling are indistinguishable, so the user picks the feel.
+    expect(screen.getByTestId("click-track-candidate-picker")).toHaveAttribute(
+      "aria-label",
+      "3 readings ranked · pick the feel you hear"
+    );
 
     const picker = screen.getByTestId("click-track-candidate-picker");
     const chips = within(picker).getAllByRole("button");
     expect(chips).toHaveLength(3);
+    // Stitch skin 08a: one compact uniform chip family — every reading shows
+    // its tempo and its own confidence, the locked one included, so no chip
+    // claims one BPM as certain.
     expect(chips.map((chip) => (chip.textContent ?? "").trim())).toEqual([
-      "107.7 BPM 93% CONFIDENCE",
-      "215.4 BPM 61% (2x Double)",
-      "72.0 BPM 34% Alternate",
+      "107.7 BPM 93% match",
+      "215.4 BPM 61% match",
+      "72.0 BPM 34% match",
     ]);
 
     // The Beat Grid is already locked to the top reading: that chip is
@@ -668,22 +688,21 @@ describe("StemPlayer UI Component", () => {
       "Re-lock Beat Grid to 215.4 BPM"
     );
 
-    // ADR-0013 (ticket 08): the picker is its own Rail — a named group, not a
-    // guest inside the Click Track lane — and it renders before the Transport
-    // row: the Mix stage reads hear-the-readings first.
-    const candidatesRail = screen.getByTestId("tempo-candidates-rail");
-    expect(candidatesRail).toHaveAttribute("role", "group");
-    expect(candidatesRail).toHaveAttribute(
-      "aria-label",
-      "Tempo Detector candidates (ranked)"
-    );
+    // ADR-0013 (ticket 08) + Stitch skin 08a: the ranked readings are the
+    // Click Track card's own named group — decision support for the grid the
+    // card is locked to, never loose chrome on the workspace surface — and the
+    // group still renders before the Transport row, so the Mix stage hears the
+    // readings before it ships the mix out.
+    const card = screen.getByTestId("click-track-rail");
+    expect(picker).toHaveAttribute("role", "group");
+    expect(
+      within(card).getAllByTestId("click-track-candidate-picker")
+    ).toHaveLength(1);
     const transportRow = screen.getByTestId("transport-row");
-    expect(candidatesRail.compareDocumentPosition(transportRow) & 4).not.toBe(
-      0
-    );
+    expect(picker.compareDocumentPosition(transportRow) & 4).not.toBe(0);
   });
 
-  it("says calibrated by hand for a hand-anchored grid: the BPM line owns the claim, the confidence line names the taps, never an auto reading", () => {
+  it("says calibrated by hand for a hand-anchored grid: the picker's accessible name owns the claim and names the taps, never an auto reading", () => {
     const handCalibration: CalibratedClickGrid = {
       kind: "calibrated",
       pulseSec: 0.5,
@@ -708,21 +727,19 @@ describe("StemPlayer UI Component", () => {
       />
     );
 
-    // The BPM line carries the claim: the grid reads at the tapped pulse,
-    // and it is owned as a hand decision.
-    expect(screen.getByTestId("click-track-bpm-label")).toHaveTextContent(
-      "120.0 BPM · calibrated by hand"
+    // The picker's accessible name carries the claim: the grid reads at the
+    // tapped pulse and it is owned as a hand decision.
+    // Stitch skin 08a moved the honest copy onto the picker group, and the
+    // card keeps no BPM line of its own.
+    expect(screen.getByTestId("click-track-candidate-picker")).toHaveAttribute(
+      "aria-label",
+      "calibrated by hand · your 4 taps anchor the grid"
     );
-
-    // The confidence line names the taps behind the grid: never the
-    // Detector's "solid reading" wording while a hand decision holds.
-    expect(
-      screen.getByTestId("click-track-confidence-label")
-    ).toHaveTextContent("calibrated by hand · your 4 taps anchor the grid");
+    expect(screen.queryByTestId("click-track-bpm-label")).toBeNull();
     expect(screen.queryByText(/solid reading/)).toBeNull();
 
-    // The candidate picker stays intact: hand calibration replaces the
-    // Beat Grid, it does not hide the Detector's ranked readings.
+    // The chip family stays intact: hand calibration replaces the Beat Grid,
+    // it does not hide the Detector's ranked readings.
     const picker = screen.getByTestId("click-track-candidate-picker");
     const chips = within(picker).getAllByRole("button");
     expect(chips).toHaveLength(2);

@@ -673,7 +673,9 @@ describe("App UI Shell", () => {
     // Deliberate untouched neighbors: the Tempo/Speed and Pitch Transposition
     // sub-boxes keep their ruled frames at every viewport (06e ports the mockup
     // hairline token: border-st-hairline replaces border-border/50), and
-    // the Click Track rail keeps its bordered lane look.
+    // the Click Track rail is lifted onto the same blanket card rule (08a:
+    // the mix card's own container must be visible against the card ground,
+    // so the translucent lane wash of 06/07 is no longer enough).
     const tempoSubBoxClasses =
       screen
         .getByTestId("current-tempo-label")
@@ -690,7 +692,11 @@ describe("App UI Shell", () => {
     });
     const railClasses =
       screen.getByTestId("click-track-rail").getAttribute("class") ?? "";
-    expect(railClasses).toContain("border border-st-hairline/40");
+    // Stitch skin 08a: the rail's rim is the blanket card rule, so the seam
+    // pins the opaque hairline and proves the /40 lane wash died.
+    expect(railClasses).toContain("border border-st-hairline");
+    expect(railClasses).toContain("bg-st-panel");
+    expect(railClasses.includes("border-st-hairline/40")).toBe(false);
   });
 
   it("keeps the Formant pill-slider dead in the composed Mix stage and homes the Mic chip on its label row", async () => {
@@ -1004,11 +1010,14 @@ describe("App UI Shell", () => {
       )
     ).toBeInTheDocument();
 
-    // Ticket 04: the recovered Beat Grid feeds the Mix tab's Click Track rail,
-    // so the rail resumes at the same locked tempo.
-    expect(screen.getByTestId("click-track-bpm-label")).toHaveTextContent(
-      "107.7 BPM"
-    );
+    // Ticket 04: the recovered Beat Grid feeds the Mix tab's Click Track card,
+    // so the card resumes at the same locked tempo — the locked candidate chip
+    // names it (Stitch skin 08a erased the separate BPM line).
+    expect(
+      screen.getByRole("button", {
+        name: /^beat grid locked to 107\.7 bpm$/i,
+      })
+    ).toBeInTheDocument();
     // Ticket 05: the rail resumes exactly as the saved Session left it — ON.
     const resumedRailSwitch = screen.getByRole("switch", {
       name: /^click track$/i,
@@ -1542,7 +1551,7 @@ describe("App UI Shell", () => {
     fireQueuedTempoCompletions();
     await waitFor(() => {
       expect(
-        screen.getByTestId("click-track-tempo-readout")
+        screen.getByTestId("click-track-candidate-picker")
       ).toBeInTheDocument();
     });
   };
@@ -1642,25 +1651,28 @@ describe("App UI Shell", () => {
     // Mix Tab cohesion (ADR-0013, ticket 08): one rail order at every
     // breakpoint — the stage reads in the order the work is done. The whole-app
     // seam walks the Mix stage top-down: Hand Calibration chrome (inline in the
-    // spine's meta bar, Stitch skin 07y) → spine → the Tempo Detector candidate
-    // picker (now its own Rail) → the Stem Strips → the Click Track lane →
-    // Time-Stretch; the master Transport row that used to close the section foot
-    // is erased from the hosted stage (Stitch skin 07j), so the chain ends at
+    // spine's meta bar, Stitch skin 07y) → spine canvas → the Stem Strips → the
+    // Click Track card with its ranked readings INSIDE it (Stitch skin 08a,
+    // ADR-0013 amendment) → Time-Stretch; the standalone readings rail and the
+    // master Transport row that used to close the section foot are erased from
+    // the hosted stage (Stitch skins 07j/08a), so the chain ends at
     // Time-Stretch.
     const tapStrip = within(mixTab).getByTestId("click-tap-calibration-strip");
-    const pickerRail = within(mixTab).getByTestId("tempo-candidates-rail");
     const firstStrip = within(mixTab).getAllByRole("group", {
       name: /stem$/i,
     })[0];
     const clickRail = within(mixTab).getByTestId("click-track-rail");
+    const pickerRail = within(clickRail).getByTestId(
+      "click-track-candidate-picker"
+    );
     const timeStretchPanel = within(mixTab).getByRole("slider", {
       name: /playback tempo/i,
     });
     for (const [earlier, later] of [
       [tapStrip, spine],
       [tapStrip, pickerRail],
-      [pickerRail, firstStrip],
       [firstStrip, clickRail],
+      [pickerRail, timeStretchPanel],
       [clickRail, timeStretchPanel],
     ]) {
       expect(earlier.compareDocumentPosition(later) & 4).not.toBe(0);
@@ -2261,16 +2273,22 @@ describe("App UI Shell", () => {
     try {
       await separateAndDetectTempo();
 
-      // The Beat Grid starts locked to the engine's top reading, and the
-      // rail says honestly that it ranked two readings.
-      expect(screen.getByTestId("click-track-bpm-label")).toHaveTextContent(
-        "107.7 BPM"
-      );
+      // The Beat Grid starts locked to the engine's top reading, and the card
+      // says honestly that it ranked two readings (Stitch skin 08a: the locked
+      // chip is the readout, the picker names the ranking).
       expect(
-        screen.getByTestId("click-track-confidence-label")
-      ).toHaveTextContent("2 readings ranked");
+        screen.getByRole("button", {
+          name: /^beat grid locked to 107\.7 bpm$/i,
+        })
+      ).toHaveAttribute("aria-pressed", "true");
+      expect(
+        screen.getByTestId("click-track-candidate-picker")
+      ).toHaveAttribute(
+        "aria-label",
+        "2 readings ranked · pick the feel you hear"
+      );
 
-      // The rail's picker asks for the metric doubling as a re-lock hint.
+      // The card's picker asks for the metric doubling as a re-lock hint.
       fireEvent.click(
         screen.getByRole("button", {
           name: /^re-lock beat grid to 215\.4 bpm$/i,
@@ -2278,12 +2296,14 @@ describe("App UI Shell", () => {
       );
       fireQueuedTempoCompletions();
 
-      // The new Beat Grid replaces the old one: the rail now reads the chosen
-      // feel, and the Session keeps working off that same result.
+      // The new Beat Grid replaces the old one: the card now marks the chosen
+      // feel locked, and the Session keeps working off that same result.
       await waitFor(() => {
-        expect(screen.getByTestId("click-track-bpm-label")).toHaveTextContent(
-          "215.4 BPM"
-        );
+        expect(
+          screen.getByRole("button", {
+            name: /^beat grid locked to 215\.4 bpm$/i,
+          })
+        ).toBeInTheDocument();
       });
 
       // The lock moved: the doubling is now informational and the pulse
@@ -2326,12 +2346,14 @@ describe("App UI Shell", () => {
         })
       );
 
-      // Mid-pass: nothing half-applied. The rail still reads the old grid,
-      // the Tab Shell is intact, and the Transport still drives the shared
-      // engine, so the heavy pass never blocks the Mix Tab.
-      expect(screen.getByTestId("click-track-bpm-label")).toHaveTextContent(
-        "107.7 BPM"
-      );
+      // Mid-pass: nothing half-applied. The locked chip still names the old
+      // grid, the Tab Shell is intact, and the Transport still drives the
+      // shared engine, so the heavy pass never blocks the Mix Tab.
+      expect(
+        screen.getByRole("button", {
+          name: /^beat grid locked to 107\.7 bpm$/i,
+        })
+      ).toBeInTheDocument();
       expect(screen.getAllByRole("navigation")).toHaveLength(1);
       expect(
         screen
@@ -2351,13 +2373,18 @@ describe("App UI Shell", () => {
       // abandoned pass is discarded, never resurrected as a stale grid.
       fireQueuedTempoCompletions();
       await waitFor(() => {
-        expect(screen.getByTestId("click-track-bpm-label")).toHaveTextContent(
-          "215.4 BPM"
-        );
+        expect(
+          screen.getByRole("button", {
+            name: /^beat grid locked to 215\.4 bpm$/i,
+          })
+        ).toBeInTheDocument();
       });
       expect(
-        screen.getByTestId("click-track-confidence-label")
-      ).toHaveTextContent("2 readings ranked");
+        screen.getByTestId("click-track-candidate-picker")
+      ).toHaveAttribute(
+        "aria-label",
+        "2 readings ranked · pick the feel you hear"
+      );
     } finally {
       vi.unstubAllGlobals();
     }
@@ -2369,9 +2396,11 @@ describe("App UI Shell", () => {
       await separateAndDetectTempo();
 
       const lockedTo = (bpm: string) =>
-        expect(screen.getByTestId("click-track-bpm-label")).toHaveTextContent(
-          `${bpm} BPM`
-        );
+        expect(
+          screen.getByRole("button", {
+            name: new RegExp(`^beat grid locked to ${bpm} bpm$`, "i"),
+          })
+        ).toBeInTheDocument();
       const actionable = (label: string) =>
         expect(
           screen.queryByRole("button", {
@@ -2474,11 +2503,13 @@ describe("App UI Shell", () => {
     try {
       await separateAndDetectTempo();
 
-      // The rail is live (the helper lands on the Mix tab with a Beat Grid):
-      // the grid readout still names the locked tempo…
-      expect(screen.getByTestId("click-track-bpm-label")).toHaveTextContent(
-        "107.7 BPM"
-      );
+      // The card is live (the helper lands on the Mix tab with a Beat Grid):
+      // the locked candidate chip still names the locked tempo…
+      expect(
+        screen.getByRole("button", {
+          name: /^beat grid locked to 107\.7 bpm$/i,
+        })
+      ).toBeInTheDocument();
       // …but nothing Downbeat-shaped survives anywhere on the rail (ADR-0011
       // Amendment): no Meter label, no Meter selector, no phase control, no
       // −/+ buttons, and no button phrased around a Downbeat.
@@ -2498,8 +2529,8 @@ describe("App UI Shell", () => {
   // Calibrate the Click (ticket 08): when the automatic readings are wrong,
   // the user taps four beats on the spine's timeline; confirm re-locks
   // through the same heavy-pass machinery with the derived BPM as hint, and
-  // the rail says "calibrated by hand" — never an auto reading.
-  it("anchors the Beat Grid by hand: four taps on the spine re-lock at the derived BPM and the rail says calibrated by hand", async () => {
+  // the picker says "calibrated by hand" — never an auto reading.
+  it("anchors the Beat Grid by hand: four taps on the spine re-lock at the derived BPM and the picker says calibrated by hand", async () => {
     vi.stubGlobal("Worker", StubTempoWorker);
     try {
       await separateAndDetectTempo();
@@ -2537,14 +2568,19 @@ describe("App UI Shell", () => {
       const startsBefore = tempoWorkerStarts.length;
       fireEvent.click(confirm);
 
-      // Mid-pass: nothing half-applied — the rail still reads the old grid
-      // and claims no by-hand decision yet.
-      expect(screen.getByTestId("click-track-bpm-label")).toHaveTextContent(
-        "107.7 BPM"
-      );
+      // Mid-pass: nothing half-applied — the locked chip still names the old
+      // grid and the picker claims no by-hand decision yet.
       expect(
-        screen.getByTestId("click-track-confidence-label")
-      ).toHaveTextContent("2 readings ranked");
+        screen.getByRole("button", {
+          name: /^beat grid locked to 107\.7 bpm$/i,
+        })
+      ).toBeInTheDocument();
+      expect(
+        screen.getByTestId("click-track-candidate-picker")
+      ).toHaveAttribute(
+        "aria-label",
+        "2 readings ranked · pick the feel you hear"
+      );
 
       // The re-lock went through the same heavy-pass seam with the derived
       // BPM as its hint (ticket 06 machinery extended, not bypassed).
@@ -2553,16 +2589,18 @@ describe("App UI Shell", () => {
 
       fireQueuedTempoCompletions();
       await waitFor(() => {
-        expect(screen.getByTestId("click-track-bpm-label")).toHaveTextContent(
-          "120.0 BPM · calibrated by hand"
+        expect(
+          screen.getByTestId("click-track-candidate-picker")
+        ).toHaveAttribute(
+          "aria-label",
+          "calibrated by hand · your 4 taps anchor the grid"
         );
       });
 
-      // The confidence line names the hand decision and its taps — never a
-      // Detector claim while calibrated.
-      expect(
-        screen.getByTestId("click-track-confidence-label")
-      ).toHaveTextContent("calibrated by hand · your 4 taps anchor the grid");
+      // The picker's accessible name carries the hand decision and its taps —
+      // never a Detector claim while calibrated (Stitch skin 08a moved the
+      // honest copy onto the picker group; the separate confidence line is
+      // gone, and the visible text still says no solid reading).
       expect(screen.queryByText(/solid reading/)).toBeNull();
 
       // Reset clears the taps: the strip returns to its invitation.
@@ -2608,15 +2646,20 @@ describe("App UI Shell", () => {
       const startsBefore = tempoWorkerStarts.length;
       fireEvent.click(confirm);
 
-      // Honest refusal: no Tempo Detector pass was started, and the rail
+      // Honest refusal: no Tempo Detector pass was started, and the card
       // keeps its automatic reading with no by-hand claim.
       expect(tempoWorkerStarts).toHaveLength(startsBefore);
-      expect(screen.getByTestId("click-track-bpm-label")).toHaveTextContent(
-        "107.7 BPM"
-      );
       expect(
-        screen.getByTestId("click-track-confidence-label")
-      ).toHaveTextContent("2 readings ranked");
+        screen.getByRole("button", {
+          name: /^beat grid locked to 107\.7 bpm$/i,
+        })
+      ).toBeInTheDocument();
+      expect(
+        screen.getByTestId("click-track-candidate-picker")
+      ).toHaveAttribute(
+        "aria-label",
+        "2 readings ranked · pick the feel you hear"
+      );
     } finally {
       vi.unstubAllGlobals();
     }
@@ -2660,12 +2703,13 @@ describe("App UI Shell", () => {
         { sampleCount: 700, hintBpm: undefined },
       ]);
 
-      // Delivering both replies leaves the rail on the re-detection's grid —
-      // and the abandoned Source Mix read is discarded, never resurrected.
+      // Delivering both replies leaves the card on the re-detection's grid —
+      // its picker island live again — and the abandoned Source Mix read is
+      // discarded, never resurrected.
       fireQueuedTempoCompletions();
       await waitFor(() => {
         expect(
-          screen.getByTestId("click-track-tempo-readout")
+          screen.getByTestId("click-track-candidate-picker")
         ).toBeInTheDocument();
       });
     } finally {
@@ -2700,7 +2744,8 @@ describe("App UI Shell", () => {
       await loadAndSeparate();
 
       // No stem pass is posted at all: the decode-time Source Mix read is the
-      // only pass, and its completion keeps the grid on the rail.
+      // only pass, and its completion keeps the grid — and the card's picker —
+      // live.
       expect(tempoWorkerStarts).toEqual([
         { sampleCount: 500, hintBpm: undefined },
       ]);
@@ -2708,7 +2753,7 @@ describe("App UI Shell", () => {
       fireQueuedTempoCompletions();
       await waitFor(() => {
         expect(
-          screen.getByTestId("click-track-tempo-readout")
+          screen.getByTestId("click-track-candidate-picker")
         ).toBeInTheDocument();
       });
     } finally {
