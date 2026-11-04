@@ -1642,8 +1642,9 @@ describe("App UI Shell", () => {
     // Mix Tab cohesion (ADR-0013, ticket 08): one rail order at every
     // breakpoint — the stage reads in the order the work is done. The whole-app
     // seam walks the Mix stage top-down: spine → Hand Calibration tap lane →
-    // the Tempo Detector candidate picker (now its own Rail) → the Transport
-    // row → the Stem Strips → the Click Track lane → Time-Stretch last.
+    // the Tempo Detector candidate picker (now its own Rail) → the Stem Strips
+    // → the Click Track lane → Time-Stretch → the master Transport row at the
+    // section foot (Stitch skin 07f, where the mockup puts its transport bar).
     const tapStrip = within(mixTab).getByTestId("click-tap-calibration-strip");
     const pickerRail = within(mixTab).getByTestId("tempo-candidates-rail");
     const transportRow = within(mixTab).getByTestId("transport-row");
@@ -1657,10 +1658,10 @@ describe("App UI Shell", () => {
     for (const [earlier, later] of [
       [spine, tapStrip],
       [tapStrip, pickerRail],
-      [pickerRail, transportRow],
-      [transportRow, firstStrip],
+      [pickerRail, firstStrip],
       [firstStrip, clickRail],
       [clickRail, timeStretchPanel],
+      [timeStretchPanel, transportRow],
     ]) {
       expect(earlier.compareDocumentPosition(later) & 4).not.toBe(0);
     }
