@@ -66,7 +66,7 @@ This repo has **no remote**. All branches and commits are local only; there is n
 
 ### Stitch Skin increment — screenshot-driven fidelity (added 2026-11-04, unattended run)
 
-The user left the session unattended: keep iterating until the app copies `stitch.html` (repo root — the Google Stitch mockup HTML, the DESIGN TRUTH for this increment; `desktop.png`/`mobile.png` at root are screenshots of the running app, not the mockup). Mandatory loop:
+The user left the session unattended: keep iterating until the app copies the DESIGN TRUTH, which now lives in `view_target/` (repo-root folder, created by the user 2026-11-04 — `view_target/stitch.html` is the Google Stitch mockup HTML, `view_target/desktop_stitch_target_design.png` and `view_target/mobile_stitch_target_design.png` are the mockup's own desktop/mobile renders: the VIEW TARGET). MANDATORY: `view_target/` is READ-ONLY — never write, overwrite, rename, delete or git-add anything inside it; the running app's own screenshots go to the temp PNG dir under `app-*` names (`scripts/shot.mjs`, `scripts/shot-mix.mjs`) and must never replace the targets. The loop:
 
 1. Boot the app (`npm run dev`, vite) in the background, screenshot the RUNNING app with Playwright at desktop (1440×900) and mobile (390×844) via `scripts/shot.mjs`, and screenshot the mockup itself (`file:///…/stitch.html`).
 2. `read` the PNGs (they render to the model), diff against `stitch.html` composition/class facts, patch the skin (App.tsx / components / tailwind.config.js / index.css ONLY — engine logic untouched), retarget the class-token test pins in the SAME commit, run all gates + `npm run test:report`, commit gated green on branch `stitch-skin`.

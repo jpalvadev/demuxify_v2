@@ -14,13 +14,13 @@ const shots = [
   ["app-mobile", "https://localhost:5174/", 390, 844],
   [
     "mockup-desktop",
-    "file:///C:/Programacion/demuxify_v2/stitch.html",
+    "file:///C:/Programacion/demuxify_v2/view_target/stitch.html",
     1440,
     900,
   ],
   [
     "mockup-mobile",
-    "file:///C:/Programacion/demuxify_v2/stitch.html",
+    "file:///C:/Programacion/demuxify_v2/view_target/stitch.html",
     390,
     844,
   ],
