@@ -690,7 +690,7 @@ describe("App UI Shell", () => {
     });
     const railClasses =
       screen.getByTestId("click-track-rail").getAttribute("class") ?? "";
-    expect(railClasses).toContain("border border-primary/30");
+    expect(railClasses).toContain("border border-st-hairline/40");
   });
 
   it("keeps the Formant pill-slider dead in the composed Mix stage and homes the Mic chip on its label row", async () => {

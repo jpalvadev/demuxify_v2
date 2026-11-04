@@ -724,9 +724,14 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
           aria-label="Click Track"
           data-testid="click-track-rail"
           className={cn(
-            "flex flex-col sm:flex-row items-stretch sm:items-center gap-3 rounded border border-primary/30 bg-secondary/40 p-3 transition-colors shadow-xs",
+            // Stitch skin 07p: the mockup renders the Click Track lane as a
+            // QUIET strip hugging the foot of the stem card (zinc surface on
+            // a hairline rim), never a coral-bordered box — the enabled state
+            // lifts to the mockup's surfaceLight instead of paying a coral
+            // frame; the enabled/disabled semantics stay in the aria state.
+            "flex flex-col sm:flex-row items-stretch sm:items-center gap-3 rounded border border-st-hairline/40 bg-st-panel/60 p-3 transition-colors shadow-xs",
             clickTrack.enabled
-              ? "border-primary/60 bg-secondary/70"
+              ? "border-st-hairline/90 bg-st-surface"
               : "opacity-80"
           )}
         >
@@ -735,7 +740,7 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
             <div
               className={cn(
                 "flex items-center gap-2 rounded border px-2.5 py-1 text-xs font-semibold shadow-xs",
-                "border-primary/40 bg-primary/10 text-primary"
+                "border-st-hairline bg-st-surface text-st-ink-dim"
               )}
             >
               <Music className="h-3.5 w-3.5 shrink-0" />

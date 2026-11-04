@@ -101,7 +101,7 @@ export const BeatGridTapCalibration: React.FC<BeatGridTapCalibrationProps> = ({
         // Mix Tab cohesion (ADR-0013): the card look is dead — the lane is a
         // thin strip on the spine's width and time axis: no border rhythm, no
         // outer padding, no height default. The decision contract stays whole.
-        "flex flex-col gap-1 items-center rounded bg-transparent px-0 py-0",
+        "flex flex-col gap-1 items-end rounded bg-transparent px-0 py-0",
         className
       )}
     >
@@ -114,9 +114,12 @@ export const BeatGridTapCalibration: React.FC<BeatGridTapCalibrationProps> = ({
         role="group"
         aria-label="Tap beats along the timeline"
         className={cn(
-          // Stitch skin 07i: the strip is a zinc lane on the mockup's hairline
-          // rhythm (border-brand-border + surface), not a coral-rimmed card.
-          "relative w-full overflow-hidden select-none rounded border border-st-hairline bg-st-surface focus-visible:outline-none",
+          // Stitch skin 07p: the mockup shows NO visible lane between the
+          // waveform and the BPM chips — its tap chrome is a one-line right
+          // row, so the live gesture strip fades to a phantom hairline on a
+          // panel wash (barely-there, like the mockup's phantom strips) and
+          // the lane's lines right-align under the spine.
+          "relative w-full overflow-hidden select-none rounded border border-st-hairline/30 bg-st-panel focus-visible:outline-none",
           disabled && "opacity-60 pointer-events-none"
         )}
         style={{ height: `${height}px` }}
