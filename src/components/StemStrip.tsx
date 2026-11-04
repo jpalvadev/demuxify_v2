@@ -36,6 +36,12 @@ const STEM_CONFIG: Record<
     label: string;
     icon: React.ComponentType<{ className?: string }>;
     badgeClass: string;
+    iso: string;
+    nameText: string;
+    isoText: string;
+    badgeBg: string;
+    waveBg: string;
+    dotGlow: string;
     activeColor: string;
     inactiveColor: string;
   }
@@ -46,6 +52,12 @@ const STEM_CONFIG: Record<
     badgeClass: "bg-stem-vocals/15 text-stem-vocals border-stem-vocals/40",
     activeColor: "#c084fc", // stem-vocals: hsl(270 95.2% 75.3%)
     inactiveColor: "rgba(192, 132, 252, 0.25)",
+    iso: "ISO-1",
+    nameText: "text-purple-300",
+    isoText: "text-purple-400/70",
+    badgeBg: "#1b1724",
+    waveBg: "#0d0c13",
+    dotGlow: "#c084fc",
   },
   drums: {
     label: "Drums",
@@ -53,6 +65,12 @@ const STEM_CONFIG: Record<
     badgeClass: "bg-stem-drums/15 text-stem-drums border-stem-drums/40",
     activeColor: "#818cf8", // stem-drums: hsl(234 89.5% 73.9%)
     inactiveColor: "rgba(129, 140, 248, 0.25)",
+    iso: "ISO-2",
+    nameText: "text-indigo-300",
+    isoText: "text-indigo-400/70",
+    badgeBg: "#171827",
+    waveBg: "#0b0c16",
+    dotGlow: "#818cf8",
   },
   bass: {
     label: "Bass",
@@ -60,6 +78,12 @@ const STEM_CONFIG: Record<
     badgeClass: "bg-stem-bass/15 text-stem-bass border-stem-bass/40",
     activeColor: "#f59e0b", // stem-bass: hsl(38 92.1% 50.2%)
     inactiveColor: "rgba(245, 158, 11, 0.25)",
+    iso: "ISO-3",
+    nameText: "text-amber-300",
+    isoText: "text-amber-400/70",
+    badgeBg: "#221c13",
+    waveBg: "#130f08",
+    dotGlow: "#f59e0b",
   },
   other: {
     label: "Other",
@@ -67,6 +91,12 @@ const STEM_CONFIG: Record<
     badgeClass: "bg-stem-other/15 text-stem-other border-stem-other/40",
     activeColor: "#22d3ee", // stem-other: hsl(188 85.7% 53.3%)
     inactiveColor: "rgba(34, 211, 238, 0.25)",
+    iso: "ISO-4",
+    nameText: "text-cyan-300",
+    isoText: "text-cyan-400/70",
+    badgeBg: "#121f24",
+    waveBg: "#091114",
+    dotGlow: "#22d3ee",
   },
 };
 
@@ -97,7 +127,6 @@ export const StemStrip: React.FC<StemStripProps> = ({
   const solo = settings?.solo ?? looseSolo ?? false;
 
   const config = STEM_CONFIG[stem];
-  const Icon = config.icon;
 
   // Compute waveform peaks if not provided
   const effectivePeaks = useMemo(() => {
@@ -157,7 +186,7 @@ export const StemStrip: React.FC<StemStripProps> = ({
 
     // Background fill
     ctx.clearRect(0, 0, width, canvasHeight);
-    ctx.fillStyle = isSilenced ? "#080a10" : "#0c101a";
+    ctx.fillStyle = isSilenced ? "#080a10" : config.waveBg; // Stitch skin: the mockup's per-stem tinted waveform field
     ctx.fillRect(0, 0, width, canvasHeight);
 
     const playheadRatio =
@@ -238,38 +267,53 @@ export const StemStrip: React.FC<StemStripProps> = ({
       role="group"
       aria-label={`${config.label} Stem`}
       className={cn(
-        "group flex flex-col sm:flex-row items-stretch sm:items-center gap-3 rounded border border-border bg-card/60 p-3 transition-colors shadow-xs",
+        "group flex flex-col sm:flex-row items-stretch sm:items-center rounded border border border-st-hairline/80 hover:border-zinc-700 transition-colors overflow-hidden bg-st-surface shadow-xs",
         isSilenced && "opacity-65 bg-card/30",
         className
       )}
     >
-      {/* Stem Label and Icon Badge */}
-      <div className="flex items-center gap-2 sm:w-32 shrink-0">
-        <div
-          className={cn(
-            "flex items-center gap-2 rounded border px-2.5 py-1 text-xs font-semibold shadow-xs",
-            config.badgeClass
-          )}
-        >
-          <Icon className="h-3.5 w-3.5 shrink-0" />
-          <span>{config.label}</span>
+      {/* Channel header badge (Stitch skin): the mockup's tinted badge column —
+            glowing stem dot + mono bold stem-tinted name + ISO identity tag. The
+            grizzly-era lucide stem icons are gone; the dot carries the identity. */}
+      <div
+        className="flex w-32 shrink-0 items-center px-3 justify-between rounded-none border-e border-st-hairline/80"
+        style={{ backgroundColor: config.badgeBg }}
+      >
+        <div className="flex items-center gap-2">
+          <span
+            aria-hidden="true"
+            className="h-2.5 w-2.5 rounded-full"
+            style={{
+              backgroundColor: config.activeColor,
+              boxShadow: `0 0 6px ${config.dotGlow}`,
+            }}
+          />
+          <span className={cn("font-mono font-bold text-xs", config.nameText)}>
+            {config.label}
+          </span>
         </div>
+        <span className={cn("text-[9px] font-mono", config.isoText)}>
+          {config.iso}
+        </span>
       </div>
 
-      {/* Waveform Canvas Area */}
+      {/* Waveform Display Area (Stitch skin): the mockup's borderless tinted
+            waveform field — the canvas paints the per-stem wash itself now. */}
       <div
         ref={containerRef}
         onClick={handleWaveformClick}
         role="presentation"
-        className="relative flex-1 rounded overflow-hidden border border-border/40 cursor-pointer shadow-inner min-w-[120px]"
+        className="relative flex-1 overflow-hidden cursor-pointer min-w-[120px]"
         style={{ height }}
       >
         <canvas ref={canvasRef} className="block w-full h-full" />
       </div>
 
-      {/* Mixer Controls: Mute & Solo buttons and Volume slider */}
-      <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0">
-        <div className="flex items-center gap-1.5">
+      {/* Channel Controls Rack (Stitch skin): the mockup's w-64 rack welded to
+            the field with a hairline; compact mono M/S caps, speaker, slider,
+            and a w-8 percent readout. Behavior, aria, and handlers untouched. */}
+      <div className="flex items-center px-3 space-x-3 w-64 shrink-0 bg-st-panel rounded-none border-s border-st-hairline/80">
+        <div className="flex items-center gap-1">
           <button
             type="button"
             aria-label={`Mute ${config.label}`}
@@ -277,10 +321,10 @@ export const StemStrip: React.FC<StemStripProps> = ({
             onClick={onToggleMute}
             title={`Mute ${config.label}`}
             className={cn(
-              "h-8 w-8 rounded border text-xs font-bold transition-all flex items-center justify-center",
+              "h-6 w-6 rounded border font-mono font-bold text-[10px] flex items-center justify-center transition-colors",
               muted
-                ? "border-destructive/60 bg-destructive text-destructive-foreground shadow-xs"
-                : "border-border/70 bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground"
+                ? "border-st-danger bg-st-danger text-st-surface"
+                : "border-zinc-700 bg-st-surface text-zinc-400 hover:text-white"
             )}
           >
             M
@@ -292,22 +336,24 @@ export const StemStrip: React.FC<StemStripProps> = ({
             onClick={onToggleSolo}
             title={`Solo ${config.label}`}
             className={cn(
-              "h-8 w-8 rounded border text-xs font-bold transition-all flex items-center justify-center",
+              "h-6 w-6 rounded border font-mono font-bold text-[10px] flex items-center justify-center transition-colors",
               solo
-                ? "border-primary/70 bg-muted text-foreground shadow-xs font-black"
-                : "border-border/70 bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground"
+                ? "border-st-coral bg-st-coral text-st-surface shadow-chip-glow"
+                : cn(
+                    "border-zinc-700 bg-st-surface hover:text-white",
+                    config.nameText
+                  )
             )}
           >
             S
           </button>
         </div>
 
-        {/* Volume Slider & Icon */}
-        <div className="flex items-center gap-2 w-32 sm:w-36">
+        <div className="flex-1 flex items-center gap-2">
           {muted || isSilenced ? (
-            <VolumeX className="h-4 w-4 text-muted-foreground/60 shrink-0" />
+            <VolumeX className="h-3 w-3 text-st-ink-faint shrink-0" />
           ) : (
-            <Volume2 className="h-4 w-4 text-muted-foreground shrink-0" />
+            <Volume2 className="h-3 w-3 text-zinc-400 shrink-0" />
           )}
           <input
             type="range"
@@ -319,7 +365,7 @@ export const StemStrip: React.FC<StemStripProps> = ({
             aria-label={`${config.label} Volume`}
             className="w-full accent-primary cursor-pointer h-1.5 bg-secondary rounded appearance-none"
           />
-          <span className="text-[11px] font-mono text-muted-foreground w-7 text-right">
+          <span className="font-mono text-[10px] text-st-ink-dim w-8 text-right">
             {Math.round(volume * 100)}%
           </span>
         </div>
