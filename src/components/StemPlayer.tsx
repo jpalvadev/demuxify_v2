@@ -531,10 +531,11 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
           role="group"
           aria-label="Tempo Detector candidates (ranked)"
           data-testid="tempo-candidates-rail"
-          // Stitch skin 07r band foot: the mockup's master panel ENDS on the
+          // Stitch skin 07r band foot + 07z seam rhythm: the mockup's master panel ENDS on the
           // bare BPM chip grid — the rail closes the band head's wash: same
-          // st-panel ground, hairline sides continued, rounded bottom only.
-          className="w-full flex flex-col items-stretch gap-2 rounded-b-lg border-x border-b border-st-hairline bg-st-panel px-3 pt-1 pb-3"
+          // st-panel ground, hairline sides continued, rounded bottom only; the
+          // -mt-3 cancels the stage seam's space-y-3 so the weld stays snug.
+          className="w-full -mt-3 flex flex-col items-stretch gap-2 rounded-b-lg border-x border-b border-st-hairline bg-st-panel px-3 pt-1 pb-3"
         >
           {/* Candidates readout (ticket 06): the Tempo Detector ranks a top
               reading plus ranked alternatives, each with its confidence, and a

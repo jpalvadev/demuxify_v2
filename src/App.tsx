@@ -114,7 +114,7 @@ const tabPanelClass = (gated: boolean, active: boolean) =>
   // 2026-11-04: "one container more than what we need" — delete it).
   gated || !active
     ? "hidden"
-    : "absolute inset-0 overflow-y-auto overflow-x-hidden py-3 transition-colors";
+    : "absolute inset-0 overflow-y-auto overflow-x-hidden space-y-3 transition-colors";
 
 export const App: React.FC = () => {
   // Dark-only contract (ticket 09): no theme state — html keeps `dark` forever
@@ -853,7 +853,7 @@ export const App: React.FC = () => {
           scrolling stage content from ghosting through. */}
       <nav
         aria-label="Tab Band"
-        className="sticky top-0 z-30 px-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between py-2 pb-3.5 sm:py-2.5 sm:pb-4 overflow-hidden w-full border-b border-st-hairline bg-st-panel"
+        className="sticky top-0 z-30 px-4 md:h-13 py-2 flex flex-col gap-2 md:flex-row md:items-center md:justify-between overflow-hidden w-full border-b border-st-hairline bg-st-panel"
       >
         <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-6 shrink-0">
           <BrandUnit />
@@ -964,7 +964,7 @@ export const App: React.FC = () => {
         </div>
       </nav>
 
-      <main className="flex-1 w-full mt-3 sm:mt-4 md:mt-5 px-4 flex flex-col gap-3 sm:gap-4 md:gap-5">
+      <main className="flex-1 w-full px-4 py-3 flex flex-col gap-3">
         {/* Tab stage: four pinned Tab panels, always present in the DOM; the
             stage shows only the ACTIVE Tab panel (artifact `.stage` + `.panel`). */}
         <div className="relative flex-1 min-h-[340px] overflow-hidden">
