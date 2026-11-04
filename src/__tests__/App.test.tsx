@@ -637,17 +637,15 @@ describe("App UI Shell", () => {
     expect(rootClasses).toContain("border");
     expect(rootClasses).toContain("border-st-hairline");
     expect(rootClasses).not.toMatch(/md:border/);
-    // Everything else on the root stays verbatim (no padding/spacing/bg drift).
+    // Stitch skin 07e: the root is now the mockup's section panel — bg-st-panel,
+    // p-3 rhythm, space-y-2.5 gaps, rounded-lg sweep (no blur, no lifted
+    // shadow). The ruling-everywhere invariant above still guards md: drift.
     for (const token of [
       "w-full",
-      "rounded",
-      "bg-card/70",
-      "p-3.5",
-      "sm:p-5",
-      "shadow-md",
-      "backdrop-blur-md",
-      "space-y-5",
-      "sm:space-y-6",
+      "rounded-lg",
+      "bg-st-panel",
+      "p-3",
+      "space-y-2.5",
     ]) {
       expect(rootClasses).toContain(token);
     }

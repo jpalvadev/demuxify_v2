@@ -519,7 +519,7 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
       role="region"
       aria-label="Stem Player"
       className={cn(
-        "w-full rounded border border-st-hairline bg-card/70 p-3.5 sm:p-5 shadow-md backdrop-blur-md space-y-5 sm:space-y-6",
+        "w-full rounded-lg border border-st-hairline bg-st-panel p-3 space-y-2.5",
         className
       )}
     >
@@ -662,14 +662,14 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
           {/* Time Display: strong mono readout (Bold port of the .tread row) */}
           <div
             data-testid="stem-player-time"
-            className="flex items-center gap-1 font-mono text-lg font-extrabold tracking-tight bg-secondary/60 px-3 py-1.5 rounded border border-border/60"
+            className="flex items-baseline gap-1.5 font-mono text-[11px] bg-st-canvas px-3 py-1 rounded border border-st-hairline"
             style={{ fontFamily: MONO_FONT_STACK }}
           >
-            <span className="text-primary font-bold">
+            <span className="text-white font-bold tracking-wider">
               {formatTime(currentTime)}
             </span>
-            <span className="text-muted-foreground/60">/</span>
-            <span className="text-muted-foreground">
+            <span className="text-zinc-500 text-xs">/</span>
+            <span className="text-zinc-400 text-xs">
               {formatTime(duration)}
             </span>
           </div>
@@ -689,8 +689,8 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
                 className={cn(
                   "relative flex h-11 w-11 items-center justify-center rounded-full border transition-all font-semibold shadow-sm active:scale-95",
                   isPlaying
-                    ? "bg-primary text-primary-foreground border-primary hover:bg-primary/90"
-                    : "bg-secondary/60 text-foreground border-border hover:bg-secondary"
+                    ? "bg-st-coral text-white border-st-coral shadow-play-glow hover:bg-st-coral"
+                    : "bg-st-panel text-zinc-300 border-st-hairline hover:bg-st-surface hover:text-white"
                 )}
               >
                 {isPlaying ? (
@@ -736,7 +736,7 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
                 aria-label="Export Stems"
                 title="Export isolated stems (WAV/MP3/ZIP)"
                 onClick={() => setIsExportDialogOpen(true)}
-                className="flex h-10 px-3.5 items-center justify-center gap-2 rounded border border-border bg-secondary/60 text-foreground font-medium shadow-xs hover:bg-secondary hover:border-primary/40 active:scale-95 transition-all text-xs sm:text-sm"
+                className="px-3 py-1 rounded border border-st-hairline bg-st-surface text-zinc-400 hover:text-white font-mono font-semibold text-[10px] flex items-center gap-2 transition-colors"
               >
                 <Download className="h-4 w-4 text-primary" />
                 <span>Export Stems</span>
@@ -745,8 +745,10 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
           </div>
 
           {/* Master Volume Slider */}
-          <div className="flex items-center gap-2 pl-2 border-l border-border/60">
-            <Volume2 className="h-4 w-4 text-muted-foreground" />
+          <div className="flex items-center gap-2 pl-2 border-s border-st-hairline/60">
+            <span className="font-mono text-[10px] uppercase font-semibold text-st-ink-dim shrink-0">
+              Master
+            </span>
             <input
               type="range"
               min={0}
@@ -759,7 +761,7 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
               aria-label="Master Volume"
               className="flex-1 min-w-[96px] accent-primary cursor-pointer h-1.5 bg-secondary rounded appearance-none"
             />
-            <span className="text-xs font-mono text-muted-foreground w-7 text-right">
+            <span className="font-mono text-[10px] font-bold text-zinc-200 w-7 text-right">
               {Math.round(masterVolume * 100)}%
             </span>
           </div>
