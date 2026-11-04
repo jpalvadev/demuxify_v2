@@ -1296,11 +1296,108 @@ export const App: React.FC = () => {
         </div>
       </main>
 
-      {/* Footer (ADR-0009): the red gradient slab and the 2px warn rule died
-          with the hero band; the page ends flat on one tan hairline — the
-          same token as the rail chip dividers. Stitch skin (ticket 05): the
-          footer's two micro lines died too — the marker is an empty element. */}
-      <footer className="w-full block border-t border-st-hairline py-3" />
+      {/* Footer transport (06c stitch.html port): the mockup master transport
+          bar renders verbatim as a DEAD PLACEHOLDER — data-mockup-placeholder
+          + aria-hidden on the bar itself; no handlers, no state; a later
+          cleanup commit erases it. The flat tan hairline cap (ticket 05) is
+          its border-t, same token as the Band chip dividers. */}
+      <footer
+        data-mockup-placeholder="true"
+        aria-hidden="true"
+        className="w-full flex items-center justify-between shrink-0 z-30 border-t border-st-hairline bg-st-panel px-3 sm:px-6 py-3 sm:py-2 sm:h-16"
+      >
+        <div className="flex items-center gap-4 w-72 shrink-0">
+          <div className="font-mono bg-st-canvas px-3 py-1.5 rounded border border-st-hairline flex items-baseline px-1.5">
+            <span className="text-white text-base font-bold tracking-wider">
+              00:51
+            </span>
+            <span className="text-zinc-500 text-xs">/</span>
+            <span className="text-zinc-400 text-xs">03:35</span>
+          </div>
+          <div className="flex flex-col">
+            <span className="text-[9px] font-mono uppercase tracking-widest text-st-ok flex items-center">
+              <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1 shadow-[0_0_6px_#34d399]" />
+              SYNC READY
+            </span>
+            <span className="text-[9px] font-mono text-zinc-500">
+              4 STEMS PHASE-LOCKED
+            </span>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="p-2 text-zinc-400 bg-st-surface rounded border border-st-hairline flex items-center justify-center">
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+              />
+            </svg>
+          </div>
+          <div className="p-2 text-zinc-300 bg-st-surface rounded border border-st-hairline flex items-center justify-center">
+            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M8.445 14.832A1 1 0 0010 14v-2.798l5.445 3.63A1 1 0 0017 14V6a1 1 0 00-1.555-.832L10 8.798V6a1 1 0 00-1.555-.832l-6 4a1 1 0 000 1.664l6 4z" />
+            </svg>
+          </div>
+          <div className="w-11 h-11 rounded-full bg-st-coral text-white flex items-center justify-center shadow-play-glow">
+            <svg
+              className="w-5 h-5 ml-0.5"
+              fill="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <polygon points="6 4 20 12 6 20 6 4" />
+            </svg>
+          </div>
+          <div className="p-2 text-zinc-300 bg-st-surface rounded border border-st-hairline flex items-center justify-center">
+            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M4.555 5.168A1 1 0 003 6v8a1 1 0 001.555.832L10 11.202V14a1 1 0 001.555.832l6-4a1 1 0 000-1.664l-6-4A1 1 0 0010 6v2.798L4.555 5.168z" />
+            </svg>
+          </div>
+          <div className="px-2.5 py-1.5 bg-st-surface border border-st-hairline rounded text-zinc-400 font-mono text-[10px] font-semibold flex items-center justify-center">
+            TAP
+          </div>
+        </div>
+        <div className="flex items-center gap-4 w-72 shrink-0 justify-end">
+          <div className="flex items-center gap-1">
+            <div className="flex flex-col gap-0.5">
+              <span className="inline-block w-1.5 h-1 bg-zinc-700" />
+              <span className="inline-block w-1.5 h-1 bg-emerald-500" />
+              <span className="inline-block w-1.5 h-1 bg-emerald-500" />
+              <span className="inline-block w-1.5 h-1 bg-emerald-400" />
+              <span className="inline-block w-1.5 h-1 bg-emerald-400" />
+              <span className="inline-block w-1.5 h-1 bg-emerald-400" />
+            </div>
+            <div className="flex flex-col gap-0.5">
+              <span className="inline-block w-1.5 h-1 bg-zinc-700" />
+              <span className="inline-block w-1.5 h-1 bg-zinc-700" />
+              <span className="inline-block w-1.5 h-1 bg-emerald-500" />
+              <span className="inline-block w-1.5 h-1 bg-emerald-400" />
+              <span className="inline-block w-1.5 h-1 bg-emerald-400" />
+              <span className="inline-block w-1.5 h-1 bg-emerald-400" />
+            </div>
+            <span className="font-mono text-[9px] text-zinc-500 ml-1">
+              0 dB
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-[10px] text-zinc-400 uppercase font-semibold">
+              Master
+            </span>
+            <div className="w-20 h-1 rounded bg-st-hairline relative">
+              <span className="absolute right-0 top-[-2px] w-1.5 h-2 rounded bg-st-surface-light" />
+            </div>
+            <span className="font-mono text-[10px] text-zinc-200 font-bold w-7 text-right">
+              100%
+            </span>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 };

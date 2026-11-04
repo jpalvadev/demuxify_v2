@@ -2223,8 +2223,9 @@ describe("App UI Shell", () => {
       screen.queryByText(/in-browser · nothing uploaded/i)
     ).not.toBeInTheDocument();
 
-    // Flat footer (ticket 05): one tan hairline with NOTHING under it — the
-    // band's copy died with its chrome; the footer's lines are 100% absent.
+    // Flat footer (ticket 05 + 06c mockup transport bar): one tan hairline cap;
+    // the 06c bar renders verbatim as aria-hidden dead placeholder chrome, still
+    // no copy lines under the hairline (100% absent).
     const footer = document.querySelectorAll("footer")[0];
     const footerClasses = (footer.getAttribute("class") ?? "").split(" ");
     expect(footerClasses).toContain("border-t");
@@ -2234,6 +2235,9 @@ describe("App UI Shell", () => {
       false
     );
     expect(footer.getAttribute("style") ?? "").not.toContain("gradient");
+    // 06c fidelity contract: the transport bar is marked dead placeholder.
+    expect(footer.getAttribute("data-mockup-placeholder")).toBe("true");
+    expect(footer.getAttribute("aria-hidden")).toBe("true");
     expect(screen.queryByText(/powered by/i)).toBeNull();
     expect(
       screen.queryByText(/client-side audio source separation/i)
