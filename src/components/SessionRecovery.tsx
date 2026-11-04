@@ -31,7 +31,7 @@ export const SessionRecovery: React.FC<SessionRecoveryProps> = ({
       aria-label="Previous Session Recovery"
       role="region"
       className={cn(
-        "rounded border border-border/60 bg-card/95 p-4 sm:p-5 shadow-sm backdrop-blur-sm transition-all",
+        "rounded border border-st-hairline bg-st-panel p-4 sm:p-5 shadow-sm transition-all",
         className
       )}
     >

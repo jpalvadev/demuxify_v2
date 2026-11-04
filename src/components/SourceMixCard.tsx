@@ -57,7 +57,7 @@ export const SourceMixCard: React.FC<SourceMixCardProps> = ({
   return (
     <div
       className={cn(
-        "rounded border border-border bg-card/90 p-5 shadow-sm backdrop-blur-sm transition-all sm:p-6",
+        "rounded border border-st-hairline bg-st-panel p-5 shadow-sm transition-all sm:p-6",
         className
       )}
     >

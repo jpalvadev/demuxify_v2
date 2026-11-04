@@ -1041,7 +1041,7 @@ export const App: React.FC = () => {
 
               {/* Decoding In-Progress Indicator */}
               {isDecoding && (
-                <div className="flex flex-col items-center justify-center rounded border border-border bg-card/60 p-12 text-center shadow-sm">
+                <div className="flex flex-col items-center justify-center rounded border border-st-hairline bg-st-panel p-12 text-center shadow-sm">
                   <Loader2 className="h-8 w-8 animate-spin text-primary mb-3" />
                   <h3 className="font-display text-base font-semibold text-foreground">
                     Decoding Audio Buffer
@@ -1133,7 +1133,7 @@ export const App: React.FC = () => {
                         {STEM_NAMES.map((stem) => (
                           <div
                             key={stem}
-                            className="flex items-center gap-2 rounded border border-border bg-card/80 p-3 shadow-xs"
+                            className="flex items-center gap-2 rounded border border-st-hairline bg-st-panel p-3 shadow-xs"
                           >
                             <Music
                               className={`h-4 w-4 shrink-0 text-stem-${stem}`}

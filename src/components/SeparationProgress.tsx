@@ -92,7 +92,7 @@ export const SeparationProgress: React.FC<SeparationProgressProps> = ({
     <div
       role="region"
       aria-label="Separation Progress"
-      className="relative overflow-hidden rounded border border-border bg-card p-6 shadow-md transition-all animate-in fade-in duration-300"
+      className="relative overflow-hidden rounded border border-st-hairline bg-st-panel p-6 shadow-md transition-all animate-in fade-in duration-300"
     >
       {/* Header Info */}
       <div className="flex items-center justify-between gap-4">

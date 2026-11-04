@@ -39,7 +39,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
     <div
       role="region"
       aria-label="Model Profile Selection"
-      className="rounded border border-border bg-card/60 p-4 shadow-xs space-y-3"
+      className="rounded border border-st-hairline bg-st-panel p-4 shadow-xs space-y-3"
     >
       <div className="flex items-center justify-between">
         <div>
@@ -128,7 +128,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
               className={`relative flex flex-col justify-between rounded border p-3.5 text-left transition-all ${
                 isSelected
                   ? "border-primary bg-primary/10 shadow-sm ring-1 ring-primary/30"
-                  : "border-border bg-card/40 hover:bg-muted/40 hover:border-border/80"
+                  : "border-st-hairline bg-st-panel hover:border-st-highlight"
               } ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
             >
               <div className="flex items-center justify-between w-full mb-1.5">

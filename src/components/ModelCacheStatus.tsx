@@ -40,7 +40,7 @@ export const ModelCacheStatus: React.FC = () => {
     <section
       role="region"
       aria-label="Model Cache Status"
-      className="w-full rounded border border-border/60 bg-card/60 p-3 space-y-2"
+      className="w-full rounded border border-st-hairline bg-st-panel p-3 space-y-2"
     >
       <div className="flex items-center gap-2 pb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
         <Download className="h-3.5 w-3.5" />

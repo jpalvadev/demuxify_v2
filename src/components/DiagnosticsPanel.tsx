@@ -63,7 +63,7 @@ export const DiagnosticsPanel: React.FC = () => {
     <section
       role="region"
       aria-label="System Diagnostics"
-      className="w-full rounded border border-border bg-card p-4 space-y-3"
+      className="w-full rounded border border-st-hairline bg-st-panel p-4 space-y-3"
     >
       {/* Header */}
       <div className="flex items-center justify-between gap-2 border-b border-border/60 pb-2">

@@ -94,7 +94,7 @@ export const SourceMixDropzone: React.FC<SourceMixDropzoneProps> = ({
             "group relative flex flex-col items-center justify-center rounded border-2 border-dashed p-10 text-center cursor-pointer transition-all duration-200 select-none min-h-[280px]",
             isDragOver
               ? "border-primary bg-primary/10 scale-[1.01]"
-              : "border-border bg-card/60 hover:border-primary/50 hover:bg-card/90"
+              : "border-st-hairline bg-st-panel hover:border-primary/50"
           )}
         >
           <div className="relative mb-4 flex h-16 w-16 items-center justify-center rounded bg-primary/10 text-primary transition-transform group-hover:scale-110">
@@ -151,7 +151,7 @@ export const SourceMixDropzone: React.FC<SourceMixDropzoneProps> = ({
           </div>
         </div>
       ) : (
-        <div className="rounded border border-border bg-card p-6 shadow-sm">
+        <div className="rounded border border-st-hairline bg-st-panel p-6 shadow-sm">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <div className="flex h-12 w-12 items-center justify-center rounded bg-secondary text-secondary-foreground">
