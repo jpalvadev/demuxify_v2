@@ -1,63 +1,21 @@
-/* Grizzlython skin (grz-01): faces bundled from the Wayback snapshot of
-   solana.com/grizzlython (web.archive.org 2023-07-13 capture, im_ raw woff2 URLs)
-   into public/fonts/grizzly. Declared with LOCAL urls only, so the offline-first
-   PWA never fetches a CDN font. Archivo/JetBrains names stay in the fallback
-   tails of the stacks (ticket 10 seam); their subsets are no longer shipped. */
+/* Stitch Skin (ticket 01): faces provisioned by scripts/provision-stitch-fonts.mjs
+   into public/fonts/stitch as variable latin-subset woff2 (Inter 400..700,
+   JetBrains Mono 400..700). Declared with LOCAL urls only, so the offline-first
+   PWA never fetches a CDN font; the grizzly-* faces and public/fonts/grizzly are
+   retired with this skin (ADR-0014 supersedes the Grizzlython record). */
 @font-face {
-  font-family: "Diatype";
+  font-family: "Inter";
   font-style: normal;
-  font-weight: 400;
+  font-weight: 400 700;
   font-display: block;
-  src: url("/fonts/grizzly/diatype-regular.woff2") format("woff2");
+  src: url("/fonts/stitch/inter-latin.woff2") format("woff2");
 }
 @font-face {
-  font-family: "Diatype";
+  font-family: "JetBrains Mono";
   font-style: normal;
-  font-weight: 500;
+  font-weight: 400 700;
   font-display: block;
-  src: url("/fonts/grizzly/diatype-medium.woff2") format("woff2");
-}
-@font-face {
-  font-family: "Diatype";
-  font-style: normal;
-  font-weight: 700;
-  font-display: block;
-  src: url("/fonts/grizzly/diatype-bold.woff2") format("woff2");
-}
-@font-face {
-  font-family: "DSemi";
-  font-style: normal;
-  font-weight: 400;
-  font-display: block;
-  src: url("/fonts/grizzly/dsemi-regular.woff2") format("woff2");
-}
-@font-face {
-  font-family: "DSemi";
-  font-style: normal;
-  font-weight: 500;
-  font-display: block;
-  src: url("/fonts/grizzly/dsemi-medium.woff2") format("woff2");
-}
-@font-face {
-  font-family: "DSemi";
-  font-style: normal;
-  font-weight: 700;
-  font-display: block;
-  src: url("/fonts/grizzly/dsemi-bold.woff2") format("woff2");
-}
-@font-face {
-  font-family: "BlenderPro";
-  font-style: normal;
-  font-weight: 400;
-  font-display: block;
-  src: url("/fonts/grizzly/blenderpro-book.woff2") format("woff2");
-}
-@font-face {
-  font-family: "BlenderPro";
-  font-style: normal;
-  font-weight: 700;
-  font-display: block;
-  src: url("/fonts/grizzly/blenderpro-bold.woff2") format("woff2");
+  src: url("/fonts/stitch/jetbrains-mono-latin.woff2") format("woff2");
 }
 
 @tailwind base;
@@ -65,63 +23,60 @@
 @tailwind utilities;
 
 @layer base {
-  /* Bold identity (OpenDesign ticket 01 run, dark-only contract) mapped onto
-     the shadcn HSL CSS-variable architecture: token names unchanged, values
-     retuned to the ticket 01 sheet (:root verbatim, hsl() components only). */
+  /* Stitch Skin palette (coral-on-black): the shadcn HSL-variable architecture
+     keeps its token names; the values below are the Stitch sheet. Grizzlython
+     identity values from the Wayback snapshot are gone with ADR-0014. */
   :root {
-    /* Grizzlython identity (grz-01): lifted verbatim from the Wayback snapshot
-       of solana.com/grizzlython (2023-07-13). black #161515 · cream #eae7dd
-       · tan #979385 · peach #f1b994 · coral #ef474a · deep red #c12f2f. */
-    --color-grizzly-black: 0 2% 8%;
-    --color-grizzly-tan-1: 46 23% 89%;
-    --color-grizzly-tan-2: 47 8% 56%;
-    --color-grizzly-peach: 23 77% 76%;
-    --color-grizzly-red: 358 84% 61%;
-    --color-grizzly-deep-red: 358 61% 47%;
+    --background: 240 9.7% 6.1%;
+    --foreground: 216 12.2% 83.9%;
+    --card: 240 9.1% 8.6%;
+    --card-foreground: 216 12.2% 83.9%;
+    --popover: 240 11.1% 14.1%;
+    --popover-foreground: 216 12.2% 83.9%;
+    --primary: 359 92.3% 64.5%;
+    --primary-foreground: 240 20% 7%;
+    --secondary: 240 12.7% 10.8%;
+    --secondary-foreground: 217 10.6% 66.7%;
+    --muted: 240 12.7% 10.8%;
+    --muted-foreground: 217 10.6% 66.7%;
+    --accent: 359 92.3% 64.5%;
+    --accent-foreground: 240 20% 7%;
+    --destructive: 359 92.3% 64.5%;
+    --destructive-foreground: 240 20% 7%;
+    --border: 240 10% 15.7%;
+    --input: 240 12.7% 10.8%;
+    --ring: 359 92.3% 64.5%;
+    --radius: 0.5rem;
 
-    /* Grizzly chrome ramp (grz-15/18): the named chrome-only ramp behind the
-       System-Tab band, rail hairlines and chrome-0 radii. Same HSL components
-       as the identity set — no surface reads the default Tailwind palette. */
-    --grz-01: 358 84% 61%;
-    --grz-02: 46 23% 89%;
-    --grz-03: 47 8% 56%;
-    --grz-04: 0 2% 8%;
-    --grz-05: 23 77% 76%;
-    --grz-600: 358 61% 47%;
-    --background: 0 2% 8%;
-    --foreground: 46 23% 89%;
-    --card: 0 2% 12%;
-    --card-foreground: 46 23% 89%;
-    --popover: 0 2% 16%;
-    --popover-foreground: 46 23% 89%;
-    --primary: 358 84% 61%;
-    --primary-foreground: 46 23% 89%;
-    --secondary: 0 2% 16%;
-    --secondary-foreground: 47 8% 56%;
-    --muted: 0 2% 16%;
-    --muted-foreground: 47 8% 56%;
-    --accent: 358 84% 61%;
-    --accent-foreground: 46 23% 89%;
-    --destructive: 358 84% 61%;
-    --destructive-foreground: 46 23% 89%;
-    --border: 47 8% 44%;
-    --input: 0 2% 16%;
-    --ring: 358 84% 61%;
-    --radius: 0;
+    /* Stitch chrome ramp: the named surfaces behind the Tab Band, stage panels
+       and hairlines. Same HSL-component convention as every identity token —
+       no surface reads the default Tailwind palette. */
+    --st-canvas: 240 9.7% 6.1%;
+    --st-body: 240 10.3% 5.7%;
+    --st-panel: 240 9.1% 8.6%;
+    --st-surface: 240 12.7% 10.8%;
+    --st-surface-light: 240 11.1% 14.1%;
+    --st-hairline: 240 10% 15.7%;
+    --st-highlight: 240 10.7% 22%;
+    --st-coral: 359 92.3% 64.5%;
+    --st-coral-hover: 359 100% 69.2%;
+    --st-ink: 216 12.2% 83.9%;
+    --st-ink-dim: 217 10.6% 66.7%;
+    --st-ok: 158 64.4% 51.6%;
+    --st-warn: 43 96.4% 56.3%;
+    --st-waveform-box: 240 13% 4.5%;
 
-    /* Stem quartet (ticket 01 --stem-* tokens): the one identity set used
-       consistently across stem chips, waveform canvases and stem strips. */
-    --stem-vocals: 320 88% 64%;
-    --stem-drums: 264 84% 70%;
-    --stem-bass: 34 95% 60%;
-    --stem-other: 196 86% 62%;
+    /* Stem quartet (retuned for Stitch Skin, class names kept): the one
+       identity set used across stem chips, waveform canvases and strips. */
+    --stem-vocals: 270 95.2% 75.3%;
+    --stem-drums: 234 89.5% 73.9%;
+    --stem-bass: 38 92.1% 50.2%;
+    --stem-other: 188 85.7% 53.3%;
 
-    /* Status hues (ticket 01 --ok/--warn tokens): the declared set behind every
-       ok / caution surface, so no surface reads the default Tailwind palette. */
-    /* Grz status roles: ok reads peach (the snapshot highlight ink), warn
-       reads the deep-red footer hue so alerts never leave the identity. */
-    --status-ok: 23 77% 76%;
-    --status-warn: 358 61% 47%;
+    /* Status hues (retuned for Stitch Skin): emerald ok + amber warn, so the
+       honest transport pip and caution surfaces stay off the coral family. */
+    --status-ok: 158 64.4% 51.6%;
+    --status-warn: 43 96.4% 56.3%;
   }
 }
 
@@ -134,17 +89,17 @@
   }
 }
 
-/* Dark-only chrome (ADR-0007 / ticket 09): the near-black canvas must not
-   float bright white UA scrollbars or light form controls. `color-scheme:
-   dark` themes the UA widgets; the rules below give the stage panels a
-   slim border-tinted scrollbar instead of the default chunky light one. */
+/* Dark-only chrome: the near-black canvas must not float bright white UA
+   scrollbars or light form controls. `color-scheme: dark` themes the UA
+   widgets; the rules below give the stage panels a slim hairline-tinted
+   scrollbar instead of the default chunky light one. */
 :root {
   color-scheme: dark;
 }
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: hsl(var(--border)) transparent;
+  scrollbar-color: hsl(var(--st-hairline)) transparent;
 }
 
 ::-webkit-scrollbar {
@@ -157,46 +112,33 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: hsl(var(--border));
+  background: hsl(var(--st-hairline));
   border: 2px solid transparent;
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--color-grizzly-tan-2));
+  background: hsl(var(--st-highlight));
 }
 
-/* Grizzlython skin chrome (grz-02): primitives ported from the OpenDesign
-   grizzlython-skin artifact (Bold design-system plugin). Zero-radius chips come
-   from the token retune (--radius: 0) plus rounded-none utilities; the rules
-   below add the canvas grid, the brand pulse, and the Separate-tab hero rule.
-   (The hero band is now an IN-FLOW slim band ported from the grz-03 run-7
-   artifact `separate-header-grizzly.html`; the old fading-mask variant painted
-   over the header type and erased its hairline seam — see that ticket.) */
-.grizzly-grid {
-  background-image:
-    linear-gradient(
-      hsl(var(--color-grizzly-tan-2) / 0.06) 1px,
-      transparent 1px
-    ),
-    linear-gradient(
-      90deg,
-      hsl(var(--color-grizzly-tan-2) / 0.06) 1px,
-      transparent 1px
-    );
-  background-size: 32px 32px;
+/* Slider thumbs read as the coral control glyph on the black canvas: a
+   12px pill with the skin's glow, replacing the invisible UA thumb. */
+input[type="range"]::-webkit-slider-thumb {
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 9999px;
+  background: hsl(var(--st-coral));
+  box-shadow: 0 0 8px hsl(var(--st-coral) / 0.55);
+  cursor: pointer;
 }
 
-.grizzly-pulse {
-  animation: grizzly-pulse 2.4s ease-in-out infinite;
-}
-
-@keyframes grizzly-pulse {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.35;
-  }
+input[type="range"]::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border: none;
+  border-radius: 9999px;
+  background: hsl(var(--st-coral));
+  box-shadow: 0 0 8px hsl(var(--st-coral) / 0.55);
+  cursor: pointer;
 }

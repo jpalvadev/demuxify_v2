@@ -12,14 +12,14 @@ export const FallbackAdvisory: React.FC<FallbackAdvisoryProps> = ({
   return (
     <div
       role="alert"
-      className="rounded-none border border-status-warn/30 bg-status-warn/10 p-4 text-status-warn shadow-sm transition-all"
+      className="rounded border border-status-warn/30 bg-status-warn/10 p-4 text-status-warn shadow-sm transition-all"
     >
       <div className="flex items-start gap-3">
         <AlertCircle className="w-5 h-5 text-status-warn mt-0.5 shrink-0" />
         <div className="space-y-1 text-sm">
           <div className="font-semibold text-status-warn flex items-center gap-2">
             <span>Running in CPU/WASM Fallback Mode</span>
-            <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-none bg-status-warn/20 text-status-warn font-mono">
+            <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded bg-status-warn/20 text-status-warn font-mono">
               <Cpu className="w-3 h-3" /> WASM
             </span>
           </div>

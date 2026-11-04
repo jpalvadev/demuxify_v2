@@ -107,7 +107,7 @@ const tabPanelClass = (gated: boolean, active: boolean) =>
   // display-hidden inside the stage.
   gated || !active
     ? "hidden"
-    : "absolute inset-0 overflow-y-auto overflow-x-hidden rounded-none border border-muted-foreground/60 bg-card/80 p-4 sm:px-6 sm:py-6 transition-colors";
+    : "absolute inset-0 overflow-y-auto overflow-x-hidden rounded border border-muted-foreground/60 bg-card/80 p-4 sm:px-6 sm:py-6 transition-colors";
 
 export const App: React.FC = () => {
   // Dark-only contract (ticket 09): no theme state — html keeps `dark` forever
@@ -803,7 +803,7 @@ export const App: React.FC = () => {
   };
 
   return (
-    <div className="grizzly-grid min-h-screen bg-background text-foreground flex flex-col font-sans transition-colors duration-200">
+    <div className="bg-st-canvas min-h-screen bg-background text-foreground flex flex-col font-sans transition-colors duration-200">
       {/* Rail-hosted chrome (ADR-0009, ticket 02): the page-level header is dead at
           every breakpoint — identity and navigation now live in the single sticky Tab
           Rail block below, a brand row over the four-chip Tab row. */}
@@ -811,19 +811,20 @@ export const App: React.FC = () => {
       {/* Full-bleed shell (artifact `.app`: no max-width; rail + stage fill the
           viewport; at md+ the rail is a fixed column beside the fluid stage). */}
       <main className="flex-1 w-full px-2 sm:px-6 flex flex-col gap-4 md:flex-row md:gap-5">
-        {/* Tab rail: ONE sticky top block at every breakpoint (ADR-0009 ticket 02).
-            Mobile portrait: brand row (col-span-4) over the four-chip Tab row inside
-            this same block; at md+ it becomes the fixed vertical rail column beside
-            the stage. Sticky + z-30 replaces the dead page-level header's pinning;
-            mobile paints the header's old chrome backdrop so scrolling stage content
-            never ghosts through the pinned block. */}
+        {/* Tab Band (ADR-0014 supersedes ADR-0007/ADR-0009): ONE sticky 4-up band
+            at every breakpoint — the mobile composition promoted to desktop. The
+            brand row (col-span-4) sits over the four-chip Tab row inside the same
+            block; the vertical rail column and the two-column md shell are dead.
+            Sticky + z-30 keeps the pinned chrome; the blurred canvas backdrop
+            keeps scrolling stage content from ghosting through the band. */}
         <nav
-          aria-label="Tab rail"
-          className="sticky top-0 z-30 grid grid-cols-4 gap-1 items-stretch py-2.5 pb-4 overflow-hidden w-full backdrop-blur-md bg-background/95 md:bg-card/50 sm:grid-cols-[112px_112px_112px_112px] md:grid-cols-[112px_112px_112px_112px] md:w-[250px] lg:w-[280px] md:flex md:flex-col md:no-wrap md:justify-start md:items-start md:gap-2.5 md:border-r md:border-grz-600/40"
+          aria-label="Tab Band"
+          className="sticky top-0 z-30 grid grid-cols-4 gap-1 items-stretch py-2.5 pb-4 overflow-hidden w-full backdrop-blur-md bg-background/95 md:bg-card/50 md:gap-1"
         >
-          {/* Brand Unit at the rail head: same lockup everywhere; on mobile the col-span-4
-              puts it on its own row above the four chips; the mono tagline line is rail-hosted
-              only (hidden md:block — the mobile lockup stays reduced at ~108px total). */}
+          {/* Brand Unit at the Band head: the wordmark cell owns its grid slot at
+              every breakpoint (col-span-4 puts it on its own row above the four
+              chips); the mono tagline line stays Band-hosted so the mobile lockup
+              remains reduced. */}
           <BrandUnit />
           {TAB_REGISTRY.map((tab) => {
             const gated = tab.gatedUntilStems && !stemsReady;
@@ -834,8 +835,9 @@ export const App: React.FC = () => {
                 type="button"
                 aria-label={tab.title}
                 aria-current={active ? "true" : undefined}
+                aria-disabled={gated ? true : undefined}
                 onClick={() => handleSelectTab(tab.id)}
-                className={`flex flex-col items-center justify-center gap-1 rounded-none px-[3px] py-2 min-h-[44px] min-w-[44px] text-[7px] sm:text-[9px] md:text-sm font-bold uppercase tracking-[0.2em] text-muted-foreground border border-grz-600/40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:w-full md:px-3 md:py-2.5 md:text-sm md:flex-row md:justify-start md:items-center md:gap-3 ${gated ? "opacity-50 text-muted-foreground" : ""} ${active ? "bg-primary text-primary-foreground border-primary" : ""}`.trim()}
+                className={`flex flex-col items-center justify-center gap-0.5 rounded-full px-2 py-1.5 min-h-[44px] min-w-[44px] text-[9px] md:text-sm font-bold uppercase tracking-[0.2em] text-st-ink-dim border border-st-hairline transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${gated ? "opacity-50 text-muted-foreground" : ""} ${active ? "bg-primary text-primary-foreground border-primary" : ""}`.trim()}
               >
                 <span className="whitespace-nowrap">{tab.title}</span>
                 {gated && (
@@ -891,7 +893,7 @@ export const App: React.FC = () => {
               {decodeError && (
                 <div
                   role="alert"
-                  className="flex items-start gap-3 rounded-none border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive"
+                  className="flex items-start gap-3 rounded border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive"
                 >
                   <AlertCircle className="h-5 w-5 shrink-0 mt-0.5" />
                   <div className="flex-1">
@@ -903,7 +905,7 @@ export const App: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setDecodeError(null)}
-                    className="rounded-none border border-destructive/20 px-2 py-1 text-xs font-medium hover:bg-destructive/20 transition-colors"
+                    className="rounded border border-destructive/20 px-2 py-1 text-xs font-medium hover:bg-destructive/20 transition-colors"
                   >
                     Dismiss
                   </button>
@@ -938,7 +940,7 @@ export const App: React.FC = () => {
 
               {/* Decoding In-Progress Indicator */}
               {isDecoding && (
-                <div className="flex flex-col items-center justify-center rounded-none border border-border bg-card/60 p-12 text-center shadow-sm">
+                <div className="flex flex-col items-center justify-center rounded border border-border bg-card/60 p-12 text-center shadow-sm">
                   <Loader2 className="h-8 w-8 animate-spin text-primary mb-3" />
                   <h3 className="font-display text-base font-semibold text-foreground">
                     Decoding Audio Buffer
@@ -1018,7 +1020,7 @@ export const App: React.FC = () => {
                     <div
                       role="region"
                       aria-label="Separation Complete"
-                      className="rounded-none border border-status-ok/30 bg-status-ok/10 p-5 shadow-sm space-y-3"
+                      className="rounded border border-status-ok/30 bg-status-ok/10 p-5 shadow-sm space-y-3"
                     >
                       <div className="flex items-center gap-2.5 text-status-ok">
                         <CheckCircle2 className="h-5 w-5 shrink-0" />
@@ -1030,7 +1032,7 @@ export const App: React.FC = () => {
                         {STEM_NAMES.map((stem) => (
                           <div
                             key={stem}
-                            className="flex items-center gap-2 rounded-none border border-border bg-card/80 p-3 shadow-xs"
+                            className="flex items-center gap-2 rounded border border-border bg-card/80 p-3 shadow-xs"
                           >
                             <Music className="h-4 w-4 text-primary shrink-0" />
                             <div>
@@ -1204,7 +1206,7 @@ export const App: React.FC = () => {
                   and grz-02 Mixer (smaller ears, cocked brow, carries a machete). */
               <div
                 data-testid="header-band"
-                className="grid items-center gap-3 rounded-none border border-grz-600/40 bg-card/40 px-3 py-2 mb-3.5"
+                className="grid items-center gap-3 rounded border border-st-hairline bg-card/40 px-3 py-2 mb-3.5"
               >
                 <h2
                   className="font-display text-[15px] leading-[18px] font-bold uppercase tracking-[0.07em] text-foreground sm:text-[22px] sm:leading-[26px] sm:tracking-[0.06em]"
@@ -1289,7 +1291,7 @@ export const App: React.FC = () => {
       {/* Footer (ADR-0009): the red gradient slab and the 2px warn rule died
           with the hero band; the page ends flat on one tan hairline — the
           same token as the rail chip dividers and the System band border. */}
-      <footer className="w-full block border-t border-grz-600/40 py-3 text-center text-[10px] text-muted-foreground">
+      <footer className="w-full block border-t border-st-hairline py-3 text-center text-[10px] text-muted-foreground">
         <p>
           <span className="block">
             Demuxify Web • 100% Client-Side Audio Source Separation

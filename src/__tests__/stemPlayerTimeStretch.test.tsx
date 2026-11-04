@@ -314,7 +314,7 @@ describe("StemPlayer Time-Stretch & Pitch Controls", () => {
     for (const token of [
       "h-8",
       "w-8",
-      "rounded-none",
+      "rounded",
       "border",
       "flex items-center justify-center",
       "transition-all",

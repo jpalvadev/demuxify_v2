@@ -40,7 +40,7 @@ export const ModelCacheStatus: React.FC = () => {
     <section
       role="region"
       aria-label="Model Cache Status"
-      className="w-full rounded-none border border-border/60 bg-card/60 p-3 space-y-2"
+      className="w-full rounded border border-border/60 bg-card/60 p-3 space-y-2"
     >
       <div className="flex items-center gap-2 pb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
         <Download className="h-3.5 w-3.5" />
@@ -52,7 +52,7 @@ export const ModelCacheStatus: React.FC = () => {
           return (
             <div
               key={profile.id}
-              className="flex items-center justify-between gap-2 rounded-none border border-border/60 bg-secondary/40 px-2.5 py-1.5"
+              className="flex items-center justify-between gap-2 rounded border border-border/60 bg-secondary/40 px-2.5 py-1.5"
             >
               <span className="text-xs text-foreground">
                 {profile.name} · ~{profile.estimatedSizeMb} MB

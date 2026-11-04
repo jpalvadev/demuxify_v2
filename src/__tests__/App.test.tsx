@@ -116,7 +116,7 @@ describe("App UI Shell", () => {
 
     // One shell chrome region: the Tab Rail is the only navigation, the page-level
     // <header> is gone for good (ticket 02), and the rail itself carries the pinning.
-    const rail = screen.getByRole("navigation", { name: /tab rail/i });
+    const rail = screen.getByRole("navigation", { name: /tab band/i });
     expect(screen.getAllByRole("navigation")).toHaveLength(1);
     expect(screen.queryByRole("header")).toBeNull();
 
@@ -252,7 +252,7 @@ describe("App UI Shell", () => {
       expect(
         screen.queryByRole("slider", { name: /master waveform timeline/i })
       ).toBeNull();
-      const rail = screen.getByRole("navigation", { name: /tab rail/i });
+      const rail = screen.getByRole("navigation", { name: /tab band/i });
       const mixChip = within(rail).getByRole("button", { name: /^Mix$/i });
       expect(mixChip.getAttribute("class") ?? "").toContain("opacity-50");
     });
@@ -635,7 +635,7 @@ describe("App UI Shell", () => {
     // Everything else on the root stays verbatim (no padding/spacing/bg drift).
     for (const token of [
       "w-full",
-      "rounded-none",
+      "rounded",
       "bg-card/70",
       "p-4",
       "sm:p-6",
@@ -656,12 +656,7 @@ describe("App UI Shell", () => {
       resetControl.parentElement?.parentElement?.getAttribute("class") ?? "";
     expect(wrapperClasses).toContain("md:border-border/60");
     expect(wrapperClasses).not.toMatch(/(^|\s)border(-border)?(\/60)?(\s|:|$)/);
-    for (const token of [
-      "rounded-none",
-      "bg-secondary/30",
-      "p-4",
-      "space-y-4",
-    ]) {
+    for (const token of ["rounded", "bg-secondary/30", "p-4", "space-y-4"]) {
       expect(wrapperClasses).toContain(token);
     }
 
@@ -891,7 +886,7 @@ describe("App UI Shell", () => {
     ).not.toBeInTheDocument();
 
     // Resuming lands the shell on the Mix Tab, where the Stem Player lives
-    const rail = screen.getByRole("navigation", { name: /tab rail/i });
+    const rail = screen.getByRole("navigation", { name: /tab band/i });
     expect(
       within(rail).getByRole("button", { name: /^Mix$/i })
     ).toHaveAttribute("aria-current", "true");
@@ -1080,7 +1075,7 @@ describe("App UI Shell", () => {
     expect(
       screen.getByText(/drag and drop your source mix/i)
     ).toBeInTheDocument();
-    const rail = screen.getByRole("navigation", { name: /tab rail/i });
+    const rail = screen.getByRole("navigation", { name: /tab band/i });
     for (const gatedName of ["Mix", "Export"]) {
       const chip = within(rail).getByRole("button", { name: gatedName });
       expect(chip.getAttribute("class") ?? "").toContain("opacity-50");
@@ -1270,7 +1265,7 @@ describe("App UI Shell", () => {
       expect(screen.getByText(/webgpu active/i)).toBeInTheDocument();
     });
 
-    const rail = screen.getByRole("navigation", { name: /tab rail/i });
+    const rail = screen.getByRole("navigation", { name: /tab band/i });
     const railEntries = within(rail).getAllByRole("button");
     expect(railEntries).toHaveLength(4);
     expect(
@@ -1294,8 +1289,8 @@ describe("App UI Shell", () => {
     // chip, no rounded corner
     for (const entry of railEntries) {
       const classes = entry.getAttribute("class") ?? "";
-      expect(classes).not.toMatch(/(^|\s)rounded(?!-none)/);
-      expect(classes).toContain("border-grz-600/40");
+      expect(classes).toContain("rounded-full");
+      expect(classes).toContain("border-st-hairline");
     }
 
     // The Listen surface is gone: no Listen button, region, or banner anywhere
@@ -1324,7 +1319,7 @@ describe("App UI Shell", () => {
 
     render(<App />);
 
-    const rail = screen.getByRole("navigation", { name: /tab rail/i });
+    const rail = screen.getByRole("navigation", { name: /tab band/i });
     const gatedEntries = ["Mix", "Export"].map((name) =>
       within(rail).getByRole("button", { name })
     );
@@ -1376,15 +1371,15 @@ describe("App UI Shell", () => {
     ).toHaveAttribute("aria-checked", "false");
   });
 
-  it("keeps the shell chrome contract: clipped stage and fixed 112px rail cells", async () => {
+  it("keeps the shell chrome contract: clipped stage and four-up Tab Band cells", async () => {
     render(<App />);
 
-    const rail = screen.getByRole("navigation", { name: /tab rail/i });
-    // Four Tab cells, each a fixed 112px chip
+    const rail = screen.getByRole("navigation", { name: /tab band/i });
+    // Tab Band (ADR-0014): an equal four-up grid at EVERY breakpoint — the
+    // fixed 112px cells and the md vertical-column override are dead.
     expect(rail.getAttribute("class") ?? "").toContain("grid-cols-4");
-    expect(rail.getAttribute("class") ?? "").toContain(
-      "grid-cols-[112px_112px_112px_112px]"
-    );
+    expect(rail.getAttribute("class") ?? "").not.toMatch(/grid-cols-\[/);
+    expect(rail.getAttribute("class") ?? "").toContain("md:gap-1");
 
     const separatePanel = screen.getByRole("region", {
       name: /^Separate Tab$/,
@@ -1467,14 +1462,14 @@ describe("App UI Shell", () => {
   };
 
   const clickTabButton = async (name: string) => {
-    const rail = screen.getByRole("navigation", { name: /tab rail/i });
+    const rail = screen.getByRole("navigation", { name: /tab band/i });
     const button = within(rail).getByRole("button", {
       name: new RegExp(`^${name}$`, "i"),
     });
     fireEvent.click(button);
     await waitFor(() => {
       expect(
-        within(screen.getByRole("navigation", { name: /tab rail/i })).getByRole(
+        within(screen.getByRole("navigation", { name: /tab band/i })).getByRole(
           "button",
           { name: new RegExp(`^${name}$`, "i") }
         )
@@ -1539,7 +1534,7 @@ describe("App UI Shell", () => {
     await loadAndSeparate();
 
     // Separation completion auto-activates the Mix Tab
-    const rail = screen.getByRole("navigation", { name: /tab rail/i });
+    const rail = screen.getByRole("navigation", { name: /tab band/i });
     const mixRailBtn = within(rail).getByRole("button", { name: /^Mix$/i });
     const exportRailBtn = within(rail).getByRole("button", {
       name: /^Export$/i,
@@ -1574,7 +1569,7 @@ describe("App UI Shell", () => {
 
     render(<App />);
 
-    const rail = screen.getByRole("navigation", { name: /tab rail/i });
+    const rail = screen.getByRole("navigation", { name: /tab band/i });
     const mixRailBtn = within(rail).getByRole("button", { name: /^Mix$/i });
     fireEvent.click(mixRailBtn);
 
@@ -1728,7 +1723,7 @@ describe("App UI Shell", () => {
     // Tab title and its two named faces — chrome, never a modal.
     await clickTabButton("system");
     const band = screen.getByTestId("header-band");
-    expect(band).toHaveClass("border-grz-600/40");
+    expect(band).toHaveClass("border-st-hairline");
     expect(within(band).getByText(/^System$/i)).toBeInTheDocument();
     expect(screen.queryByRole("dialog")).toBeNull();
     const faces = screen.getAllByTestId("header-band-face");
@@ -2019,19 +2014,15 @@ describe("App UI Shell", () => {
 
     // Display face: branding h1 (the rail Brand Unit) + Tab banners (the bundled
     // Archivo Black subset)
-    const railNav = screen.getByRole("navigation", { name: /tab rail/i });
+    const railNav = screen.getByRole("navigation", { name: /tab band/i });
     const brandUnit = within(railNav).getByTestId("brand-unit");
     const branding = within(brandUnit).getByRole("heading", { level: 1 });
     const mixBanner = within(mixTab).getByRole("heading", {
       level: 3,
       name: /multi-track stem player/i,
     });
-    expect(window.getComputedStyle(branding).fontFamily).toMatch(
-      /Archivo Black/
-    );
-    expect(window.getComputedStyle(mixBanner).fontFamily).toMatch(
-      /Archivo Black/
-    );
+    expect(window.getComputedStyle(branding).fontFamily).toMatch(/Inter/);
+    expect(window.getComputedStyle(mixBanner).fontFamily).toMatch(/Inter/);
     expect(window.getComputedStyle(branding).fontFamily).toMatch(
       /sans-serif\s*$/
     );
@@ -2176,7 +2167,7 @@ describe("App UI Shell", () => {
 
     // A live manager emission must reach no DOM surface at all: the toast
     // container is dead at every breakpoint and every rail placement.
-    const railNav = screen.getByRole("navigation", { name: /tab rail/i });
+    const railNav = screen.getByRole("navigation", { name: /tab band/i });
     expect(
       within(railNav).queryByTestId("toast-stack")
     ).not.toBeInTheDocument();
@@ -2212,7 +2203,7 @@ describe("App UI Shell", () => {
     const footer = document.querySelectorAll("footer")[0];
     const footerClasses = (footer.getAttribute("class") ?? "").split(" ");
     expect(footerClasses).toContain("border-t");
-    expect(footerClasses).toContain("border-grz-600/40");
+    expect(footerClasses).toContain("border-st-hairline");
     expect(footerClasses.some((c) => c.startsWith("border-t-2"))).toBe(false);
     expect(footerClasses.some((c) => c.includes("border-status-warn"))).toBe(
       false

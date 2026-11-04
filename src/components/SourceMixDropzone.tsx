@@ -91,15 +91,15 @@ export const SourceMixDropzone: React.FC<SourceMixDropzoneProps> = ({
           onDrop={handleDrop}
           onClick={handleBrowseClick}
           className={cn(
-            "group relative flex flex-col items-center justify-center rounded-none border-2 border-dashed p-10 text-center cursor-pointer transition-all duration-200 select-none min-h-[280px]",
+            "group relative flex flex-col items-center justify-center rounded border-2 border-dashed p-10 text-center cursor-pointer transition-all duration-200 select-none min-h-[280px]",
             isDragOver
               ? "border-primary bg-primary/10 scale-[1.01]"
               : "border-border bg-card/60 hover:border-primary/50 hover:bg-card/90"
           )}
         >
-          <div className="relative mb-4 flex h-16 w-16 items-center justify-center rounded-none bg-primary/10 text-primary transition-transform group-hover:scale-110">
+          <div className="relative mb-4 flex h-16 w-16 items-center justify-center rounded bg-primary/10 text-primary transition-transform group-hover:scale-110">
             <Music2 className="h-8 w-8" />
-            <div className="absolute -bottom-1 -right-1 rounded-none bg-primary p-1 text-primary-foreground shadow">
+            <div className="absolute -bottom-1 -right-1 rounded bg-primary p-1 text-primary-foreground shadow">
               <Upload className="h-3.5 w-3.5" />
             </div>
           </div>
@@ -122,7 +122,7 @@ export const SourceMixDropzone: React.FC<SourceMixDropzoneProps> = ({
                 e.stopPropagation();
                 handleBrowseClick();
               }}
-              className="inline-flex items-center gap-2 rounded-none bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground shadow hover:bg-primary/90 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="inline-flex items-center gap-2 rounded bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground shadow hover:bg-primary/90 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <Upload className="h-4 w-4" />
               <span>Browse Files</span>
@@ -130,19 +130,19 @@ export const SourceMixDropzone: React.FC<SourceMixDropzoneProps> = ({
           </div>
 
           <div className="mt-6 flex flex-wrap items-center justify-center gap-2 text-xs text-muted-foreground">
-            <span className="rounded-none bg-secondary/80 px-2.5 py-1 font-mono">
+            <span className="rounded bg-secondary/80 px-2.5 py-1 font-mono">
               MP3
             </span>
-            <span className="rounded-none bg-secondary/80 px-2.5 py-1 font-mono">
+            <span className="rounded bg-secondary/80 px-2.5 py-1 font-mono">
               WAV
             </span>
-            <span className="rounded-none bg-secondary/80 px-2.5 py-1 font-mono">
+            <span className="rounded bg-secondary/80 px-2.5 py-1 font-mono">
               FLAC
             </span>
-            <span className="rounded-none bg-secondary/80 px-2.5 py-1 font-mono">
+            <span className="rounded bg-secondary/80 px-2.5 py-1 font-mono">
               AAC
             </span>
-            <span className="rounded-none bg-secondary/80 px-2.5 py-1 font-mono">
+            <span className="rounded bg-secondary/80 px-2.5 py-1 font-mono">
               OGG
             </span>
             <span className="text-muted-foreground/70">
@@ -151,10 +151,10 @@ export const SourceMixDropzone: React.FC<SourceMixDropzoneProps> = ({
           </div>
         </div>
       ) : (
-        <div className="rounded-none border border-border bg-card p-6 shadow-sm">
+        <div className="rounded border border-border bg-card p-6 shadow-sm">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <div className="flex h-12 w-12 items-center justify-center rounded-none bg-secondary text-secondary-foreground">
+              <div className="flex h-12 w-12 items-center justify-center rounded bg-secondary text-secondary-foreground">
                 <FileAudio className="h-6 w-6" />
               </div>
               <div>
@@ -178,7 +178,7 @@ export const SourceMixDropzone: React.FC<SourceMixDropzoneProps> = ({
               <button
                 type="button"
                 onClick={handleBrowseClick}
-                className="rounded-none border border-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-secondary transition-colors"
+                className="rounded border border-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-secondary transition-colors"
               >
                 Change
               </button>
@@ -187,7 +187,7 @@ export const SourceMixDropzone: React.FC<SourceMixDropzoneProps> = ({
                   type="button"
                   onClick={onClearFile}
                   aria-label="Remove Source Mix"
-                  className="rounded-none border border-border p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+                  className="rounded border border-border p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
                 >
                   <X className="h-4 w-4" />
                 </button>

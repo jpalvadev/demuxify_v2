@@ -48,6 +48,35 @@ const SRC_DIR = path.resolve(process.cwd(), "src");
 
 const BANNED_IN_SRC = [
   {
+    pattern:
+      /(bg|border|text|ring|fill|shadow|divide|space|accent)-(grz-[0-9]+|grz-[0-9]{2,3})\b/,
+    reason:
+      "Stitch Skin (ticket 01, ADR-0014 supersedes the Grizzlython skin): the " +
+      "grz-* Tailwind ramp classes (grz-01…05, grz-600) are fully retired onto " +
+      "the st-* chrome ramp; no surface may read a grz class anymore.",
+  },
+  {
+    pattern: /grizzly-(grid|pulse)\b/,
+    reason:
+      "Stitch Skin retires the grz-02 canvas-grid and brand-pulse CSS " +
+      "primitives (.grizzly-grid / .grizzly-pulse); the Band carries its own " +
+      "pinned backdrop and the brand dot pulses via animate-pulse.",
+  },
+  {
+    pattern: /fonts\/grizzly/,
+    reason:
+      "public/fonts/grizzly woff2 are retired with the skin (scripts/provision-" +
+      "stitch-fonts.mjs provisions Inter + JetBrains Mono into public/fonts/" +
+      "stitch); no @font-face or url may reference the grizzly face bundle.",
+  },
+  {
+    pattern: /"(BlenderPro|Diatype|DSemi)"/,
+    reason:
+      "the grizzly skin's font-family names are retired: no face declaration or " +
+      "stack may name BlenderPro/Diatype/DSemi as an applied face anymore " +
+      "(fallback stacks start with Inter / JetBrains Mono).",
+  },
+  {
     pattern: /downbeat/i,
     reason:
       "ADR-0011 Amendment retired the Click Track's accent/Downbeat axis end " +

@@ -39,7 +39,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
     <div
       role="region"
       aria-label="Model Profile Selection"
-      className="rounded-none border border-border bg-card/60 p-4 shadow-xs space-y-3"
+      className="rounded border border-border bg-card/60 p-4 shadow-xs space-y-3"
     >
       <div className="flex items-center justify-between">
         <div>
@@ -57,10 +57,10 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
         <div
           role="region"
           aria-label="Active Model Profile Advisory"
-          className="rounded-none border border-primary/20 bg-primary/5 p-3"
+          className="rounded border border-primary/20 bg-primary/5 p-3"
         >
           <div className="flex items-start gap-2.5">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-none bg-primary/10 text-primary">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-primary/10 text-primary">
               <Smartphone className="h-4 w-4" />
             </div>
             <div className="flex-1 space-y-0.5">
@@ -68,7 +68,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
                 <span className="text-xs font-semibold uppercase tracking-wider text-primary">
                   Mobile-Optimized Model Active
                 </span>
-                <span className="inline-flex items-center gap-1 rounded-none bg-status-ok/10 px-2 py-0.5 text-[10px] font-medium text-status-ok">
+                <span className="inline-flex items-center gap-1 rounded bg-status-ok/10 px-2 py-0.5 text-[10px] font-medium text-status-ok">
                   <ShieldCheck className="h-3 w-3" />
                   Memory Protected
                 </span>
@@ -87,7 +87,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
       {isMobile && isStudioSelected && (
         <div
           role="alert"
-          className="rounded-none border border-status-warn/30 bg-status-warn/10 p-3 text-xs text-status-warn flex items-start gap-2.5"
+          className="rounded border border-status-warn/30 bg-status-warn/10 p-3 text-xs text-status-warn flex items-start gap-2.5"
         >
           <AlertTriangle className="h-4 w-4 shrink-0 text-status-warn mt-0.5" />
           <div className="space-y-0.5">
@@ -125,7 +125,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
               aria-checked={isSelected}
               disabled={disabled}
               onClick={() => onSelectModel(profile.id)}
-              className={`relative flex flex-col justify-between rounded-none border p-3.5 text-left transition-all ${
+              className={`relative flex flex-col justify-between rounded border p-3.5 text-left transition-all ${
                 isSelected
                   ? "border-primary bg-primary/10 shadow-sm ring-1 ring-primary/30"
                   : "border-border bg-card/40 hover:bg-muted/40 hover:border-border/80"
@@ -134,7 +134,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
               <div className="flex items-center justify-between w-full mb-1.5">
                 <div className="flex items-center gap-2">
                   <div
-                    className={`flex h-7 w-7 items-center justify-center rounded-none ${
+                    className={`flex h-7 w-7 items-center justify-center rounded ${
                       isSelected
                         ? "bg-primary text-primary-foreground"
                         : "bg-muted text-muted-foreground"
@@ -153,7 +153,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
                 </div>
 
                 {isSelected && (
-                  <div className="flex h-5 w-5 items-center justify-center rounded-none bg-primary text-primary-foreground">
+                  <div className="flex h-5 w-5 items-center justify-center rounded bg-primary text-primary-foreground">
                     <Check className="h-3 w-3" />
                   </div>
                 )}
@@ -172,7 +172,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
       </div>
 
       {/* Explanation Callout for Selected Model */}
-      <div className="rounded-none border border-border/60 bg-muted/30 p-2.5 text-xs text-muted-foreground flex items-center gap-2">
+      <div className="rounded border border-border/60 bg-muted/30 p-2.5 text-xs text-muted-foreground flex items-center gap-2">
         <span className="text-[11px] font-medium text-foreground">
           {activeProfile.shortName} Mode:
         </span>

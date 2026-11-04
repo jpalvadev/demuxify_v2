@@ -47,27 +47,30 @@ export default {
         // Status hues (ticket 09 follow-up): sheet's --ok / --warn tokens.
         "status-ok": "hsl(var(--status-ok) / <alpha-value>)",
         "status-warn": "hsl(var(--status-warn) / <alpha-value>)",
-        // Grizzly chrome ramp (grz-15/18): band + rail hairline colors.
-        "grz-01": "hsl(var(--grz-01) / <alpha-value>)",
-        "grz-02": "hsl(var(--grz-02) / <alpha-value>)",
-        "grz-03": "hsl(var(--grz-03) / <alpha-value>)",
-        "grz-04": "hsl(var(--grz-04) / <alpha-value>)",
-        "grz-05": "hsl(var(--grz-05) / <alpha-value>)",
-        "grz-600": "hsl(var(--grz-600) / <alpha-value>)",
+        // Stitch Skin chrome ramp (ticket 01, ADR-0014): Tab Band + stage surfaces,
+        // coral control ink, honest status hues, waveform canvas box.
+        "st-canvas": "hsl(var(--st-canvas) / <alpha-value>)",
+        "st-body": "hsl(var(--st-body) / <alpha-value>)",
+        "st-panel": "hsl(var(--st-panel) / <alpha-value>)",
+        "st-surface": "hsl(var(--st-surface) / <alpha-value>)",
+        "st-surface-light": "hsl(var(--st-surface-light) / <alpha-value>)",
+        "st-hairline": "hsl(var(--st-hairline) / <alpha-value>)",
+        "st-highlight": "hsl(var(--st-highlight) / <alpha-value>)",
+        "st-coral": "hsl(var(--st-coral) / <alpha-value>)",
+        "st-coral-hover": "hsl(var(--st-coral-hover) / <alpha-value>)",
+        "st-ink": "hsl(var(--st-ink) / <alpha-value>)",
+        "st-ink-dim": "hsl(var(--st-ink-dim) / <alpha-value>)",
+        "st-ok": "hsl(var(--st-ok) / <alpha-value>)",
+        "st-warn": "hsl(var(--st-warn) / <alpha-value>)",
+        "st-waveform-box": "hsl(var(--st-waveform-box) / <alpha-value>)",
       },
       fontFamily: {
         // Bold pairing (ticket 01 sheet): Archivo Black display for
         // headings/branding, JetBrains Mono for readouts. woff2 subsets are
         // bundled in ticket 10; until then these fall back to the stacks.
-        display: [
-          '"BlenderPro"',
-          '"Diatype"',
-          '"Archivo Black"',
-          "Impact",
-          "sans-serif",
-        ],
+        display: ['"Inter"', '"Archivo Black"', "Impact", "sans-serif"],
         sans: [
-          '"Diatype"',
+          '"Inter"',
           '"Helvetica Neue"',
           "Helvetica",
           "Arial",
@@ -76,7 +79,7 @@ export default {
           "sans-serif",
         ],
         mono: [
-          '"DSemi"',
+          '"JetBrains Mono"',
           '"JetBrains Mono"',
           "ui-monospace",
           "SFMono-Regular",
@@ -85,8 +88,9 @@ export default {
         ],
       },
       borderRadius: {
-        // grz-15: chrome-0 radius everywhere — bare `rounded` now resolves to
-        // the zero --radius token, not Tailwind's 0.25rem default.
+        // Stitch Skin (ticket 01): --radius retuned to 0.5rem on the sheet — one
+        // uniform sweep replaces the grz-15 chrome-0 radii (`rounded-none` is
+        // retired across the shell).
         default: "var(--radius)",
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",

@@ -63,7 +63,7 @@ export const DiagnosticsPanel: React.FC = () => {
     <section
       role="region"
       aria-label="System Diagnostics"
-      className="w-full rounded-none border border-border bg-card p-4 space-y-3"
+      className="w-full rounded border border-border bg-card p-4 space-y-3"
     >
       {/* Header */}
       <div className="flex items-center justify-between gap-2 border-b border-border/60 pb-2">
@@ -73,7 +73,7 @@ export const DiagnosticsPanel: React.FC = () => {
             System Diagnostics
           </h2>
           {errorCount > 0 && (
-            <span className="rounded-none bg-destructive/20 px-2 py-0.5 text-xs font-semibold text-destructive">
+            <span className="rounded bg-destructive/20 px-2 py-0.5 text-xs font-semibold text-destructive">
               {errorCount} error{errorCount > 1 ? "s" : ""}
             </span>
           )}
@@ -82,11 +82,11 @@ export const DiagnosticsPanel: React.FC = () => {
 
       {/* Sub-header Controls / Tabs */}
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 py-1 text-xs">
-        <div className="flex items-center gap-1 rounded-none bg-muted p-1">
+        <div className="flex items-center gap-1 rounded bg-muted p-1">
           <button
             type="button"
             onClick={() => setActiveTab("logs")}
-            className={`rounded-none px-3 py-1 font-medium transition-colors ${
+            className={`rounded px-3 py-1 font-medium transition-colors ${
               activeTab === "logs"
                 ? "bg-background text-foreground shadow-xs"
                 : "text-muted-foreground hover:text-foreground"
@@ -97,7 +97,7 @@ export const DiagnosticsPanel: React.FC = () => {
           <button
             type="button"
             onClick={() => setActiveTab("env")}
-            className={`rounded-none px-3 py-1 font-medium transition-colors ${
+            className={`rounded px-3 py-1 font-medium transition-colors ${
               activeTab === "env"
                 ? "bg-background text-foreground shadow-xs"
                 : "text-muted-foreground hover:text-foreground"
@@ -114,7 +114,7 @@ export const DiagnosticsPanel: React.FC = () => {
                 key={lvl}
                 type="button"
                 onClick={() => setFilterLevel(lvl)}
-                className={`rounded-none px-2 py-1 uppercase text-[10px] font-semibold transition-colors ${
+                className={`rounded px-2 py-1 uppercase text-[10px] font-semibold transition-colors ${
                   filterLevel === lvl
                     ? "bg-primary text-primary-foreground"
                     : "text-muted-foreground hover:bg-muted"
@@ -140,7 +140,7 @@ export const DiagnosticsPanel: React.FC = () => {
               {filteredLogs.map((log) => (
                 <div
                   key={log.id}
-                  className={`rounded-none border p-2 transition-colors ${
+                  className={`rounded border p-2 transition-colors ${
                     log.level === "error"
                       ? "border-destructive/40 bg-destructive/10 text-destructive-foreground"
                       : log.level === "warn"
@@ -169,14 +169,14 @@ export const DiagnosticsPanel: React.FC = () => {
                     {log.message}
                   </p>
                   {log.data !== undefined && (
-                    <pre className="mt-1 overflow-x-auto rounded-none bg-black/40 p-1.5 text-[10px] text-muted-foreground">
+                    <pre className="mt-1 overflow-x-auto rounded bg-black/40 p-1.5 text-[10px] text-muted-foreground">
                       {typeof log.data === "object"
                         ? JSON.stringify(log.data, null, 2)
                         : String(log.data)}
                     </pre>
                   )}
                   {log.stack && (
-                    <pre className="mt-1 overflow-x-auto rounded-none bg-destructive/20 p-1.5 text-[10px] text-destructive">
+                    <pre className="mt-1 overflow-x-auto rounded bg-destructive/20 p-1.5 text-[10px] text-destructive">
                       {log.stack}
                     </pre>
                   )}
@@ -195,7 +195,7 @@ export const DiagnosticsPanel: React.FC = () => {
                 {Object.entries(envReport).map(([key, value]) => (
                   <div
                     key={key}
-                    className="rounded-none border border-border bg-muted/20 p-1.5"
+                    className="rounded border border-border bg-muted/20 p-1.5"
                   >
                     <span className="font-bold text-muted-foreground uppercase text-[10px] block">
                       {key}
@@ -220,7 +220,7 @@ export const DiagnosticsPanel: React.FC = () => {
         <button
           type="button"
           onClick={handleClearLogs}
-          className="flex items-center gap-1.5 rounded-none border border-border bg-card px-3 py-1 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground active:scale-95 transition-all"
+          className="flex items-center gap-1.5 rounded border border-border bg-card px-3 py-1 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground active:scale-95 transition-all"
         >
           <Trash2 className="h-3.5 w-3.5" />
           Clear Logs
@@ -229,7 +229,7 @@ export const DiagnosticsPanel: React.FC = () => {
         <button
           type="button"
           onClick={handleCopyReport}
-          className="flex items-center gap-1.5 rounded-none bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 active:scale-95 transition-all"
+          className="flex items-center gap-1.5 rounded bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 active:scale-95 transition-all"
         >
           {copied ? (
             <>

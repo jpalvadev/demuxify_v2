@@ -101,7 +101,7 @@ export const BeatGridTapCalibration: React.FC<BeatGridTapCalibrationProps> = ({
         // Mix Tab cohesion (ADR-0013): the card look is dead — the lane is a
         // thin strip on the spine's width and time axis: no border rhythm, no
         // outer padding, no height default. The decision contract stays whole.
-        "flex flex-col gap-1 items-center rounded-none bg-transparent px-0 py-0",
+        "flex flex-col gap-1 items-center rounded bg-transparent px-0 py-0",
         className
       )}
     >
@@ -114,7 +114,7 @@ export const BeatGridTapCalibration: React.FC<BeatGridTapCalibrationProps> = ({
         role="group"
         aria-label="Tap beats along the timeline"
         className={cn(
-          "relative w-full overflow-hidden select-none rounded-none border border-primary/30 bg-secondary/60 focus-visible:outline-none",
+          "relative w-full overflow-hidden select-none rounded border border-primary/30 bg-secondary/60 focus-visible:outline-none",
           disabled && "opacity-60 pointer-events-none"
         )}
         style={{ height: `${height}px` }}
@@ -159,7 +159,7 @@ export const BeatGridTapCalibration: React.FC<BeatGridTapCalibrationProps> = ({
           }}
           aria-label="Confirm hand calibration of the Beat Grid"
           className={cn(
-            "px-2 py-1 rounded-none border border-primary/70 bg-primary/20 text-primary text-[11px] font-semibold font-mono transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+            "px-2 py-1 rounded border border-primary/70 bg-primary/20 text-primary text-[11px] font-semibold font-mono transition-all disabled:opacity-40 disabled:cursor-not-allowed"
           )}
         >
           Confirm hand calibration
@@ -173,7 +173,7 @@ export const BeatGridTapCalibration: React.FC<BeatGridTapCalibrationProps> = ({
           }}
           aria-label="Reset the hand-calibration taps"
           className={cn(
-            "px-2 py-1 rounded-none border border-border/70 bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground text-[11px] font-semibold font-mono transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+            "px-2 py-1 rounded border border-border/70 bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground text-[11px] font-semibold font-mono transition-all disabled:opacity-40 disabled:cursor-not-allowed"
           )}
         >
           Reset taps
