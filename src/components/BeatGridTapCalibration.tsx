@@ -114,7 +114,9 @@ export const BeatGridTapCalibration: React.FC<BeatGridTapCalibrationProps> = ({
         role="group"
         aria-label="Tap beats along the timeline"
         className={cn(
-          "relative w-full overflow-hidden select-none rounded border border-primary/30 bg-secondary/60 focus-visible:outline-none",
+          // Stitch skin 07i: the strip is a zinc lane on the mockup's hairline
+          // rhythm (border-brand-border + surface), not a coral-rimmed card.
+          "relative w-full overflow-hidden select-none rounded border border-st-hairline bg-st-surface focus-visible:outline-none",
           disabled && "opacity-60 pointer-events-none"
         )}
         style={{ height: `${height}px` }}
@@ -123,7 +125,7 @@ export const BeatGridTapCalibration: React.FC<BeatGridTapCalibrationProps> = ({
           <span
             key={`${index}-${tapSec}`}
             aria-hidden="true"
-            className="absolute top-0 w-px-2 h-full bg-primary opacity-90 pointer-events-none"
+            className="absolute top-0 w-px-2 h-full bg-st-coral opacity-90 pointer-events-none"
             style={{
               left: `${duration > 0 ? (tapSec / duration) * 100 : 0}%`,
             }}
@@ -133,7 +135,7 @@ export const BeatGridTapCalibration: React.FC<BeatGridTapCalibrationProps> = ({
 
       <div
         data-testid="click-tap-calibration-readout"
-        className="block text-[11px] font-mono text-muted-foreground"
+        className="block text-[10px] font-mono italic text-st-ink-dim"
         style={{ fontFamily: MONO_FONT_STACK }}
       >
         {calibrationResult.kind === "calibrated"
@@ -159,7 +161,9 @@ export const BeatGridTapCalibration: React.FC<BeatGridTapCalibrationProps> = ({
           }}
           aria-label="Confirm hand calibration of the Beat Grid"
           className={cn(
-            "px-2 py-1 rounded border border-primary/70 bg-primary/20 text-primary text-[11px] font-semibold font-mono transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+            // Stitch skin 07i: mockup Confirm chip — accentMuted ground,
+            // hairline coral rim, coral ink; coral fill + white on hover.
+            "px-2.5 py-1 rounded bg-st-coral/15 border border-st-coral/40 text-st-coral font-semibold hover:bg-st-coral hover:text-white hover:border-st-coral transition-colors text-[10px] font-mono disabled:opacity-40 disabled:cursor-not-allowed"
           )}
         >
           Confirm hand calibration
@@ -173,7 +177,9 @@ export const BeatGridTapCalibration: React.FC<BeatGridTapCalibrationProps> = ({
           }}
           aria-label="Reset the hand-calibration taps"
           className={cn(
-            "px-2 py-1 rounded border border-border/70 bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground text-[11px] font-semibold font-mono transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+            // Stitch skin 07i: mockup Reset chip — zinc surface, hairline rim,
+            // dim ink lifting to ink on hover.
+            "px-2 py-1 rounded bg-st-surface border border-st-hairline text-st-ink-dim hover:text-st-ink font-mono font-semibold text-[10px] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           )}
         >
           Reset taps

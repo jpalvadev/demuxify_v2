@@ -26,16 +26,6 @@ function formatTime(totalSeconds: number): string {
   return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 }
 
-function calculateTickInterval(duration: number): number {
-  if (duration <= 15) return 2;
-  if (duration <= 30) return 5;
-  if (duration <= 60) return 10;
-  if (duration <= 180) return 15;
-  if (duration <= 360) return 30;
-  if (duration <= 720) return 60;
-  return 120;
-}
-
 // Mix Tab cohesion (ADR-0013): the spine carries a live Playhead, so its canvas
 // repaint runs at a ceiling near fifteen draws per second instead of once per
 // position update. The position value itself keeps flowing every frame — the
@@ -131,25 +121,10 @@ export const MasterWaveform: React.FC<MasterWaveformProps> = ({
       duration > 0 ? Math.max(0, Math.min(1, currentTime / duration)) : 0;
     const playheadX = playheadRatio * width;
 
-    // Draw timeline grid ticks
-    const tickInterval = calculateTickInterval(duration);
-    ctx.font = "10px sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "top";
-
-    for (let t = 0; t <= duration; t += tickInterval) {
-      const tickX = duration > 0 ? (t / duration) * width : 0;
-      ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(tickX, 0);
-      ctx.lineTo(tickX, canvasHeight);
-      ctx.stroke();
-
-      // Render tick time labels at bottom (--muted-foreground)
-      ctx.fillStyle = "rgba(136, 138, 149, 0.5)";
-      ctx.fillText(formatTime(t), tickX, canvasHeight - 14);
-    }
+    // Stitch skin 07i: the mockup's master field carries exactly ONE ruler —
+    // the DOM row at the top of the box — and the canvas only draws the
+    // midline guide + waveform. The canvas-drawn bottom ruler + tick lines
+    // (the old second ruler) are gone with it.
 
     // Midline
     const midY = (canvasHeight - 16) / 2;
