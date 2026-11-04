@@ -107,10 +107,14 @@ const TAB_GATING_REASON = "no Stems yet";
 const tabPanelClass = (gated: boolean, active: boolean) =>
   // Tab Shell stage invariant (artifact `.panel` + `.panel.act`): every Tab panel
   // stays in the DOM, but only the ACTIVE Tab's panel paints — the rest are
-  // display-hidden inside the stage.
+  // display-hidden inside the stage. 07x stitch fidelity: the ACTIVE panel is a
+  // BARE positioning seam — never a painted frame. The mock stage is main's
+  // px-4 py-3 column itself; cards are direct children painting st-panel over
+  // the canvas, so any inner hairline wrapper is one container too many (user
+  // 2026-11-04: "one container more than what we need" — delete it).
   gated || !active
     ? "hidden"
-    : "absolute inset-0 overflow-y-auto overflow-x-hidden rounded border border-st-hairline bg-st-canvas p-4 sm:px-6 sm:py-6 transition-colors";
+    : "absolute inset-0 overflow-y-auto overflow-x-hidden py-3 transition-colors";
 
 export const App: React.FC = () => {
   // Dark-only contract (ticket 09): no theme state — html keeps `dark` forever
@@ -836,128 +840,131 @@ export const App: React.FC = () => {
           every breakpoint — identity and navigation now live in the single sticky Tab
           Rail block below, a brand row over the four-chip Tab row. */}
 
-      {/* Full-bleed shell (artifact `.app`: no max-width; the Band always sits
-          OVER the stage — main is one flex column at every width). */}
-      <main className="flex-1 w-full px-2 sm:px-6 flex flex-col gap-3 sm:gap-4 md:gap-5">
-        {/* Tab Band (ADR-0014 + 06b stitch.html port): ONE sticky block — brand
-            cluster and the bordered chip-container with compact JetBrains-Mono
-            chips share a row at md+ (stacked below-md), coral glow marks the
-            ACTIVE chip; the mockup phantom utility cluster trails right. Sticky +
-            z-30 pins the chrome; the blurred canvas backdrop keeps scrolling
-            stage content from ghosting through. */}
-        <nav
-          aria-label="Tab Band"
-          className="sticky top-0 z-30 flex flex-col gap-2 md:flex-row md:items-center md:justify-between py-2 pb-3.5 sm:py-2.5 sm:pb-4 overflow-hidden w-full border-b border-st-hairline bg-st-panel"
-        >
-          <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-6 shrink-0">
-            <BrandUnit />
-            {/* Debug mode marker (ticket 08): the flag is honest chrome — while
+      {/* Full-bleed shell (artifact `.app`: no max-width). 07w stitch fidelity:
+          the Band is a ROOT-level edge-to-edge child, never wrapped in the
+          padded stage container — the mock header is a direct child of body
+          and carries its own px-4, so a wrapper inset is a bug to delete,
+          not to inherit. main below is the padded stage column (mock main: px-4). */}
+      {/* Tab Band (ADR-0014 + 06b stitch.html port + 07w root-level): ONE sticky
+          block — brand cluster and the bordered chip-container with compact
+          JetBrains-Mono chips share a row at md+ (stacked below-md), coral glow
+          marks the ACTIVE chip; the mockup phantom utility cluster trails right.
+          Sticky + z-30 pins the chrome; the blurred canvas backdrop keeps
+          scrolling stage content from ghosting through. */}
+      <nav
+        aria-label="Tab Band"
+        className="sticky top-0 z-30 px-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between py-2 pb-3.5 sm:py-2.5 sm:pb-4 overflow-hidden w-full border-b border-st-hairline bg-st-panel"
+      >
+        <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-6 shrink-0">
+          <BrandUnit />
+          {/* Debug mode marker (ticket 08): the flag is honest chrome — while
                 the synthetic fixture is on the stage, the Band says so, so a
                 preview can never be mistaken for a real upload. */}
-            {debugSession && (
-              <span className="font-mono text-[10px] tracking-widest uppercase text-st-coral whitespace-nowrap">
-                Debug · synthetic media
-              </span>
-            )}
-            <div
-              data-testid="tab-band-chips"
-              className="grid grid-cols-4 gap-1 w-full md:inline-grid md:w-auto md:gap-2 rounded border border-st-hairline bg-st-canvas p-1"
-            >
-              {TAB_REGISTRY.map((tab) => {
-                const gated = tab.gatedUntilStems && !stemsReady;
-                const active = activeTab === tab.id;
-                return (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    aria-label={tab.title}
-                    aria-current={active ? "true" : undefined}
-                    aria-disabled={gated ? true : undefined}
-                    onClick={() => handleSelectTab(tab.id)}
-                    className={`flex flex-col items-center justify-center gap-0.5 px-3 py-1 min-h-[${TAB_CHIP_MIN_TARGET_PX}px] min-w-[${TAB_CHIP_MIN_TARGET_PX}px] rounded uppercase font-mono text-[${TAB_CHIP_TYPE_PX}px] tracking-wide transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${active ? "bg-primary text-white font-bold shadow-chip-glow" : "font-medium text-st-ink-dim hover:text-white"} ${gated ? "opacity-50 text-muted-foreground" : ""}`.trim()}
-                  >
-                    <span className="whitespace-nowrap">{tab.title}</span>
-                    {gated && (
-                      <span className="font-mono text-[6px] sm:text-[9px] font-medium tracking-wide text-muted-foreground">
-                        {TAB_GATING_REASON}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
+          {debugSession && (
+            <span className="font-mono text-[10px] tracking-widest uppercase text-st-coral whitespace-nowrap">
+              Debug · synthetic media
+            </span>
+          )}
+          <div
+            data-testid="tab-band-chips"
+            className="grid grid-cols-4 gap-1 w-full md:inline-grid md:w-auto md:gap-2 rounded border border-st-hairline bg-st-canvas p-1"
+          >
+            {TAB_REGISTRY.map((tab) => {
+              const gated = tab.gatedUntilStems && !stemsReady;
+              const active = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  aria-label={tab.title}
+                  aria-current={active ? "true" : undefined}
+                  aria-disabled={gated ? true : undefined}
+                  onClick={() => handleSelectTab(tab.id)}
+                  className={`flex flex-col items-center justify-center gap-0.5 px-3 py-1 min-h-[${TAB_CHIP_MIN_TARGET_PX}px] min-w-[${TAB_CHIP_MIN_TARGET_PX}px] rounded uppercase font-mono text-[${TAB_CHIP_TYPE_PX}px] tracking-wide transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${active ? "bg-primary text-white font-bold shadow-chip-glow" : "font-medium text-st-ink-dim hover:text-white"} ${gated ? "opacity-50 text-muted-foreground" : ""}`.trim()}
+                >
+                  <span className="whitespace-nowrap">{tab.title}</span>
+                  {gated && (
+                    <span className="font-mono text-[6px] sm:text-[9px] font-medium tracking-wide text-muted-foreground">
+                      {TAB_GATING_REASON}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
-          {/* Mockup phantom chrome (06b, data-mockup-placeholder): the stitch
+        </div>
+        {/* Mockup phantom chrome (06b, data-mockup-placeholder): the stitch
               mockup invented an engine status badge and an undo/redo/settings icon
               cluster. Per the user 2026-11-04 override they render as VERBATIM
               DEAD PLACEHOLDERS — no handlers, no state, aria-hidden so no phantom
               roles leak into the Band subtree; a later cleanup commit erases them. */}
-          <div
-            data-mockup-placeholder="true"
-            aria-hidden="true"
-            className="flex flex-col gap-2 md:flex-row md:items-center md:gap-4"
-          >
-            <div className="hidden md:flex items-center gap-3 rounded border border-st-hairline bg-st-canvas px-3 py-1 font-mono text-[10px] text-zinc-400">
-              <span className="flex items-center gap-1.5">
-                <span className="inline-block h-1.5 w-1.5 rounded-full bg-st-ok mr-1.5" />
-                DSP WebAudio 44.1kHz
-              </span>
-              <span className="text-zinc-600">|</span>
-              <span>{"LATENCY: <1.8ms"}</span>
-              <span className="text-zinc-600">|</span>
-              <span className="text-zinc-300">BUFFERS: SYNCED</span>
+        <div
+          data-mockup-placeholder="true"
+          aria-hidden="true"
+          className="flex flex-col gap-2 md:flex-row md:items-center md:gap-4"
+        >
+          <div className="hidden md:flex items-center gap-3 rounded border border-st-hairline bg-st-canvas px-3 py-1 font-mono text-[10px] text-zinc-400">
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block h-1.5 w-1.5 rounded-full bg-st-ok mr-1.5" />
+              DSP WebAudio 44.1kHz
+            </span>
+            <span className="text-zinc-600">|</span>
+            <span>{"LATENCY: <1.8ms"}</span>
+            <span className="text-zinc-600">|</span>
+            <span className="text-zinc-300">BUFFERS: SYNCED</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="p-1.5 rounded border border-transparent text-zinc-400 flex items-center justify-center">
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  d="M3 10h10a5 5 0 0 1 5 5v2m0 0l-3-3m3 3l3-3M3 10l3-3M3 10l3 3"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                />
+              </svg>
             </div>
-            <div className="flex items-center gap-1.5">
-              <div className="p-1.5 rounded border border-transparent text-zinc-400 flex items-center justify-center">
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    d="M3 10h10a5 5 0 0 1 5 5v2m0 0l-3-3m3 3l3-3M3 10l3-3M3 10l3 3"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                  />
-                </svg>
-              </div>
-              <div className="p-1.5 rounded border border-transparent text-zinc-400 flex items-center justify-center">
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    d="M21 10H11a5 5 0 0 0-5 5v2m0 0l3-3m-3 3L3 14m18-4l-3-3m3 3l-3 3"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                  />
-                </svg>
-              </div>
-              <div className="p-1.5 rounded border border-transparent text-zinc-400 flex items-center justify-center">
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924-1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065 2.572c1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                  />
-                  <circle cx="12" cy="12" r="3" />
-                </svg>
-              </div>
+            <div className="p-1.5 rounded border border-transparent text-zinc-400 flex items-center justify-center">
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  d="M21 10H11a5 5 0 0 0-5 5v2m0 0l3-3m-3 3L3 14m18-4l-3-3m3 3l-3 3"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                />
+              </svg>
+            </div>
+            <div className="p-1.5 rounded border border-transparent text-zinc-400 flex items-center justify-center">
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924-1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065 2.572c1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                />
+                <circle cx="12" cy="12" r="3" />
+              </svg>
             </div>
           </div>
-        </nav>
+        </div>
+      </nav>
 
+      <main className="flex-1 w-full mt-3 sm:mt-4 md:mt-5 px-4 flex flex-col gap-3 sm:gap-4 md:gap-5">
         {/* Tab stage: four pinned Tab panels, always present in the DOM; the
             stage shows only the ACTIVE Tab panel (artifact `.stage` + `.panel`). */}
         <div className="relative flex-1 min-h-[340px] overflow-hidden">
@@ -1173,16 +1180,14 @@ export const App: React.FC = () => {
                     timeline surface; scrubbing it drives the Stem Player engine
                     through the transport bridge, and its position flows back on
                     the one Playhead channel (ADR-0013). */}
-                <div className="pt-2">
-                  <MasterWaveform
-                    peaks={waveformPeaks}
-                    audioBuffer={decodedSourceMix.buffer}
-                    duration={decodedSourceMix.metadata.duration}
-                    currentTime={currentTime}
-                    onSeek={handleSeek}
-                    height={96}
-                  />
-                </div>
+                <MasterWaveform
+                  peaks={waveformPeaks}
+                  audioBuffer={decodedSourceMix.buffer}
+                  duration={decodedSourceMix.metadata.duration}
+                  currentTime={currentTime}
+                  onSeek={handleSeek}
+                  height={96}
+                />
                 {/* Hand Calibration (ADR-0013, ticket 09): the lane welds
                     directly under the spine — same width, same time axis, no
                     card gap. Tapping stays a gesture against the axis the
