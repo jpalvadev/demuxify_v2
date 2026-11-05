@@ -66,6 +66,33 @@ export default defineConfig({
     // the factory promise hangs forever (silent playbackRate fallback = pitch coupling).
     exclude: ["signalsmith-stretch"],
   },
+  build: {
+    // Production twin of the optimizeDeps guard above (that exclude is dev-only;
+    // it never touches the Rollup build). Vite's default build target "modules"
+    // includes safari14, which lacks ES2022 class fields: esbuild lowers them to
+    // the module-scope __publicField helper (minified alias, e.g. `v(this,…)`).
+    // signalsmith-stretch serializes its worklet processor source via
+    // Function.prototype.toString into a Blob module; the helper is NOT in scope
+    // there, the processor constructor throws inside the worklet, the 'ready'
+    // handshake times out, and tempo/pitch silently degrade to the WSOLA/
+    // playbackRate fallback (pitch coupling) — dev fine, `vite preview` broken.
+    // es2022 keeps class fields native, so the serialized source is complete.
+    target: "es2022",
+    // Second production twin of the same guard: signalsmith-stretch's worklet
+    // Blob is built from a string-literal template `(_scriptName=>${Module})()`
+    // whose arrow parameter NAME binds the glue's same-named closure variable
+    // inside the serialized source. esbuild minify (Vite's default) renames the
+    // closure var (to `K`), leaving the literal parameter `_scriptName` — the
+    // shipped Blob then calls an undefined name, the wasm Module() promise
+    // never resolves, 'ready' never posts, and the engine falls back exactly
+    // as above. esbuild has no reserved-name option; terser's does the job.
+    minify: "terser",
+    terserOptions: {
+      mangle: {
+        reserved: ["_scriptName"],
+      },
+    },
+  },
   server: {
     host: true,
     headers: {
