@@ -1,0 +1,1131 @@
+<!doctype html>
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>Demuxify - Client-Side Stem Separation &amp; DAW</title>
+    <!-- Tailwind CSS CDN with Forms & Container Queries -->
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <!-- Custom Tailwind Config for High-Fidelity DAW UI matching screenshot -->
+    <script>
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              brand: {
+                accent: "#f85153",
+                accentHover: "#ff6264",
+                accentMuted: "rgba(248, 81, 83, 0.15)",
+                bg: "#0e0e11",
+                panel: "#141418",
+                surface: "#18181f",
+                surfaceLight: "#202028",
+                border: "#24242c",
+                borderHighlight: "#32323e",
+              },
+              stem: {
+                master: "#39ff14",
+                masterBg: "rgba(57, 255, 20, 0.08)",
+                vocals: "#c084fc",
+                drums: "#818cf8",
+                bass: "#f59e0b",
+                other: "#22d3ee",
+              },
+            },
+            fontFamily: {
+              mono: [
+                '"JetBrains Mono"',
+                '"Space Mono"',
+                "ui-monospace",
+                "SFMono-Regular",
+                "Menlo",
+                "Monaco",
+                "Consolas",
+                "monospace",
+              ],
+              sans: [
+                '"Inter"',
+                "system-ui",
+                "-apple-system",
+                "BlinkMacSystemFont",
+                "sans-serif",
+              ],
+            },
+          },
+        },
+      };
+    </script>
+    <!-- Google Fonts: JetBrains Mono and Inter -->
+    <link href="https://fonts.googleapis.com" rel="preconnect" />
+    <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;600;700&amp;display=swap"
+      rel="stylesheet"
+    />
+    <style data-purpose="daw-custom-styling">
+      body {
+        background-color: #0d0d10;
+        color: #d1d5db;
+        user-select: none;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      /* DAW custom sliders */
+      input[type="range"] {
+        -webkit-appearance: none;
+        background: #25252f;
+        height: 4px;
+        border-radius: 2px;
+        outline: none;
+      }
+      input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: #f85153;
+        cursor: pointer;
+        box-shadow: 0 0 8px rgba(248, 81, 83, 0.6);
+        border: 1px solid #ffffff;
+        transition: transform 0.1s ease;
+      }
+      input[type="range"]::-webkit-slider-thumb:hover {
+        transform: scale(1.2);
+      }
+
+      /* Custom Scrollbars */
+      ::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #0f0f13;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #262630;
+        border-radius: 3px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #373746;
+      }
+
+      /* Waveform canvas styling */
+      .waveform-canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+    </style>
+  </head>
+  <body class="flex flex-col h-screen overflow-hidden font-sans text-xs">
+    <!-- BEGIN: TopNavigationBar -->
+    <header
+      class="h-13 bg-brand-panel border-b border-brand-border flex items-center justify-between px-4 py-2 shrink-0 z-20"
+    >
+      <!-- Brand and Engine Info -->
+      <div class="flex items-center space-x-6">
+        <div class="flex items-center space-x-2">
+          <div
+            class="w-6 h-6 rounded flex items-center justify-center bg-brand-surface border border-brand-border"
+          >
+            <div
+              class="w-2.5 h-2.5 bg-brand-accent rounded-sm shadow-[0_0_8px_rgba(248,81,83,0.8)]"
+            ></div>
+          </div>
+          <div>
+            <div class="flex items-center space-x-1.5 leading-none">
+              <span class="font-bold tracking-tight text-white text-sm"
+                >Demuxify</span
+              >
+              <span class="w-1.5 h-1.5 rounded-full bg-brand-accent"></span>
+            </div>
+            <span
+              class="text-[9px] font-mono text-zinc-500 uppercase tracking-wider block mt-0.5"
+              >Client-Side Stem Separation</span
+            >
+          </div>
+        </div>
+        <!-- Mode Selector Tabs -->
+        <nav
+          aria-label="Mode Navigation"
+          class="flex items-center space-x-1 bg-brand-bg p-1 rounded border border-brand-border"
+        >
+          <button
+            class="px-3 py-1 rounded text-zinc-400 hover:text-white font-mono text-[11px] font-medium tracking-wide transition-colors"
+          >
+            SEPARATE
+          </button>
+          <button
+            class="px-3 py-1 rounded bg-brand-accent text-white font-mono text-[11px] font-bold tracking-wide shadow-[0_0_10px_rgba(248,81,83,0.4)]"
+          >
+            MIX
+          </button>
+          <button
+            class="px-3 py-1 rounded text-zinc-400 hover:text-white font-mono text-[11px] font-medium tracking-wide transition-colors"
+          >
+            EXPORT
+          </button>
+          <button
+            class="px-3 py-1 rounded text-zinc-400 hover:text-white font-mono text-[11px] font-medium tracking-wide transition-colors"
+          >
+            SYSTEM
+          </button>
+        </nav>
+      </div>
+      <!-- Engine Status Badges & Utilities -->
+      <div class="flex items-center space-x-4">
+        <div
+          class="hidden md:flex items-center space-x-3 bg-brand-bg px-3 py-1 rounded border border-brand-border font-mono text-[10px] text-zinc-400"
+        >
+          <span class="flex items-center"
+            ><span
+              class="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block mr-1.5"
+            ></span
+            >DSP WebAudio 44.1kHz</span
+          >
+          <span class="text-zinc-600">|</span>
+          <span>LATENCY: &lt;1.8ms</span>
+          <span class="text-zinc-600">|</span>
+          <span class="text-zinc-300">BUFFERS: SYNCED</span>
+        </div>
+        <div class="flex items-center space-x-1.5">
+          <button
+            class="p-1.5 text-zinc-400 hover:text-white hover:bg-brand-surface rounded border border-transparent hover:border-brand-border"
+            title="Undo (Ctrl+Z)"
+          >
+            <svg
+              class="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewbox="0 0 24 24"
+            >
+              <path
+                d="M3 10h10a5 5 0 0 1 5 5v2m0 0l-3-3m3 3l3-3M3 10l3-3M3 10l3 3"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+              ></path>
+            </svg>
+          </button>
+          <button
+            class="p-1.5 text-zinc-400 hover:text-white hover:bg-brand-surface rounded border border-transparent hover:border-brand-border"
+            title="Redo (Ctrl+Y)"
+          >
+            <svg
+              class="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewbox="0 0 24 24"
+            >
+              <path
+                d="M21 10H11a5 5 0 0 0-5 5v2m0 0l3-3m-3 3L3 14m18-4l-3-3m3 3l-3 3"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+              ></path>
+            </svg>
+          </button>
+          <button
+            class="p-1.5 text-zinc-400 hover:text-white hover:bg-brand-surface rounded border border-transparent hover:border-brand-border"
+            title="Settings"
+          >
+            <svg
+              class="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewbox="0 0 24 24"
+            >
+              <path
+                d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+              ></path>
+              <circle cx="12" cy="12" r="3"></circle>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </header>
+    <!-- END: TopNavigationBar -->
+    <!-- BEGIN: MainWorkspace -->
+    <main
+      class="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-3 min-h-0 bg-brand-bg"
+      data-purpose="workspace-container"
+    >
+      <!-- BEGIN: MasterWaveformSection -->
+      <section
+        aria-label="Master Waveform and Beat Grid"
+        class="bg-brand-panel border border-brand-border rounded-lg p-3 relative flex flex-col gap-2 shrink-0 shadow-sm"
+      >
+        <!-- Section Title & Meta Bar -->
+        <div
+          class="flex items-center justify-between font-mono text-[11px] pb-1 border-b border-brand-border/60"
+        >
+          <div class="flex items-center space-x-2">
+            <span class="font-bold tracking-wider text-zinc-200"
+              >MASTER WAVEFORM</span
+            >
+            <span class="text-zinc-500 font-sans text-[10px]">Overview</span>
+            <span
+              class="bg-zinc-800 text-zinc-400 px-1.5 py-0.5 rounded text-[9px] uppercase"
+              >Stereo Mix</span
+            >
+          </div>
+          <!-- Beat Anchoring helper text and calibration buttons -->
+          <div class="flex items-center space-x-3 text-zinc-400 text-[10px]">
+            <span class="text-zinc-400 italic"
+              >Tap 4 beats on the groove to anchor the Beat Grid by hand:</span
+            >
+            <button
+              class="px-2.5 py-1 rounded bg-brand-accentMuted border border-brand-accent/40 text-brand-accent font-semibold hover:bg-brand-accent hover:text-white transition-colors"
+            >
+              Confirm hand calibration
+            </button>
+            <button
+              class="px-2 py-1 rounded bg-brand-surface border border-brand-border text-zinc-400 hover:text-zinc-200"
+            >
+              Reset taps
+            </button>
+          </div>
+        </div>
+        <!-- Master Waveform Canvas Container -->
+        <div
+          class="relative w-full h-24 bg-[#0a0a0d] rounded border border-brand-border overflow-hidden cursor-crosshair group"
+          id="master-waveform-box"
+        >
+          <!-- Grid overlay markings (measures / timeline) -->
+          <div
+            class="absolute inset-0 flex justify-between pointer-events-none px-2 text-[9px] font-mono text-zinc-600 select-none z-10 pt-1"
+          >
+            <span>0:00</span>
+            <span>0:30</span>
+            <span>1:00</span>
+            <span>1:30</span>
+            <span>2:00</span>
+            <span>2:30</span>
+            <span>3:00</span>
+            <span>3:35</span>
+          </div>
+          <!-- Canvas rendering neon-lime master waveform -->
+          <canvas
+            class="waveform-canvas absolute inset-0 z-0"
+            id="masterWaveformCanvas"
+          ></canvas>
+          <!-- Dynamic Playhead Scrubber -->
+          <div
+            class="absolute top-0 bottom-0 left-[24%] w-0.5 bg-white z-20 pointer-events-none shadow-[0_0_8px_#ffffff]"
+          >
+            <div
+              class="w-2.5 h-2.5 -ml-1 bg-white rotate-45 transform origin-center shadow"
+            ></div>
+          </div>
+        </div>
+        <!-- BPM Detection & Multiple Reading Ranked Selectors -->
+        <div
+          class="grid grid-cols-1 md:grid-cols-4 gap-2 pt-1 font-mono text-[10px]"
+        >
+          <div
+            class="p-1.5 rounded bg-brand-accentMuted border border-brand-accent/50 text-white flex items-center justify-between"
+          >
+            <span class="font-bold text-brand-accent">118.0 BPM</span>
+            <span
+              class="text-[9px] bg-brand-accent/20 px-1 py-0.5 rounded text-white font-bold"
+              >100% CONFIDENCE</span
+            >
+          </div>
+          <div
+            class="p-1.5 rounded bg-brand-surface border border-brand-border text-zinc-400 flex items-center justify-between hover:border-zinc-500 cursor-pointer"
+          >
+            <span class="font-medium text-zinc-300">79.0 BPM</span>
+            <span class="text-[9px] text-zinc-500">64% Match</span>
+          </div>
+          <div
+            class="p-1.5 rounded bg-brand-surface border border-brand-border text-zinc-400 flex items-center justify-between hover:border-zinc-500 cursor-pointer"
+          >
+            <span class="font-medium text-zinc-300">236.0 BPM</span>
+            <span class="text-[9px] text-zinc-500">53% (2x Double)</span>
+          </div>
+          <div
+            class="p-1.5 rounded bg-brand-surface border border-brand-border text-zinc-400 flex items-center justify-between hover:border-zinc-500 cursor-pointer"
+          >
+            <span class="font-medium text-zinc-300">94.0 BPM</span>
+            <span class="text-[9px] text-zinc-500">34% Alternate</span>
+          </div>
+        </div>
+      </section>
+      <!-- END: MasterWaveformSection -->
+      <!-- BEGIN: MultiTrackStemPlayer -->
+      <section
+        aria-label="Multi-Track Stem Channels"
+        class="bg-brand-panel border border-brand-border rounded-lg p-3 flex flex-col gap-2.5 shrink-0 shadow-sm"
+      >
+        <!-- Section Header -->
+        <div
+          class="flex items-center justify-between font-mono text-[11px] pb-1 border-b border-brand-border/60"
+        >
+          <div class="flex items-center space-x-2">
+            <svg
+              class="w-3.5 h-3.5 text-brand-accent"
+              fill="currentColor"
+              viewbox="0 0 20 20"
+            >
+              <path
+                d="M7 3a1 1 0 000 2h6a1 1 0 100-2H7zM4 7a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1zM2 11a2 2 0 012-2h12a2 2 0 012 2v4a2 2 0 01-2 2H4a2 2 0 01-2-2v-4z"
+              ></path>
+            </svg>
+            <span class="font-bold tracking-wider text-zinc-200 uppercase"
+              >Multi-Track Stem Player</span
+            >
+            <span class="text-zinc-500 font-sans text-[10px]"
+              >Synchronized 4-Stem real-time playback</span
+            >
+          </div>
+          <div class="text-zinc-500 text-[10px]">
+            Solo (<span class="text-zinc-400">s</span>) isolates · Mute (<span
+              class="text-zinc-400"
+              >m</span
+            >) silences track
+          </div>
+        </div>
+        <!-- Stems Stack Container -->
+        <div class="flex flex-col gap-2" data-purpose="stem-tracks-list">
+          <!-- Stem Track 1: Vocals (Neon Purple/Magenta) -->
+          <article
+            class="flex items-stretch bg-brand-surface rounded border border-brand-border/80 hover:border-zinc-700 transition-colors h-14 overflow-hidden"
+            data-stem="vocals"
+          >
+            <!-- Channel Header Badge -->
+            <div
+              class="w-32 bg-[#1b1724] border-r border-brand-border flex items-center px-3 justify-between shrink-0"
+            >
+              <div class="flex items-center space-x-2">
+                <span
+                  class="w-2.5 h-2.5 rounded-full bg-stem-vocals shadow-[0_0_6px_#c084fc]"
+                ></span>
+                <span class="font-mono font-bold text-xs text-purple-300"
+                  >Vocals</span
+                >
+              </div>
+              <span class="text-[9px] font-mono text-purple-400/70">ISO-1</span>
+            </div>
+            <!-- Waveform Display Area -->
+            <div
+              class="flex-1 relative bg-[#0d0c13] overflow-hidden cursor-pointer"
+            >
+              <canvas
+                class="waveform-canvas absolute inset-0"
+                id="waveform-vocals"
+              ></canvas>
+              <!-- Playhead scrubber mark -->
+              <div
+                class="absolute top-0 bottom-0 left-[24%] w-0.5 bg-purple-300/80 pointer-events-none"
+              ></div>
+            </div>
+            <!-- Channel Controls Rack -->
+            <div
+              class="w-64 bg-brand-surfaceLight border-l border-brand-border flex items-center px-3 space-x-3 shrink-0"
+            >
+              <!-- Mute / Solo buttons -->
+              <div class="flex items-center space-x-1">
+                <button
+                  class="w-6 h-6 rounded bg-brand-surface border border-zinc-700 text-zinc-400 hover:text-white font-mono font-bold text-[10px] flex items-center justify-center transition-colors"
+                >
+                  M
+                </button>
+                <button
+                  class="w-6 h-6 rounded bg-brand-surface border border-zinc-700 text-purple-400 hover:bg-purple-950 font-mono font-bold text-[10px] flex items-center justify-center transition-colors"
+                >
+                  S
+                </button>
+              </div>
+              <!-- Volume Slider & Readout -->
+              <div class="flex-1 flex items-center space-x-2">
+                <svg
+                  class="w-3 h-3 text-zinc-400 shrink-0"
+                  fill="currentColor"
+                  viewbox="0 0 20 20"
+                >
+                  <path
+                    d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-2.929 7.071 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 010-1.414z"
+                  ></path>
+                </svg>
+                <input
+                  class="w-full"
+                  max="100"
+                  min="0"
+                  type="range"
+                  value="100"
+                />
+                <span class="font-mono text-[10px] text-zinc-400 w-8 text-right"
+                  >100%</span
+                >
+              </div>
+            </div>
+          </article>
+          <!-- Stem Track 2: Drums (Indigo / Violet) -->
+          <article
+            class="flex items-stretch bg-brand-surface rounded border border-brand-border/80 hover:border-zinc-700 transition-colors h-14 overflow-hidden"
+            data-stem="drums"
+          >
+            <!-- Channel Header Badge -->
+            <div
+              class="w-32 bg-[#171827] border-r border-brand-border flex items-center px-3 justify-between shrink-0"
+            >
+              <div class="flex items-center space-x-2">
+                <span
+                  class="w-2.5 h-2.5 rounded-full bg-stem-drums shadow-[0_0_6px_#818cf8]"
+                ></span>
+                <span class="font-mono font-bold text-xs text-indigo-300"
+                  >Drums</span
+                >
+              </div>
+              <span class="text-[9px] font-mono text-indigo-400/70">ISO-2</span>
+            </div>
+            <!-- Waveform Display Area -->
+            <div
+              class="flex-1 relative bg-[#0b0c16] overflow-hidden cursor-pointer"
+            >
+              <canvas
+                class="waveform-canvas absolute inset-0"
+                id="waveform-drums"
+              ></canvas>
+              <div
+                class="absolute top-0 bottom-0 left-[24%] w-0.5 bg-indigo-300/80 pointer-events-none"
+              ></div>
+            </div>
+            <!-- Channel Controls Rack -->
+            <div
+              class="w-64 bg-brand-surfaceLight border-l border-brand-border flex items-center px-3 space-x-3 shrink-0"
+            >
+              <div class="flex items-center space-x-1">
+                <button
+                  class="w-6 h-6 rounded bg-brand-surface border border-zinc-700 text-zinc-400 hover:text-white font-mono font-bold text-[10px] flex items-center justify-center transition-colors"
+                >
+                  M
+                </button>
+                <button
+                  class="w-6 h-6 rounded bg-brand-surface border border-zinc-700 text-indigo-400 hover:bg-indigo-950 font-mono font-bold text-[10px] flex items-center justify-center transition-colors"
+                >
+                  S
+                </button>
+              </div>
+              <div class="flex-1 flex items-center space-x-2">
+                <svg
+                  class="w-3 h-3 text-zinc-400 shrink-0"
+                  fill="currentColor"
+                  viewbox="0 0 20 20"
+                >
+                  <path
+                    d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-2.929 7.071 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 010-1.414z"
+                  ></path>
+                </svg>
+                <input
+                  class="w-full"
+                  max="100"
+                  min="0"
+                  type="range"
+                  value="100"
+                />
+                <span class="font-mono text-[10px] text-zinc-400 w-8 text-right"
+                  >100%</span
+                >
+              </div>
+            </div>
+          </article>
+          <!-- Stem Track 3: Bass (Amber / Warm Gold) -->
+          <article
+            class="flex items-stretch bg-brand-surface rounded border border-brand-border/80 hover:border-zinc-700 transition-colors h-14 overflow-hidden"
+            data-stem="bass"
+          >
+            <!-- Channel Header Badge -->
+            <div
+              class="w-32 bg-[#221c13] border-r border-brand-border flex items-center px-3 justify-between shrink-0"
+            >
+              <div class="flex items-center space-x-2">
+                <span
+                  class="w-2.5 h-2.5 rounded-full bg-stem-bass shadow-[0_0_6px_#f59e0b]"
+                ></span>
+                <span class="font-mono font-bold text-xs text-amber-300"
+                  >Bass</span
+                >
+              </div>
+              <span class="text-[9px] font-mono text-amber-400/70">ISO-3</span>
+            </div>
+            <!-- Waveform Display Area -->
+            <div
+              class="flex-1 relative bg-[#130f08] overflow-hidden cursor-pointer"
+            >
+              <canvas
+                class="waveform-canvas absolute inset-0"
+                id="waveform-bass"
+              ></canvas>
+              <div
+                class="absolute top-0 bottom-0 left-[24%] w-0.5 bg-amber-300/80 pointer-events-none"
+              ></div>
+            </div>
+            <!-- Channel Controls Rack -->
+            <div
+              class="w-64 bg-brand-surfaceLight border-l border-brand-border flex items-center px-3 space-x-3 shrink-0"
+            >
+              <div class="flex items-center space-x-1">
+                <button
+                  class="w-6 h-6 rounded bg-brand-surface border border-zinc-700 text-zinc-400 hover:text-white font-mono font-bold text-[10px] flex items-center justify-center transition-colors"
+                >
+                  M
+                </button>
+                <button
+                  class="w-6 h-6 rounded bg-brand-surface border border-zinc-700 text-amber-400 hover:bg-amber-950 font-mono font-bold text-[10px] flex items-center justify-center transition-colors"
+                >
+                  S
+                </button>
+              </div>
+              <div class="flex-1 flex items-center space-x-2">
+                <svg
+                  class="w-3 h-3 text-zinc-400 shrink-0"
+                  fill="currentColor"
+                  viewbox="0 0 20 20"
+                >
+                  <path
+                    d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-2.929 7.071 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 010-1.414z"
+                  ></path>
+                </svg>
+                <input
+                  class="w-full"
+                  max="100"
+                  min="0"
+                  type="range"
+                  value="100"
+                />
+                <span class="font-mono text-[10px] text-zinc-400 w-8 text-right"
+                  >100%</span
+                >
+              </div>
+            </div>
+          </article>
+          <!-- Stem Track 4: Other / Instruments (Cyan / Aqua) -->
+          <article
+            class="flex items-stretch bg-brand-surface rounded border border-brand-border/80 hover:border-zinc-700 transition-colors h-14 overflow-hidden"
+            data-stem="other"
+          >
+            <!-- Channel Header Badge -->
+            <div
+              class="w-32 bg-[#121f24] border-r border-brand-border flex items-center px-3 justify-between shrink-0"
+            >
+              <div class="flex items-center space-x-2">
+                <span
+                  class="w-2.5 h-2.5 rounded-full bg-stem-other shadow-[0_0_6px_#22d3ee]"
+                ></span>
+                <span class="font-mono font-bold text-xs text-cyan-300"
+                  >Other</span
+                >
+              </div>
+              <span class="text-[9px] font-mono text-cyan-400/70">ISO-4</span>
+            </div>
+            <!-- Waveform Display Area -->
+            <div
+              class="flex-1 relative bg-[#091114] overflow-hidden cursor-pointer"
+            >
+              <canvas
+                class="waveform-canvas absolute inset-0"
+                id="waveform-other"
+              ></canvas>
+              <div
+                class="absolute top-0 bottom-0 left-[24%] w-0.5 bg-cyan-300/80 pointer-events-none"
+              ></div>
+            </div>
+            <!-- Channel Controls Rack -->
+            <div
+              class="w-64 bg-brand-surfaceLight border-l border-brand-border flex items-center px-3 space-x-3 shrink-0"
+            >
+              <div class="flex items-center space-x-1">
+                <button
+                  class="w-6 h-6 rounded bg-brand-surface border border-zinc-700 text-zinc-400 hover:text-white font-mono font-bold text-[10px] flex items-center justify-center transition-colors"
+                >
+                  M
+                </button>
+                <button
+                  class="w-6 h-6 rounded bg-brand-surface border border-zinc-700 text-cyan-400 hover:bg-cyan-950 font-mono font-bold text-[10px] flex items-center justify-center transition-colors"
+                >
+                  S
+                </button>
+              </div>
+              <div class="flex-1 flex items-center space-x-2">
+                <svg
+                  class="w-3 h-3 text-zinc-400 shrink-0"
+                  fill="currentColor"
+                  viewbox="0 0 20 20"
+                >
+                  <path
+                    d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-2.929 7.071 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 010-1.414z"
+                  ></path>
+                </svg>
+                <input
+                  class="w-full"
+                  max="100"
+                  min="0"
+                  type="range"
+                  value="100"
+                />
+                <span class="font-mono text-[10px] text-zinc-400 w-8 text-right"
+                  >100%</span
+                >
+              </div>
+            </div>
+          </article>
+        </div>
+      </section>
+      <!-- END: MultiTrackStemPlayer -->
+      <!-- BEGIN: DSPRackAndMetronome -->
+      <section
+        aria-label="Audio DSP Processing and Tools"
+        class="grid grid-cols-1 md:grid-cols-3 gap-3"
+      >
+        <!-- Card 1: Time-Stretch & Speed -->
+        <div
+          class="bg-brand-panel border border-brand-border rounded-lg p-3 flex flex-col justify-between"
+          data-purpose="tempo-control-card"
+        >
+          <div
+            class="flex items-center justify-between pb-2 border-b border-brand-border/60"
+          >
+            <div
+              class="flex items-center space-x-2 font-mono text-[11px] font-bold text-zinc-200 uppercase"
+            >
+              <svg
+                class="w-3.5 h-3.5 text-brand-accent"
+                fill="none"
+                stroke="currentColor"
+                viewbox="0 0 24 24"
+              >
+                <path
+                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                ></path>
+              </svg>
+              <span>Time-Stretch &amp; Speed</span>
+            </div>
+            <span
+              class="font-mono text-brand-accent font-bold text-[11px] bg-brand-accentMuted px-1.5 py-0.5 rounded"
+              >1.00x</span
+            >
+          </div>
+          <div class="py-2.5">
+            <div
+              class="flex justify-between text-[10px] font-mono text-zinc-400 mb-1"
+            >
+              <span>0.50x</span>
+              <span class="text-zinc-500">Real-time Phase Vocoder</span>
+              <span>2.00x</span>
+            </div>
+            <input class="w-full" max="200" min="50" type="range" value="100" />
+          </div>
+          <!-- Speed Preset Quick Pills matching original interface -->
+          <div class="grid grid-cols-6 gap-1 pt-1 font-mono text-[10px]">
+            <button
+              class="py-1 rounded bg-brand-surface border border-brand-border text-zinc-400 hover:text-white hover:border-zinc-500 text-center"
+            >
+              0.50x
+            </button>
+            <button
+              class="py-1 rounded bg-brand-surface border border-brand-border text-zinc-400 hover:text-white hover:border-zinc-500 text-center"
+            >
+              0.75x
+            </button>
+            <button
+              class="py-1 rounded bg-brand-accent text-white font-bold shadow-[0_0_8px_rgba(248,81,83,0.5)] text-center"
+            >
+              1.00x
+            </button>
+            <button
+              class="py-1 rounded bg-brand-surface border border-brand-border text-zinc-400 hover:text-white hover:border-zinc-500 text-center"
+            >
+              1.25x
+            </button>
+            <button
+              class="py-1 rounded bg-brand-surface border border-brand-border text-zinc-400 hover:text-white hover:border-zinc-500 text-center"
+            >
+              1.50x
+            </button>
+            <button
+              class="py-1 rounded bg-brand-surface border border-brand-border text-zinc-400 hover:text-white hover:border-zinc-500 text-center"
+            >
+              2.00x
+            </button>
+          </div>
+        </div>
+        <!-- Card 2: Pitch Transposition -->
+        <div
+          class="bg-brand-panel border border-brand-border rounded-lg p-3 flex flex-col justify-between"
+          data-purpose="pitch-transposition-card"
+        >
+          <div
+            class="flex items-center justify-between pb-2 border-b border-brand-border/60"
+          >
+            <div
+              class="flex items-center space-x-2 font-mono text-[11px] font-bold text-zinc-200 uppercase"
+            >
+              <svg
+                class="w-3.5 h-3.5 text-purple-400"
+                fill="currentColor"
+                viewbox="0 0 20 20"
+              >
+                <path
+                  d="M18 3a1 1 0 00-1.196-.98l-10 2A1 1 0 006 5v9.114A4.369 4.369 0 005 14c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V7.82l8-1.6v5.894A4.37 4.37 0 0015 12c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V3z"
+                ></path>
+              </svg>
+              <span>Pitch Transposition</span>
+            </div>
+            <span
+              class="font-mono text-zinc-300 font-bold text-[11px] bg-brand-surface px-1.5 py-0.5 rounded border border-brand-border"
+              >0 st</span
+            >
+          </div>
+          <div class="py-2.5">
+            <div
+              class="flex justify-between text-[10px] font-mono text-zinc-400 mb-1"
+            >
+              <span>-12 (Octave Down)</span>
+              <span class="text-zinc-500">Original (0)</span>
+              <span>+12 (Octave Up)</span>
+            </div>
+            <input class="w-full" max="12" min="-12" type="range" value="0" />
+          </div>
+          <!-- Formant lock feature -->
+          <div class="flex items-center justify-between pt-1">
+            <div class="flex items-center space-x-2">
+              <input
+                checked=""
+                class="rounded bg-brand-surface border-brand-border text-brand-accent focus:ring-0 w-3.5 h-3.5 cursor-pointer"
+                id="formant-lock"
+                type="checkbox"
+              />
+              <label
+                class="text-[10px] text-zinc-300 cursor-pointer font-medium"
+                for="formant-lock"
+                >Vocal Formant Preservation</label
+              >
+            </div>
+            <span
+              class="font-mono text-[9px] text-brand-accent uppercase tracking-wider font-semibold"
+              >Vocals Stem</span
+            >
+          </div>
+        </div>
+        <!-- Card 3: Click Track / Metronome -->
+        <div
+          class="bg-brand-panel border border-brand-border rounded-lg p-3 flex flex-col justify-between"
+          data-purpose="metronome-card"
+        >
+          <div
+            class="flex items-center justify-between pb-2 border-b border-brand-border/60"
+          >
+            <div
+              class="flex items-center space-x-2 font-mono text-[11px] font-bold text-zinc-200 uppercase"
+            >
+              <svg
+                class="w-3.5 h-3.5 text-zinc-400"
+                fill="none"
+                stroke="currentColor"
+                viewbox="0 0 24 24"
+              >
+                <path
+                  d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                ></path>
+              </svg>
+              <span>Click Track / Metronome</span>
+            </div>
+            <div class="flex items-center space-x-1 font-mono text-[10px]">
+              <span
+                class="w-2 h-2 rounded-full bg-brand-accent animate-pulse"
+              ></span>
+              <span class="text-zinc-300 font-bold">118.0 BPM</span>
+            </div>
+          </div>
+          <div class="py-2.5 flex items-center space-x-3">
+            <button
+              class="px-2.5 py-1 rounded bg-brand-surface border border-brand-border text-zinc-300 hover:text-white font-mono text-[10px] shrink-0"
+            >
+              4/4 Beat
+            </button>
+            <div class="flex-1 flex items-center space-x-2">
+              <svg
+                class="w-3 h-3 text-zinc-500"
+                fill="currentColor"
+                viewbox="0 0 20 20"
+              >
+                <path
+                  d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217z"
+                ></path>
+              </svg>
+              <input class="w-full" max="100" min="0" type="range" value="70" />
+              <span class="font-mono text-[10px] text-zinc-400">70%</span>
+            </div>
+          </div>
+          <div class="flex items-center justify-between text-[10px] pt-1">
+            <div class="flex items-center space-x-1.5 font-mono">
+              <span class="w-2 h-2 rounded-full bg-brand-accent"></span>
+              <span class="w-2 h-2 rounded-full bg-zinc-700"></span>
+              <span class="w-2 h-2 rounded-full bg-zinc-700"></span>
+              <span class="w-2 h-2 rounded-full bg-zinc-700"></span>
+              <span class="text-zinc-500 ml-1 text-[9px]">BAR 14.1</span>
+            </div>
+            <button
+              class="text-brand-accent hover:underline text-[10px] font-mono"
+            >
+              Reset Pitch &amp; Tempo
+            </button>
+          </div>
+        </div>
+      </section>
+      <!-- END: DSPRackAndMetronome -->
+    </main>
+    <!-- END: MainWorkspace -->
+    <!-- BEGIN: MasterTransportFooter -->
+    <footer
+      class="h-16 bg-brand-panel border-t border-brand-border px-6 flex items-center justify-between shrink-0 z-30"
+      data-purpose="master-transport-bar"
+    >
+      <!-- Left: Time Code & Playback Synchronization -->
+      <div class="flex items-center space-x-4 w-72">
+        <div
+          class="font-mono bg-brand-bg px-3 py-1.5 rounded border border-brand-border flex items-baseline space-x-1.5"
+        >
+          <span
+            class="text-white text-base font-bold tracking-wider"
+            id="elapsed-time"
+            >00:51</span
+          >
+          <span class="text-zinc-500 text-xs">/</span>
+          <span class="text-zinc-400 text-xs">03:35</span>
+        </div>
+        <div class="flex flex-col">
+          <span
+            class="text-[9px] font-mono uppercase tracking-widest text-emerald-400 flex items-center"
+          >
+            <span
+              class="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1 shadow-[0_0_6px_#34d399]"
+            ></span
+            >SYNC READY
+          </span>
+          <span class="text-[9px] font-mono text-zinc-500"
+            >4 STEMS PHASE-LOCKED</span
+          >
+        </div>
+      </div>
+      <!-- Center: Primary Audio Transport Controls -->
+      <div class="flex items-center space-x-3">
+        <!-- Loop Toggle -->
+        <button
+          class="p-2 text-zinc-400 hover:text-white bg-brand-surface border border-brand-border rounded-md hover:border-zinc-600 transition-colors"
+          title="Loop Section"
+        >
+          <svg
+            class="w-4 h-4"
+            fill="none"
+            stroke="currentColor"
+            viewbox="0 0 24 24"
+          >
+            <path
+              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+            ></path>
+          </svg>
+        </button>
+        <!-- Previous / Rewind -->
+        <button
+          class="p-2 text-zinc-300 hover:text-white bg-brand-surface border border-brand-border rounded-md hover:border-zinc-600 transition-colors"
+          title="Rewind to start"
+        >
+          <svg class="w-4 h-4" fill="currentColor" viewbox="0 0 20 20">
+            <path
+              d="M8.445 14.832A1 1 0 0010 14v-2.798l5.445 3.63A1 1 0 0017 14V6a1 1 0 00-1.555-.832L10 8.798V6a1 1 0 00-1.555-.832l-6 4a1 1 0 000 1.664l6 4z"
+            ></path>
+          </svg>
+        </button>
+        <!-- Large Coral Play / Pause Button -->
+        <button
+          class="w-11 h-11 rounded-full bg-brand-accent hover:bg-brand-accentHover text-white flex items-center justify-center shadow-[0_0_16px_rgba(248,81,83,0.55)] transition-all transform active:scale-95"
+          id="transport-play-btn"
+          title="Play / Pause (Space)"
+        >
+          <!-- SVG Play Icon -->
+          <svg class="w-5 h-5 ml-0.5" fill="currentColor" viewbox="0 0 24 24">
+            <polygon points="6 4 20 12 6 20 6 4"></polygon>
+          </svg>
+        </button>
+        <!-- Next / Jump -->
+        <button
+          class="p-2 text-zinc-300 hover:text-white bg-brand-surface border border-brand-border rounded-md hover:border-zinc-600 transition-colors"
+          title="Fast Forward"
+        >
+          <svg class="w-4 h-4" fill="currentColor" viewbox="0 0 20 20">
+            <path
+              d="M4.555 5.168A1 1 0 003 6v8a1 1 0 001.555.832L10 11.202V14a1 1 0 001.555.832l6-4a1 1 0 000-1.664l-6-4A1 1 0 0010 6v2.798L4.555 5.168z"
+            ></path>
+          </svg>
+        </button>
+        <!-- Tap Tempo Quick Action -->
+        <button
+          class="px-2.5 py-1.5 bg-brand-surface border border-brand-border rounded-md text-zinc-400 hover:text-white font-mono text-[10px] font-semibold"
+        >
+          TAP
+        </button>
+      </div>
+      <!-- Right: Stereo VU Meters & Master Output Fader -->
+      <div class="flex items-center space-x-4 w-72 justify-end">
+        <!-- Master Peak Meter -->
+        <div class="flex items-center space-x-1" title="Peak Output Meters L/R">
+          <div class="flex flex-col space-y-0.5">
+            <div class="w-1.5 h-1 bg-zinc-700"></div>
+            <div class="w-1.5 h-1 bg-emerald-500"></div>
+            <div class="w-1.5 h-1 bg-emerald-500"></div>
+            <div class="w-1.5 h-1 bg-emerald-400"></div>
+            <div class="w-1.5 h-1 bg-emerald-400"></div>
+            <div class="w-1.5 h-1 bg-emerald-400"></div>
+          </div>
+          <div class="flex flex-col space-y-0.5">
+            <div class="w-1.5 h-1 bg-zinc-700"></div>
+            <div class="w-1.5 h-1 bg-zinc-700"></div>
+            <div class="w-1.5 h-1 bg-emerald-500"></div>
+            <div class="w-1.5 h-1 bg-emerald-400"></div>
+            <div class="w-1.5 h-1 bg-emerald-400"></div>
+            <div class="w-1.5 h-1 bg-emerald-400"></div>
+          </div>
+          <span class="font-mono text-[9px] text-zinc-500 ml-1">0 dB</span>
+        </div>
+        <!-- Master Volume Control -->
+        <div class="flex items-center space-x-2">
+          <span
+            class="font-mono text-[10px] text-zinc-400 uppercase font-semibold"
+            >Master</span
+          >
+          <input class="w-20" max="100" min="0" type="range" value="100" />
+          <span
+            class="font-mono text-[10px] text-zinc-200 font-bold w-7 text-right"
+            >100%</span
+          >
+        </div>
+      </div>
+    </footer>
+    <!-- END: MasterTransportFooter -->
+    <!-- BEGIN: WaveformCanvasRendererScript -->
+    <script data-purpose="daw-waveform-renderers">
+      /**
+       * Procedural high-density audio waveform renderer
+       * Recreates the authentic dense audio peak visuals seen in professional DAWs
+       */
+      function drawDetailedAudioWaveform(
+        canvasId,
+        primaryColor,
+        densityMultiplier = 1.0,
+        seed = 42
+      ) {
+        const canvas = document.getElementById(canvasId);
+        if (!canvas) return;
+
+        const ctx = canvas.getContext("2d");
+        const dpr = window.devicePixelRatio || 1;
+
+        const width = canvas.parentElement.clientWidth;
+        const height = canvas.parentElement.clientHeight;
+
+        canvas.width = width * dpr;
+        canvas.height = height * dpr;
+        ctx.scale(dpr, dpr);
+
+        const midY = height / 2;
+        const barsCount = Math.floor(width / 2); // 1 vertical peak every 2px
+
+        // Simple seeded pseudo-random for natural looking song variations
+        let s = seed;
+        const pseudoRand = () => {
+          s = (s * 9301 + 49297) % 233280;
+          return s / 233280;
+        };
+
+        ctx.clearRect(0, 0, width, height);
+
+        // Draw middle center line subtle guide
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.05)";
+        ctx.beginPath();
+        ctx.moveTo(0, midY);
+        ctx.lineTo(width, midY);
+        ctx.stroke();
+
+        ctx.strokeStyle = primaryColor;
+        ctx.lineWidth = 1.2;
+
+        for (let i = 0; i < barsCount; i++) {
+          const x = i * 2;
+          const progress = i / barsCount;
+
+          // Shape envelopes: Intro, verse, chorus peaks, outro taper
+          let envelope = Math.sin(progress * Math.PI) * 0.75;
+          if (progress > 0.15 && progress < 0.45) envelope += 0.25;
+          if (progress > 0.55 && progress < 0.85) envelope += 0.35;
+          if (progress > 0.88)
+            envelope *= Math.max(0, 1 - (progress - 0.88) / 0.12); // smooth fade-out at end
+
+          // Combine multiple frequencies for dense realistic peaks
+          const noise = (pseudoRand() * 0.7 + 0.3) * densityMultiplier;
+          const amp = Math.min(midY * 0.92, midY * envelope * noise);
+
+          // Draw mirrored vertical bar
+          ctx.beginPath();
+          ctx.moveTo(x, midY - amp);
+          ctx.lineTo(x, midY + amp);
+          ctx.stroke();
+        }
+      }
+
+      // Render all waveforms matching screenshot stem colors
+      function renderAllWaveforms() {
+        // 1. Master: Lime Neon (#39ff14)
+        drawDetailedAudioWaveform("masterWaveformCanvas", "#39ff14", 1.15, 101);
+
+        // 2. Vocals: Neon Purple / Magenta (#c084fc)
+        drawDetailedAudioWaveform("waveform-vocals", "#c084fc", 0.85, 202);
+
+        // 3. Drums: Violet / Indigo (#818cf8)
+        drawDetailedAudioWaveform("waveform-drums", "#818cf8", 1.0, 303);
+
+        // 4. Bass: Warm Amber / Gold (#f59e0b)
+        drawDetailedAudioWaveform("waveform-bass", "#f59e0b", 0.75, 404);
+
+        // 5. Other: Electric Cyan (#22d3ee)
+        drawDetailedAudioWaveform("waveform-other", "#22d3ee", 0.95, 505);
+      }
+
+      // Initial render and on resize
+      window.addEventListener("load", renderAllWaveforms);
+      window.addEventListener("resize", renderAllWaveforms);
+
+      // Minor Play/Pause button interaction
+      const playBtn = document.getElementById("transport-play-btn");
+      let isPlaying = false;
+      if (playBtn) {
+        playBtn.addEventListener("click", () => {
+          isPlaying = !isPlaying;
+          if (isPlaying) {
+            playBtn.innerHTML = `<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>`;
+          } else {
+            playBtn.innerHTML = `<svg class="w-5 h-5 ml-0.5" fill="currentColor" viewBox="0 0 24 24"><polygon points="6 4 20 12 6 20 6 4"></polygon></svg>`;
+          }
+        });
+      }
+    </script>
+    <!-- END: WaveformCanvasRendererScript -->
+  </body>
+</html>
+I
