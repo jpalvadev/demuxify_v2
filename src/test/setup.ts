@@ -87,6 +87,45 @@ if (typeof window !== "undefined") {
           onended: null,
         };
       }
+      // Peak-pip tap seam (2026-11-05): flat time-domain data by default;
+      // tests set fillValue (or override getFloatTimeDomainData) to assert
+      // lit levels — the sampler real Chrome's AnalyserNode exposes.
+      createAnalyser() {
+        const analyserNode = {
+          fftSize: 2048,
+          smoothingTimeConstant: 0,
+          channelCount: 1,
+          fillValue: 0,
+          connect: vi.fn(),
+          disconnect: vi.fn(),
+          getFloatTimeDomainData: vi.fn((arr: Float32Array) => {
+            arr.fill(analyserNode.fillValue);
+          }),
+          getChannelData: vi.fn((copyTo: Float32Array) => {
+            copyTo.fill(analyserNode.fillValue);
+            return copyTo;
+          }),
+        };
+        return analyserNode;
+      }
+      createChannelSplitter() {
+        return {
+          channelCount: 2,
+          numberOfInputs: 1,
+          numberOfOutputs: 2,
+          connect: vi.fn(),
+          disconnect: vi.fn(),
+        };
+      }
+      createChannelMerger() {
+        return {
+          channelCount: 2,
+          numberOfInputs: 2,
+          numberOfOutputs: 1,
+          connect: vi.fn(),
+          disconnect: vi.fn(),
+        };
+      }
       createBuffer(channels: number, length: number, sampleRate: number) {
         const channelArrays = Array.from(
           { length: channels },

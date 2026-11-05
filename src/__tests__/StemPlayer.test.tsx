@@ -5,6 +5,7 @@ import {
   fireEvent,
   within,
   waitFor,
+  act,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { StemPlayer } from "../components/StemPlayer";
@@ -20,6 +21,14 @@ import { createMockAudioContext } from "./audioContextMockFactory";
 describe("StemPlayer UI Component", () => {
   let mockCtx: any;
   const sampleRate = 44100;
+
+  // Captures the Tab Shell bridge the component registers (ticket 02 seam):
+  // the footer controls' handleless access point, asserted without reaching
+  // into engine internals.
+  const bridgeRefCapture: { current: any } = { current: null };
+  const onBridgeRegistered = (bridge: any) => {
+    bridgeRefCapture.current = bridge;
+  };
   const sampleCount = 44100 * 10; // 10s
 
   const dummyStems: Record<StemName, Float32Array[]> = {
@@ -362,6 +371,52 @@ describe("StemPlayer UI Component", () => {
     expect(
       dialogScope.getByRole("slider", { name: /master mixdown volume/i })
     ).toHaveValue("0.75");
+  });
+
+  it("routes the footer Master fader bridge command to the engine's master volume", () => {
+    // 2026-11-05: the footer's live Master fader (App) drives master volume through the
+    // Tab Shell bridge's setMasterVolume command — it must register on the engine and
+    // mirror into the Stem Player UI exactly like the export-dialog commit path does.
+    let captured: any = null;
+    render(
+      <StemPlayer
+        stems={dummyStems}
+        sampleRate={sampleRate}
+        audioContext={mockCtx}
+        onTransportControls={(controls: any) => {
+          captured = controls;
+        }}
+      />
+    );
+
+    expect(captured, "transport controls must register").not.toBeNull();
+    expect(typeof captured.setMasterVolume).toBe("function");
+
+    act(() => {
+      captured.setMasterVolume(0.6);
+    });
+
+    const masterSlider = screen.getByRole("slider", { name: /master volume/i });
+    expect(masterSlider).toHaveValue("0.6");
+    expect(screen.getByText(/^60%$/)).toBeInTheDocument();
+
+    act(() => {
+      captured.setMasterVolume(0.75);
+    });
+
+    expect(masterSlider).toHaveValue("0.75");
+    expect(screen.getByText(/^75%$/)).toBeInTheDocument();
+
+    // The bridge command reaches the engine itself (masterGain.setValueAtTime),
+    // not just the UI mirror.
+    const gainNodes = mockCtx.createGain.mock.results.map(
+      (result: any) => result.value
+    );
+    expect(
+      gainNodes.some((node: any) =>
+        node.gain.setValueAtTime.mock.calls.some(([v]: [number]) => v === 0.75)
+      )
+    ).toBe(true);
   });
 
   it("keeps the hosted form action-free while the bridge still re-emits", async () => {
@@ -781,5 +836,50 @@ describe("StemPlayer UI Component", () => {
       })
     );
     expect(requested).toEqual([215.4]);
+  });
+
+  // 2026-11-05 live footer (ticket 09): the Tab Shell footer reaches Master
+  // Volume through the bridge, and every move mirrors out via onMixerChange.
+  it("routes the bridge's Master Volume moves to the engine's master gain and mirrors them through onMixerChange", () => {
+    const onMixerChange = vi.fn();
+    bridgeRefCapture.current = null;
+    render(
+      <StemPlayer
+        stems={dummyStems}
+        sampleRate={sampleRate}
+        audioContext={mockCtx}
+        onMixerChange={onMixerChange}
+        onTransportControls={onBridgeRegistered}
+      />
+    );
+
+    const slider = screen.getByRole("slider", { name: /master volume/i });
+    fireEvent.change(slider, { target: { value: "0.75" } });
+    fireEvent.change(slider, { target: { value: "0.3" } });
+
+    // Engine side: the master gain ramps with every move — the same node
+    // the bridge's setMasterVolume drives.
+    const rampedGain = mockCtx.createdGains.find((gain: any) =>
+      gain.gain.setValueAtTime.mock.calls.some(
+        ([v]: [number, ...number[]]) => v === 0.75
+      )
+    );
+    expect(rampedGain).toBeDefined();
+    expect(rampedGain.gain.setValueAtTime).toHaveBeenCalledWith(
+      0.3,
+      mockCtx.currentTime
+    );
+
+    // Mirror side: the bridge reports the move outward for the footer.
+    const bridge = bridgeRefCapture.current;
+    expect(bridge).not.toBeNull();
+    expect(bridge?.setMasterVolume).toBeTypeOf("function");
+    bridge?.setMasterVolume(0.5);
+    expect(rampedGain.gain.setValueAtTime).toHaveBeenLastCalledWith(
+      0.5,
+      mockCtx.currentTime
+    );
+    const lastMirror = onMixerChange.mock.calls.at(-1)?.[0];
+    expect(lastMirror?.masterVolume).toBe(0.5);
   });
 });

@@ -4,6 +4,7 @@ import {
   ClickTrackMixerState,
   CalibratedClickGrid,
   ClickCalibrationRejection,
+  StereoPeakLevels,
   synthesizeClickTrackChannel,
   calibrateClickGrid,
   reanchorBeatGridToAnchor,
@@ -55,7 +56,7 @@ describe("StemPlayerEngine", () => {
   });
 
   describe("Audio Graph Construction and Routing", () => {
-    it("creates dedicated GainNodes for all 4 Stems connected to Master Gain and Destination", () => {
+    it("creates dedicated GainNodes for all 4 Stems connected to Master Gain, the Peak tap, and Destination", () => {
       const engine = new StemPlayerEngine(dummyStems, {
         audioContext: mockCtx as any,
         sampleRate,
@@ -63,8 +64,40 @@ describe("StemPlayerEngine", () => {
 
       expect(mockCtx.createGain).toHaveBeenCalledTimes(5); // 4 stems + 1 master
 
+      // 2026-11-05 peak pips: the meter path IS the audible path — splitter
+      // → per-channel analysers → destination inputs 0/1 (live Chrome probes:
+      // analysers downmix stereo to mono, and Chrome only pulls analysers
+      // that feed the destination). Post-fader, so Master Volume moves stay
+      // visible on the pips.
       const masterGain = engine.getMasterGainNode();
-      expect(masterGain.connect).toHaveBeenCalledWith(mockCtx.destination);
+      const splitter = mockCtx.createdSplitters[0];
+      const merger = mockCtx.createdMergers[0];
+      expect(splitter).toBeDefined();
+      expect(merger).toBeDefined();
+      expect(masterGain.connect).toHaveBeenCalledWith(splitter);
+      expect(masterGain.connect).not.toHaveBeenCalledWith(mockCtx.destination);
+      expect(mockCtx.createdAnalysers).toHaveLength(2);
+      expect(splitter.connect).toHaveBeenCalledWith(
+        mockCtx.createdAnalysers[0],
+        0,
+        0
+      );
+      expect(splitter.connect).toHaveBeenCalledWith(
+        mockCtx.createdAnalysers[1],
+        1,
+        0
+      );
+      expect(mockCtx.createdAnalysers[0].connect).toHaveBeenCalledWith(
+        merger,
+        0,
+        0
+      );
+      expect(mockCtx.createdAnalysers[1].connect).toHaveBeenCalledWith(
+        merger,
+        0,
+        1
+      );
+      expect(merger.connect).toHaveBeenCalledWith(mockCtx.destination);
 
       const stemNames: StemName[] = ["vocals", "drums", "bass", "other"];
       for (const stem of stemNames) {
@@ -76,6 +109,94 @@ describe("StemPlayerEngine", () => {
       expect(engine.getDuration()).toBe(10);
       expect(engine.getCurrentTime()).toBe(0);
       expect(engine.isPlaying()).toBe(false);
+    });
+  });
+
+  describe("Stereo Peak Meters (2026-11-05 footer channel)", () => {
+    const pumpRaf = (ctx: any, frames: number) => {
+      for (let i = 0; i < frames; i++) {
+        ctx.currentTime += 0.1;
+        const cb = (globalThis as any).__rafQueue.shift();
+        if (cb) cb();
+      }
+    };
+
+    const installRafQueue = () => {
+      const queue: (() => void)[] = [];
+      (globalThis as any).__rafQueue = queue;
+      const origRaf = window.requestAnimationFrame;
+      const origCancel = window.cancelAnimationFrame;
+      window.requestAnimationFrame = ((cb: () => void) => {
+        queue.push(cb);
+        return queue.length;
+      }) as any;
+      window.cancelAnimationFrame = (() => {}) as any;
+      return () => {
+        window.requestAnimationFrame = origRaf;
+        window.cancelAnimationFrame = origCancel;
+      };
+    };
+
+    it("subscribes at zero, lights from post-fader analyser data while playing, and falls dark on pause", async () => {
+      const restoreRaf = installRafQueue();
+      try {
+        const engine = new StemPlayerEngine(dummyStems, {
+          audioContext: mockCtx as any,
+          sampleRate,
+        });
+
+        const emissions: StereoPeakLevels[] = [];
+        const unsub = engine.subscribeLevels((l) => emissions.push(l));
+
+        // Idle: the channel reports a flat, honest zero — no frozen bars.
+        expect(engine.getLevels()).toEqual({ left: 0, right: 0 });
+        expect(emissions).toEqual([{ left: 0, right: 0 }]);
+
+        // Loud-left (0.5) / quieter-right (0.15) master bus: the sidecar
+        // analysers stream that constant signal through getFloatTimeDomainData.
+        mockCtx.createdAnalysers[0].fillValue = 0.5;
+        mockCtx.createdAnalysers[1].fillValue = 0.15;
+
+        await engine.play();
+        pumpRaf(mockCtx, 8);
+
+        const lit = engine.getLevels();
+        expect(lit.left).toBeGreaterThan(0.7); // -6 dB RMS sits high on the ladder
+        expect(lit.right).toBeGreaterThan(0.5);
+        expect(lit.left).toBeGreaterThan(lit.right);
+
+        const coalesced = emissions.length;
+        expect(coalesced).toBeGreaterThan(1);
+        // Throttled: the meters are painted, not sampled per audio frame.
+        expect(coalesced).toBeLessThanOrEqual(12);
+
+        engine.pause();
+        expect(engine.getLevels()).toEqual({ left: 0, right: 0 });
+        const zeroEmission: StereoPeakLevels = { left: 0, right: 0 };
+        expect(emissions[emissions.length - 1]).toEqual(zeroEmission);
+
+        unsub();
+        engine.dispose();
+      } finally {
+        restoreRaf();
+      }
+    });
+
+    it("keeps the exact pre-fix graph and a silent level channel when the context has no AnalyserNode", () => {
+      const bareCtx: any = { ...mockCtx };
+      delete bareCtx.createAnalyser;
+
+      const engine = new StemPlayerEngine(dummyStems, {
+        audioContext: bareCtx,
+        sampleRate,
+      });
+
+      expect(engine.getAnalyserNode()).toBeNull();
+      expect(engine.getMasterGainNode().connect).toHaveBeenCalledWith(
+        bareCtx.destination
+      );
+      expect(engine.getLevels()).toEqual({ left: 0, right: 0 });
+      engine.dispose();
     });
   });
 

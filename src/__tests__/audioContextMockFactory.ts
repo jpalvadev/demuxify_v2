@@ -4,13 +4,18 @@
 // against it (UI seams: 0; headless engine anchor seams: 10.0).
 // `createdSources` records every BufferSource with its start/stop spies so
 // lane-anchor tests can read the recorded arguments without reaching into the
-// engine's graph.
+// engine's graph. `createdGains` / `createdAnalysers` / `createdSplitters`
+// expose the constructed nodes for graph and peak-pip assertions.
 import { vi } from "vitest";
 
 export function createMockAudioContext(time0: number = 0) {
   let currentTime = time0;
 
   const createdSources: any[] = [];
+  const createdGains: any[] = [];
+  const createdAnalysers: any[] = [];
+  const createdSplitters: any[] = [];
+  const createdMergers: any[] = [];
 
   const createGain = vi.fn(() => {
     const gainNode = {
@@ -23,6 +28,7 @@ export function createMockAudioContext(time0: number = 0) {
       connect: vi.fn(),
       disconnect: vi.fn(),
     };
+    createdGains.push(gainNode);
     return gainNode;
   });
 
@@ -64,6 +70,55 @@ export function createMockAudioContext(time0: number = 0) {
     }
   );
 
+  // Peak-pip tap seam (2026-11-05): the engine samples each channel analyser
+  // via getFloatTimeDomainData — the sampler real Chrome's AnalyserNode
+  // actually exposes. `fillValue` is the per-node signal the mock streams;
+  // tests set it to simulate a loud left / quiet right master bus.
+  const createAnalyser = vi.fn(() => {
+    const analyserNode = {
+      fftSize: 2048,
+      smoothingTimeConstant: 0,
+      channelCount: 1,
+      fillValue: 0,
+      connect: vi.fn(),
+      disconnect: vi.fn(),
+      getFloatTimeDomainData: vi.fn((arr: Float32Array) => {
+        arr.fill(analyserNode.fillValue);
+      }),
+      // Firefox-era copyTo shape kept for doubles that still use it.
+      getChannelData: vi.fn((copyTo: Float32Array) => {
+        copyTo.fill(analyserNode.fillValue);
+        return copyTo;
+      }),
+    };
+    createdAnalysers.push(analyserNode);
+    return analyserNode;
+  });
+
+  const createChannelSplitter = vi.fn(() => {
+    const splitterNode = {
+      channelCount: 2,
+      numberOfInputs: 1,
+      numberOfOutputs: 2,
+      connect: vi.fn(),
+      disconnect: vi.fn(),
+    };
+    createdSplitters.push(splitterNode);
+    return splitterNode;
+  });
+
+  const createChannelMerger = vi.fn(() => {
+    const mergerNode = {
+      channelCount: 2,
+      numberOfInputs: 2,
+      numberOfOutputs: 1,
+      connect: vi.fn(),
+      disconnect: vi.fn(),
+    };
+    createdMergers.push(mergerNode);
+    return mergerNode;
+  });
+
   return {
     get currentTime() {
       return currentTime;
@@ -80,6 +135,13 @@ export function createMockAudioContext(time0: number = 0) {
     createGain,
     createBufferSource,
     createBuffer,
+    createAnalyser,
+    createChannelSplitter,
+    createChannelMerger,
     createdSources,
+    createdGains,
+    createdAnalysers,
+    createdSplitters,
+    createdMergers,
   };
 }

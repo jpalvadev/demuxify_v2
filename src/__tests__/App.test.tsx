@@ -2187,6 +2187,17 @@ describe("App UI Shell", () => {
           next();
         }
       };
+
+      // 2026-11-05 footer fix: the clock chip is LIVE — 00:00 over the full
+      // duration before playback, then it walks on the same Playhead channel
+      // (the fixture's decoded Mix runs 180 s → 03:00).
+      expect(screen.getByTestId("footer-time-current")).toHaveTextContent(
+        "00:00"
+      );
+      expect(screen.getByTestId("footer-time-total")).toHaveTextContent(
+        "03:00"
+      );
+
       pump(6);
 
       await waitFor(() => {
@@ -2194,6 +2205,10 @@ describe("App UI Shell", () => {
       });
       // The disc's pressed state follows the engine's play-state channel.
       expect(footerDisc).toHaveAttribute("aria-pressed", "true");
+      // The footer clock walked with the Playhead: six half-second frames = 3 s.
+      expect(screen.getByTestId("footer-time-current")).toHaveTextContent(
+        "00:03"
+      );
       // The spine's accessible text moves on the same channel — the face is
       // the spine's own m:ss face, one second wider than the Transport's mm:ss.
       expect(spine).toHaveAttribute("aria-valuetext", "0:03");
@@ -2221,6 +2236,171 @@ describe("App UI Shell", () => {
       );
     } finally {
       // Hand the globals back so the rest of the suite keeps jsdom's shape.
+      window.AudioContext = OrigAudioContext as any;
+      window.requestAnimationFrame = OrigRaf as any;
+    }
+  });
+
+  // 2026-11-05 footer fix: the footer's Master fader is a real control wired
+  // through the transport bridge to the engine — moving it restates the %
+  // readout and the live engine master volume (proven through the Export
+  // panel's mirror, which prefills from the engine state bridge).
+  it("wires the footer Master fader to the engine's master volume", async () => {
+    vi.spyOn(webgpuModule, "detectWebGPUCapability").mockResolvedValue({
+      supported: true,
+      isFallback: false,
+    });
+    completeSeparationMocks();
+
+    render(<App />);
+    await loadAndSeparate();
+
+    // The hosted Mix Tab player carries no own transport row (07j), so the
+    // footer fader is the app's one "Master Volume" slider.
+    const fader = screen.getByRole("slider", { name: /^master volume$/i });
+    expect(fader).toHaveValue("100");
+    expect(screen.getByTestId("footer-master-percent")).toHaveTextContent(
+      "100%"
+    );
+
+    fireEvent.change(fader, { target: { value: "60" } });
+
+    // The % readout follows the drag...
+    await waitFor(() => {
+      expect(screen.getByTestId("footer-master-percent")).toHaveTextContent(
+        "60%"
+      );
+    });
+    expect(screen.getByTestId("footer-master-percent")).not.toHaveTextContent(
+      "100%"
+    );
+
+    // ...and the engine restatement reaches the Export panel's mirror, which
+    // prefills the mixdown Master from the live engine master volume.
+    await clickTabButton("Export");
+    const exportRegion = screen.getByRole("region", { name: /export tab/i });
+    const exportPanel = within(exportRegion).getByRole("region", {
+      name: /export audio stems/i,
+    });
+    fireEvent.click(
+      within(exportPanel).getByRole("radio", { name: /custom mixdown/i })
+    );
+    const mixdown = within(exportPanel).getByRole("slider", {
+      name: /master mixdown volume/i,
+    });
+    await waitFor(() => {
+      expect(mixdown).toHaveValue("0.6");
+    });
+
+    // Clamp ends: a drag to 0 silences the Master and paints 0%.
+    fireEvent.change(fader, { target: { value: "0" } });
+    await waitFor(() => {
+      expect(screen.getByTestId("footer-master-percent")).toHaveTextContent(
+        "0%"
+      );
+    });
+  });
+
+  // 2026-11-05 footer fix: the footer's peak pips read the engine's post-fader
+  // stereo levels. With a mock master bus carrying 0.5 on L and 0.15 on R,
+  // the left ladder lights higher than the right one while playing, and both
+  // fall dark on pause.
+  it("drives the footer peak pips from the engine's stereo levels", async () => {
+    vi.spyOn(webgpuModule, "detectWebGPUCapability").mockResolvedValue({
+      supported: true,
+      isFallback: false,
+    });
+    completeSeparationMocks();
+
+    const meterCtx: { ctx: any } = { ctx: null };
+    const OrigAudioContext = window.AudioContext;
+    const MeterAudioContext = function (_options?: AudioContextOptions) {
+      meterCtx.ctx ??= new OrigAudioContext();
+      // Loud-left (0.5) / quieter-right (0.15) master bus for the pump
+      // below: the engine builds the sidecar as splitter → two mono
+      // analysers, sampled via getFloatTimeDomainData (Chrome's API shape).
+      let tapChannel = 0;
+      meterCtx.ctx.createAnalyser = vi.fn(() => {
+        const fill = tapChannel++ === 0 ? 0.5 : 0.15;
+        return {
+          fftSize: 2048,
+          smoothingTimeConstant: 0,
+          channelCount: 1,
+          fillValue: fill,
+          connect: vi.fn(),
+          disconnect: vi.fn(),
+          getFloatTimeDomainData: vi.fn((arr: Float32Array) => {
+            arr.fill(fill);
+          }),
+        };
+      });
+      meterCtx.ctx.createChannelSplitter = vi.fn(() => ({
+        channelCount: 2,
+        numberOfInputs: 1,
+        numberOfOutputs: 2,
+        connect: vi.fn(),
+        disconnect: vi.fn(),
+      }));
+      meterCtx.ctx.createChannelMerger = vi.fn(() => ({
+        channelCount: 2,
+        numberOfInputs: 2,
+        numberOfOutputs: 1,
+        connect: vi.fn(),
+        disconnect: vi.fn(),
+      }));
+      return meterCtx.ctx;
+    };
+    window.AudioContext = MeterAudioContext as any;
+
+    const rafQueue: (() => void)[] = [];
+    const OrigRaf = window.requestAnimationFrame;
+    window.requestAnimationFrame = ((callback: () => void) => {
+      rafQueue.push(callback);
+      return rafQueue.length;
+    }) as any;
+
+    const litCount = (testId: string) =>
+      Array.from(screen.getByTestId(testId).querySelectorAll("span")).filter(
+        (seg) => /bg-st-ok/.test(seg.className)
+      ).length;
+
+    try {
+      render(<App />);
+      await loadAndSeparate();
+
+      // Idle: both ladders are dark — six unlit segments each.
+      expect(litCount("footer-peak-pips-left")).toBe(0);
+      expect(litCount("footer-peak-pips-right")).toBe(0);
+      expect(
+        screen.getByTestId("footer-peak-pips-left").querySelectorAll("span")
+      ).toHaveLength(6);
+
+      const footerDisc = screen.getByRole("button", {
+        name: /^play\/pause$/i,
+      });
+      fireEvent.click(footerDisc);
+      for (let i = 0; i < 8; i++) {
+        meterCtx.ctx!.currentTime += 0.5;
+        rafQueue.shift()!();
+      }
+
+      // Playing: the pips light with signal — and louder L lights higher
+      // than quieter R, the honest stereo reading.
+      await waitFor(() => {
+        expect(litCount("footer-peak-pips-left")).toBeGreaterThanOrEqual(4);
+      });
+      expect(litCount("footer-peak-pips-right")).toBeGreaterThanOrEqual(2);
+      expect(litCount("footer-peak-pips-left")).toBeGreaterThan(
+        litCount("footer-peak-pips-right")
+      );
+
+      // Pause: the meters fall silent at once.
+      fireEvent.click(footerDisc);
+      await waitFor(() => {
+        expect(litCount("footer-peak-pips-left")).toBe(0);
+        expect(litCount("footer-peak-pips-right")).toBe(0);
+      });
+    } finally {
       window.AudioContext = OrigAudioContext as any;
       window.requestAnimationFrame = OrigRaf as any;
     }

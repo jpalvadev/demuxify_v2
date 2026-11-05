@@ -80,6 +80,10 @@ _Avoid_: Modal, popup, overlay, dialog, Listen tab
 The row of dedicated playback controls inside the Stem Player: a single Play/Pause toggle whose icon shows the action coming next, time readout, and Master Volume.
 _Avoid_: Separate Play and Pause buttons, seek-to-start button, pill button
 
+**Peak Pips**:
+The footer's stereo level readout — six segmented bars per channel that rise fast and fall slow with the post-fader signal of the Master bus. A normalized 0..1 RMS display, not a decibel scale: it prints no numerals and never the word "meter".
+_Avoid_: VU meter, peak meter, level bar, dB readout
+
 **Playhead**:
 The single current playback position of a Session, shared by the Master Waveform spine, the Stem strips and the Transport readout: one value, one clock, never two readouts that disagree. Counted in canonical seconds of the Source Mix, invariant under Time-Stretch.
 _Avoid_: Timestamp, position marker, progress bar, play marker, current time

@@ -176,6 +176,27 @@ export type PositionListener = (timeSec: number) => void;
 export type StateListener = (state: StemMixerStates) => void;
 export type TimeStretchListener = (state: TimeStretchState) => void;
 
+// Stereo Peak Meters (footer transport, 2026-11-05 user fix): post-fader L/R
+// meter levels normalized to 0..1 for the footer's peak pips. The scale floor
+// is -60 dBFS; 0 dBFS is the ceiling. The engine owns the measurement (it is
+// the only owner of the audio graph); the shell only paints it.
+export interface StereoPeakLevels {
+  left: number;
+  right: number;
+}
+export type LevelsListener = (levels: StereoPeakLevels) => void;
+
+// Peak meter scale: RMS in [-60, 0] dB maps linearly onto [0, 1].
+const PEAK_METER_FLOOR_DB = -60;
+// The pips are painted, not sampled per audio frame: coalesce emissions to
+// roughly 30/s so listeners never receive more than one update per 30 ms of
+// audio-clock time.
+const PEAK_METER_EMIT_STEP_SEC = 0.03;
+// Per-channel tap: the splitter feeds two mono analysers, each sampling this
+// many time-domain frames (Chrome's getFloatTimeDomainData is mono, so the
+// per-channel split is what makes a stereo meter possible).
+const PEAK_METER_FFT_SIZE = 2048;
+
 function createAudioBufferFromChannels(
   audioContext: AudioContext,
   channels: Float32Array[],
@@ -209,6 +230,20 @@ export class StemPlayerEngine {
   private positionListeners: Set<PositionListener> = new Set();
   private stateListeners: Set<StateListener> = new Set();
   private timeStretchListeners: Set<TimeStretchListener> = new Set();
+
+  // Peak meter lane (2026-11-05): a sidecar tap off the master bus — a
+  // ChannelSplitterNode feeding one AnalyserNode per channel, sinks only.
+  // Optional by construction — environments whose AudioContext mock predates
+  // it (jsdom seams) keep the exact pre-fix graph and report a flat 0 level.
+  private splitterNode: ChannelSplitterNode | null = null;
+  private mergerNode: AudioNode | null = null;
+  private analyserL: AnalyserNode | null = null;
+  private analyserR: AnalyserNode | null = null;
+  private levelsListeners: Set<LevelsListener> = new Set();
+  private levelScratch: Float32Array<ArrayBuffer> | null = null;
+  private smoothedLevelL = 0;
+  private smoothedLevelR = 0;
+  private lastLevelsEmitContextTime = Number.NEGATIVE_INFINITY;
 
   private tempo: number = 1.0;
   private pitch: number = 0; // semitones (-12 to +12)
@@ -247,9 +282,49 @@ export class StemPlayerEngine {
     const sampleRate = options?.sampleRate ?? 44100;
     this.sampleRate = sampleRate;
 
-    // Build Master Gain Node
+    // Build Master Gain Node with the 2026-11-05 peak-pip lane. The meter
+    // path IS the audible path: splitter → one AnalyserNode per channel →
+    // merger → destination. Analysers are pass-through, so what you hear is
+    // unchanged. Live Chrome probes pinned the shape: (a) Chrome's
+    // AnalyserNode has no getChannelData and downmixes stereo input to mono,
+    // so per-channel data needs the splitter; (b) Chrome only pulls
+    // analysers that feed the destination — a sidecar sink reads flat zeros;
+    // (c) the destination node has ONE input, so the split mono channels are
+    // re-packed by a ChannelMerger (input 0 → L, input 1 → R). Contexts
+    // without the API keep the byte-original direct masterGain → destination
+    // edge (post-fader either way, so Master Volume stays visible on pips).
     this.masterGainNode = this.audioContext.createGain();
-    this.masterGainNode.connect(this.audioContext.destination);
+    const ctxWithMeter = this.audioContext as AudioContext & {
+      createAnalyser?: () => AnalyserNode;
+      createChannelSplitter?: (numberOfOutputs: number) => ChannelSplitterNode;
+      createChannelMerger?: (numberOfInputs: number) => AudioNode;
+    };
+    if (
+      typeof ctxWithMeter.createAnalyser === "function" &&
+      typeof ctxWithMeter.createChannelSplitter === "function" &&
+      typeof ctxWithMeter.createChannelMerger === "function"
+    ) {
+      const splitter = ctxWithMeter.createChannelSplitter(2);
+      const merger = ctxWithMeter.createChannelMerger(2);
+      const analyserL = ctxWithMeter.createAnalyser();
+      const analyserR = ctxWithMeter.createAnalyser();
+      analyserL.fftSize = PEAK_METER_FFT_SIZE;
+      analyserL.smoothingTimeConstant = 0;
+      analyserR.fftSize = PEAK_METER_FFT_SIZE;
+      analyserR.smoothingTimeConstant = 0;
+      this.splitterNode = splitter;
+      this.mergerNode = merger;
+      this.analyserL = analyserL;
+      this.analyserR = analyserR;
+      this.masterGainNode.connect(splitter);
+      splitter.connect(analyserL, 0, 0);
+      splitter.connect(analyserR, 1, 0);
+      analyserL.connect(merger, 0, 0);
+      analyserR.connect(merger, 0, 1);
+      merger.connect(this.audioContext.destination);
+    } else {
+      this.masterGainNode.connect(this.audioContext.destination);
+    }
 
     // Initialize stem states and gain nodes
     this.stemStates = options?.initialMixerStates
@@ -805,6 +880,10 @@ export class StemPlayerEngine {
     this.playing = false;
     this.stopPositionLoop();
     this.notifyPosition();
+    // Paused: the meters fall silent immediately (no frozen last-frame bars).
+    this.smoothedLevelL = 0;
+    this.smoothedLevelR = 0;
+    this.notifyLevels(true);
   }
 
   public seek(timeSec: number): void {
@@ -897,6 +976,7 @@ export class StemPlayerEngine {
           return;
         }
         this.notifyPosition();
+        this.notifyLevels();
         if (
           typeof window !== "undefined" &&
           typeof window.requestAnimationFrame === "function"
@@ -939,6 +1019,125 @@ export class StemPlayerEngine {
     return () => {
       this.stateListeners.delete(listener);
     };
+  }
+
+  public getAnalyserNode(): AnalyserNode | null {
+    return this.analyserL;
+  }
+
+  public getLevelTapNodes(): {
+    splitter: ChannelSplitterNode | null;
+    merger: AudioNode | null;
+    left: AnalyserNode | null;
+    right: AnalyserNode | null;
+  } {
+    return {
+      splitter: this.splitterNode,
+      merger: this.mergerNode,
+      left: this.analyserL,
+      right: this.analyserR,
+    };
+  }
+
+  public getLevels(): StereoPeakLevels {
+    return { left: this.smoothedLevelL, right: this.smoothedLevelR };
+  }
+
+  public subscribeLevels(listener: LevelsListener): () => void {
+    this.levelsListeners.add(listener);
+    listener(this.getLevels());
+    return () => {
+      this.levelsListeners.delete(listener);
+    };
+  }
+
+  private notifyLevels(force = false): void {
+    if (this.levelsListeners.size === 0) return;
+    const now = this.audioContext.currentTime;
+    if (
+      !force &&
+      now - this.lastLevelsEmitContextTime < PEAK_METER_EMIT_STEP_SEC
+    ) {
+      return;
+    }
+    this.lastLevelsEmitContextTime = now;
+    if (this.analyserL && this.analyserR && this.playing) {
+      this.sampleAnalyser(this.analyserL, this.analyserR);
+    } else {
+      this.smoothedLevelL = 0;
+      this.smoothedLevelR = 0;
+    }
+    const levels = this.getLevels();
+    for (const listener of this.levelsListeners) {
+      listener(levels);
+    }
+  }
+
+  private sampleChannelAnalyser(
+    analyser: AnalyserNode,
+    scratch: Float32Array<ArrayBuffer>
+  ): number {
+    // Chrome's AnalyserNode has NO getChannelData (live probe 2026-11-05:
+    // undefined in real Chrome); getFloatTimeDomainData is the cross-browser
+    // sampler. Keep the getChannelData copyTo shape as a fallback for the
+    // test doubles that model the Firefox-era signature.
+    const legacy = analyser as AnalyserNode & {
+      getChannelData?: (copyTo: Float32Array) => Float32Array | void;
+    };
+    let sampled = false;
+    if (typeof analyser.getFloatTimeDomainData === "function") {
+      analyser.getFloatTimeDomainData(scratch);
+      sampled = true;
+    } else if (typeof legacy.getChannelData === "function") {
+      const copied = legacy.getChannelData(scratch);
+      if (copied instanceof Float32Array && copied.length === scratch.length) {
+        scratch.set(copied);
+      }
+      sampled = true;
+    }
+    if (!sampled) return 0;
+
+    let sumSquares = 0;
+    for (let i = 0; i < scratch.length; i++) {
+      sumSquares += scratch[i] * scratch[i];
+    }
+    const rms = Math.sqrt(sumSquares / scratch.length);
+    const db = rms > 0 ? 20 * Math.log10(rms) : PEAK_METER_FLOOR_DB;
+    return Math.max(
+      0,
+      Math.min(1, (db - PEAK_METER_FLOOR_DB) / -PEAK_METER_FLOOR_DB)
+    );
+  }
+
+  private sampleAnalyser(
+    analyserL: AnalyserNode,
+    analyserR: AnalyserNode
+  ): void {
+    const size = Math.max(analyserL.fftSize || 2048, analyserR.fftSize || 2048);
+    if (!this.levelScratch || this.levelScratch.length !== size) {
+      this.levelScratch = new Float32Array(size);
+    }
+    const scratch = this.levelScratch;
+    const readings = [
+      this.sampleChannelAnalyser(analyserL, scratch),
+      this.sampleChannelAnalyser(analyserR, scratch),
+    ];
+
+    // Fast attack, slow release: pips jump up with the transient and slide
+    // down smoothly, the classic meter feel.
+    for (let channel = 0; channel < 2; channel++) {
+      const norm = readings[channel];
+      const prev = channel === 0 ? this.smoothedLevelL : this.smoothedLevelR;
+      const next =
+        norm >= prev
+          ? prev + (norm - prev) * 0.55
+          : prev + (norm - prev) * 0.12;
+      if (channel === 0) {
+        this.smoothedLevelL = next;
+      } else {
+        this.smoothedLevelR = next;
+      }
+    }
   }
 
   private notifyPosition(): void {
@@ -1130,6 +1329,27 @@ export class StemPlayerEngine {
     this.positionListeners.clear();
     this.stateListeners.clear();
     this.timeStretchListeners.clear();
+    this.levelsListeners.clear();
+
+    for (const tapNode of [
+      this.splitterNode,
+      this.mergerNode,
+      this.analyserL,
+      this.analyserR,
+    ]) {
+      if (tapNode) {
+        try {
+          tapNode.disconnect();
+        } catch {
+          // Ignored
+        }
+      }
+    }
+    this.splitterNode = null;
+    this.mergerNode = null;
+    this.analyserL = null;
+    this.analyserR = null;
+    this.levelScratch = null;
 
     if (this.stretchAdapter) {
       try {

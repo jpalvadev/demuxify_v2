@@ -20,6 +20,7 @@ import {
   TimeStretchState,
   ClickTrackMixerState,
   CalibratedClickGrid,
+  StereoPeakLevels,
 } from "../lib/stemPlayerEngine";
 import { StemStrip } from "./StemStrip";
 import { MasterWaveform } from "./MasterWaveform";
@@ -44,12 +45,15 @@ export interface ExportDialogState {
 
 // Tab Shell bridge (ADR-0008): transport actions stay available to the app —
 // the Mix Tab's single Play/Pause toggle calls play or pause by state, and
-// spine scrubbing keeps using seek. Signature unchanged; engine untouched.
+// spine scrubbing keeps using seek. 2026-11-05 footer fix: the shell's Master
+// fader routes through the same bridge, so one engine stays the single owner
+// of the transport AND of the master fader.
 export interface TransportControls {
   play: () => void;
   pause: () => void;
   seekToStart: () => void;
   seek: (seekTime: number) => void;
+  setMasterVolume: (volume: number) => void;
 }
 
 export interface StemPlayerProps {
@@ -90,6 +94,9 @@ export interface StemPlayerProps {
   // play/pause transitions and on the position ticks mirroring engine.isPlaying
   // (end-of-track stops are visible through it).
   onPlayStateChange?: (playing: boolean) => void;
+  // Peak meters (2026-11-05 footer fix): the engine's post-fader L/R levels
+  // flow out on this channel so the shell's footer pips read the real signal.
+  onLevelsChange?: (levels: StereoPeakLevels) => void;
   // Tab Shell (ADR-0007): the shell hosts the shared Master Waveform spine in
   // Listen and Mix, so the player's own overview waveform stays hidden.
   masterWaveformHosted?: boolean;
@@ -162,6 +169,7 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
   onTransportControls,
   onPlayheadChange,
   onPlayStateChange,
+  onLevelsChange,
   masterWaveformHosted,
   beatGrid,
   initialClickTrack,
@@ -214,6 +222,9 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
       pause: handlePause,
       seekToStart: handleReset,
       seek: (seekTime) => void handleSeek(seekTime),
+      // 2026-11-05: the shell's footer fader drives this same engine's master
+      // fader through the bridge, exactly like the disc drives its transport.
+      setMasterVolume: (volume) => handleMasterVolumeChange(volume),
     });
 
     setDuration(engine.getDuration());
@@ -250,10 +261,17 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
       }
     });
 
+    // Peak meters (2026-11-05): the engine samples the master bus in its own
+    // play loop; the player only forwards the coalesced L/R levels out.
+    const unsubLevels = engine.subscribeLevels((levels) => {
+      onLevelsChange?.(levels);
+    });
+
     return () => {
       unsubPos();
       unsubState();
       unsubTimeStretch();
+      unsubLevels();
       engine.dispose();
       engineRef.current = null;
     };

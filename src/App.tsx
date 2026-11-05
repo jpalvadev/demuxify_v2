@@ -55,6 +55,7 @@ import {
   CalibratedClickGrid,
   calibrateClickGrid,
   reanchorBeatGridToAnchor,
+  StereoPeakLevels,
 } from "./lib/stemPlayerEngine";
 import {
   createDebugSessionFixture,
@@ -103,6 +104,45 @@ const TAB_CHIP_TYPE_PX = 11;
 const TAB_CHIP_MIN_TARGET_PX = 44;
 
 const TAB_GATING_REASON = "no Stems yet";
+
+// Footer transport readouts (2026-11-05 user fix): the bar's clock, peak pips
+// and master fader are LIVE chrome fed by the engine — a frozen mockup frame
+// (the literal 00:51 / 03:35, static pips, pinned 100% fader) is a bug, not
+// the design truth.
+function formatTransportTime(totalSeconds: number): string {
+  const safe =
+    isNaN(totalSeconds) || totalSeconds < 0 ? 0 : Math.floor(totalSeconds);
+  const minutes = Math.floor(safe / 60);
+  const seconds = safe % 60;
+  return `${minutes.toString().padStart(2, "0")}:${seconds
+    .toString()
+    .padStart(2, "0")}`;
+}
+
+// Peak pip ladder: PEAK_METER_SEGMENTS segments per channel, painted top →
+// bottom. A segment lights when the normalized level reaches its rank from
+// the bottom; the paint tiers mirror the mockup's ladder (bottom trio full
+// st-ok, pair above dimmed, top pip is the hot lamp), the mockup's static
+// emerald/0 dB paint stays retired per check:retired-affordances.
+const PEAK_METER_SEGMENTS = 6;
+function peakMeterSegClasses(level: number): string[] {
+  const lit = Math.round(Math.max(0, Math.min(1, level)) * PEAK_METER_SEGMENTS);
+  const classes: string[] = [];
+  for (let rank = PEAK_METER_SEGMENTS; rank >= 1; rank--) {
+    if (lit >= rank) {
+      classes.push(
+        rank === PEAK_METER_SEGMENTS
+          ? "bg-st-coral"
+          : rank >= 4
+            ? "bg-st-ok/60"
+            : "bg-st-ok"
+      );
+    } else {
+      classes.push("bg-zinc-700");
+    }
+  }
+  return classes;
+}
 
 const tabPanelClass = (gated: boolean, active: boolean) =>
   // Tab Shell stage invariant (artifact `.panel` + `.panel.act`): every Tab panel
@@ -210,6 +250,7 @@ export const App: React.FC = () => {
     pause: () => {},
     seekToStart: () => {},
     seek: () => {},
+    setMasterVolume: () => {},
   });
 
   // Stitch skin 08d: the footer bar's coral disc is the app's one live
@@ -217,6 +258,19 @@ export const App: React.FC = () => {
   // ADR-0013). This mirrors the engine's play-state channel; the disc's icon,
   // aria-pressed and which bridge action a click sends all follow it.
   const [footerTransportPlaying, setFooterTransportPlaying] = useState(false);
+
+  // 2026-11-05 user fix: the footer's clock chip, peak pips and Master fader
+  // read live engine state. The fader mirror rides the existing mixer bridge
+  // (onMixerChange), the pips ride the engine's new levels channel, and the
+  // fader's own moves route back through the transport bridge — the engine
+  // stays the single owner of the master fader.
+  const [footerMasterVolume, setFooterMasterVolume] = useState(
+    restoredMixerState?.masterVolume ?? 1.0
+  );
+  const [footerPeakLevels, setFooterPeakLevels] = useState<StereoPeakLevels>({
+    left: 0,
+    right: 0,
+  });
 
   const handleFooterTransportStateChange = (playing: boolean) => {
     setFooterTransportPlaying(playing);
@@ -229,6 +283,14 @@ export const App: React.FC = () => {
     } else {
       actions.play();
     }
+  };
+
+  const handleFooterMasterVolumeChange = (percent: number) => {
+    const volume = Math.max(0, Math.min(1, percent / 100));
+    // Optimistic mirror so the fader and its % readout track the drag; the
+    // mixer bridge re-states the same value on the way through the engine.
+    setFooterMasterVolume(volume);
+    transportActionsRef.current.setMasterVolume(volume);
   };
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -596,6 +658,7 @@ export const App: React.FC = () => {
         setSelectedModelId(session.metadata.modelProfileId);
       }
       setCurrentTime(session.mixer.currentTime ?? 0);
+      setFooterMasterVolume(session.mixer.masterVolume ?? 1.0);
       setSeparationPhase("completed");
       setDetectedSession(null);
       // ADR-0008: resuming lands on the Mix Tab, where playback lives
@@ -635,6 +698,9 @@ export const App: React.FC = () => {
     // Mix Tab cohesion (ADR-0013): this bridge is mixer-and-Session only — the
     // live Playhead reaches the spine via onPlayheadChange below, so the
     // bridge never runs per frame and the Session save cadence is untouched.
+    // 2026-11-05: the footer fader mirrors every master-volume restatement
+    // here, whatever fired the bridge.
+    setFooterMasterVolume(mixer.masterVolume);
     if (!cachedSessionRef.current) return;
     const updatedSession: DemuxifySession = {
       ...cachedSessionRef.current,
@@ -1175,6 +1241,9 @@ export const App: React.FC = () => {
                   // truth, which feeds the footer disc's icon, aria-pressed
                   // and click dispatch.
                   onPlayStateChange={handleFooterTransportStateChange}
+                  // 2026-11-05 footer fix: the engine's post-fader stereo
+                  // levels feed the footer's peak pips.
+                  onLevelsChange={setFooterPeakLevels}
                   sourceMixTitle={decodedSourceMix.metadata.fileName}
                   exportDialogHosted
                   onExportDialogState={handleExportDialogStateChange}
@@ -1330,15 +1399,37 @@ export const App: React.FC = () => {
           cluster above are ERASED outright, and the surviving clusters lose
           their dead marks — the footer's remaining copy (clock, SYNC, peak
           pips, master fader, 100%) is LIVE chrome; the pips re-tint to the
-          st-ok token, same paint, retired token gone. */}
+          st-ok token, same paint, retired token gone.
+          2026-11-05 user fix ("the actual time, total time, dB levels and the
+          master volume should work"): the bar's clusters become what the 08h
+          record already claimed — genuinely LIVE. The clock chip reads the
+          shared Playhead channel and the decoded Mix's duration; the peak
+          pips paint the engine's new post-fader stereo levels (a pass-through
+          AnalyserNode on the master bus: fast attack, slow release, six
+          segments per channel, the mockup's tier paint); the fader is the
+          mockup's own input[type=range] in the skin's coral-knob paint,
+          wired through the transport bridge's new setMasterVolume action,
+          with the % readout mirroring the engine. No frozen mockup frame is
+          left on the bar. */}
       <footer className="w-full flex items-center justify-between shrink-0 z-30 border-t border-st-hairline bg-st-panel px-3 sm:px-6 py-3 sm:py-2 sm:h-16 flex-wrap sm:flex-nowrap gap-y-2 sm:gap-y-0">
         <div className="flex items-center gap-3 shrink-0 sm:gap-4 sm:w-72 sm:flex-row">
-          <div className="font-mono bg-st-canvas px-2.5 sm:px-3 py-1 sm:py-1.5 rounded border border-st-hairline flex items-baseline gap-1.5">
-            <span className="text-white text-sm sm:text-base font-bold tracking-wider">
-              00:51
+          <div
+            data-testid="footer-clock"
+            className="font-mono bg-st-canvas px-2.5 sm:px-3 py-1 sm:py-1.5 rounded border border-st-hairline flex items-baseline gap-1.5"
+          >
+            <span
+              data-testid="footer-time-current"
+              className="text-white text-sm sm:text-base font-bold tracking-wider"
+            >
+              {formatTransportTime(currentTime)}
             </span>
             <span className="text-zinc-500 text-xs">/</span>
-            <span className="text-zinc-400 text-xs">03:35</span>
+            <span
+              data-testid="footer-time-total"
+              className="text-zinc-400 text-xs"
+            >
+              {formatTransportTime(decodedSourceMix?.metadata.duration ?? 0)}
+            </span>
           </div>
           <div className="hidden sm:flex flex-col">
             <span className="text-[9px] font-mono uppercase tracking-widest text-st-ok flex items-center">
@@ -1381,22 +1472,32 @@ export const App: React.FC = () => {
           </button>
         </div>
         <div className="flex items-center gap-3 shrink-0 justify-end sm:gap-4 sm:w-72">
-          <div className="flex items-center gap-1">
-            <div className="flex flex-col gap-0.5">
-              <span className="inline-block w-1.5 h-1 bg-zinc-700" />
-              <span className="inline-block w-1.5 h-1 bg-st-ok/60" />
-              <span className="inline-block w-1.5 h-1 bg-st-ok/60" />
-              <span className="inline-block w-1.5 h-1 bg-st-ok" />
-              <span className="inline-block w-1.5 h-1 bg-st-ok" />
-              <span className="inline-block w-1.5 h-1 bg-st-ok" />
+          <div
+            className="flex items-center gap-1"
+            aria-hidden="true"
+            data-testid="footer-peak-pips"
+          >
+            <div
+              className="flex flex-col gap-0.5"
+              data-testid="footer-peak-pips-left"
+            >
+              {peakMeterSegClasses(footerPeakLevels.left).map((cls, i) => (
+                <span
+                  key={`peak-l-${i}`}
+                  className={`inline-block w-1.5 h-1 ${cls}`}
+                />
+              ))}
             </div>
-            <div className="flex flex-col gap-0.5">
-              <span className="inline-block w-1.5 h-1 bg-zinc-700" />
-              <span className="inline-block w-1.5 h-1 bg-zinc-700" />
-              <span className="inline-block w-1.5 h-1 bg-st-ok/60" />
-              <span className="inline-block w-1.5 h-1 bg-st-ok" />
-              <span className="inline-block w-1.5 h-1 bg-st-ok" />
-              <span className="inline-block w-1.5 h-1 bg-st-ok" />
+            <div
+              className="flex flex-col gap-0.5"
+              data-testid="footer-peak-pips-right"
+            >
+              {peakMeterSegClasses(footerPeakLevels.right).map((cls, i) => (
+                <span
+                  key={`peak-r-${i}`}
+                  className={`inline-block w-1.5 h-1 ${cls}`}
+                />
+              ))}
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -1406,11 +1507,24 @@ export const App: React.FC = () => {
             <span className="font-mono text-[10px] text-zinc-400 uppercase font-semibold hidden sm:inline">
               Master
             </span>
-            <div className="w-14 sm:w-20 h-1 rounded bg-st-hairline relative">
-              <span className="absolute right-0 top-[-2px] w-2 h-2 rounded-full bg-st-coral" />
-            </div>
-            <span className="font-mono text-[10px] text-zinc-200 font-bold w-6 sm:w-7 text-right">
-              100%
+            <input
+              type="range"
+              min={0}
+              max={100}
+              step={1}
+              value={Math.round(footerMasterVolume * 100)}
+              onChange={(e) =>
+                handleFooterMasterVolumeChange(parseFloat(e.target.value))
+              }
+              aria-label="Master Volume"
+              data-testid="footer-master-volume"
+              className="w-14 sm:w-20 h-1 rounded bg-st-hairline cursor-pointer appearance-none accent-st-coral [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-2.5 [&::-webkit-slider-thumb]:h-2.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-st-coral [&::-webkit-slider-thumb]:shadow-[0_0_8px_rgba(248,81,83,0.55)] [&::-moz-range-thumb]:w-2.5 [&::-moz-range-thumb]:h-2.5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-st-coral [&::-moz-range-thumb]:shadow-[0_0_8px_rgba(248,81,83,0.55)]"
+            />
+            <span
+              className="font-mono text-[10px] text-zinc-200 font-bold w-6 sm:w-7 text-right"
+              data-testid="footer-master-percent"
+            >
+              {Math.round(footerMasterVolume * 100)}%
             </span>
           </div>
         </div>
