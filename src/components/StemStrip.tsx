@@ -36,9 +36,7 @@ const STEM_CONFIG: Record<
     label: string;
     icon: React.ComponentType<{ className?: string }>;
     badgeClass: string;
-    iso: string;
     nameText: string;
-    isoText: string;
     badgeBgClass: string;
     waveBg: string;
     dotGlow: string;
@@ -52,9 +50,7 @@ const STEM_CONFIG: Record<
     badgeClass: "bg-stem-vocals/15 text-stem-vocals border-stem-vocals/40",
     activeColor: "#c084fc", // stem-vocals: hsl(270 95.2% 75.3%)
     inactiveColor: "rgba(192, 132, 252, 0.25)",
-    iso: "ISO-1",
     nameText: "text-purple-300",
-    isoText: "text-purple-400/70",
     // Stitch skin 10: the badge column tint is desktop-only (sm:). Literal
     // strings so Tailwind's content scan emits the arbitrary bg classes.
     badgeBgClass: "sm:bg-[#1b1724]",
@@ -67,9 +63,7 @@ const STEM_CONFIG: Record<
     badgeClass: "bg-stem-drums/15 text-stem-drums border-stem-drums/40",
     activeColor: "#818cf8", // stem-drums: hsl(234 89.5% 73.9%)
     inactiveColor: "rgba(129, 140, 248, 0.25)",
-    iso: "ISO-2",
     nameText: "text-indigo-300",
-    isoText: "text-indigo-400/70",
     badgeBgClass: "sm:bg-[#171827]",
     waveBg: "#0b0c16",
     dotGlow: "#818cf8",
@@ -80,9 +74,7 @@ const STEM_CONFIG: Record<
     badgeClass: "bg-stem-bass/15 text-stem-bass border-stem-bass/40",
     activeColor: "#f59e0b", // stem-bass: hsl(38 92.1% 50.2%)
     inactiveColor: "rgba(245, 158, 11, 0.25)",
-    iso: "ISO-3",
     nameText: "text-amber-300",
-    isoText: "text-amber-400/70",
     badgeBgClass: "sm:bg-[#221c13]",
     waveBg: "#130f08",
     dotGlow: "#f59e0b",
@@ -93,9 +85,7 @@ const STEM_CONFIG: Record<
     badgeClass: "bg-stem-other/15 text-stem-other border-stem-other/40",
     activeColor: "#22d3ee", // stem-other: hsl(188 85.7% 53.3%)
     inactiveColor: "rgba(34, 211, 238, 0.25)",
-    iso: "ISO-4",
     nameText: "text-cyan-300",
-    isoText: "text-cyan-400/70",
     badgeBgClass: "sm:bg-[#121f24]",
     waveBg: "#091114",
     dotGlow: "#22d3ee",
@@ -290,8 +280,8 @@ export const StemStrip: React.FC<StemStripProps> = ({
       )}
     >
       {/* Channel header badge (Stitch skin 10): mobile — transparent badge
-          riding the header row's left, name+ISO grouped; desktop — the
-          mockup's w-32 tinted badge column with hairline seam. */}
+          riding the header row's left, dot + name; desktop — the mockup's
+          w-32 tinted badge column with hairline seam. */}
       <div
         className={cn(
           "order-1 flex flex-1 items-center gap-2 px-3 py-1 sm:h-full sm:flex-none sm:w-32 sm:justify-between sm:border-e sm:border-st-hairline sm:py-0",
@@ -311,9 +301,6 @@ export const StemStrip: React.FC<StemStripProps> = ({
             {config.label}
           </span>
         </div>
-        <span className={cn("text-[9px] font-mono", config.isoText)}>
-          {config.iso}
-        </span>
       </div>
 
       {/* M/S group (Stitch skin 10b): mobile — right end of the header row

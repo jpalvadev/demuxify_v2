@@ -123,11 +123,15 @@
 }
 
 /* Slider thumbs read as the coral control glyph on the black canvas: a
-   12px pill with the skin's glow, replacing the invisible UA thumb. */
+   12px pill with the skin's glow, replacing the invisible UA thumb. Chrome
+   anchors appearance-none thumbs to the TOP of the runnable track, so the
+   pill needs a -3px lift to center on the 6px h-1.5 tracks (the footer's
+   10px-on-4px slider centers on the same offset). */
 input[type="range"]::-webkit-slider-thumb {
   appearance: none;
   width: 12px;
   height: 12px;
+  margin-top: -3px;
   border-radius: 9999px;
   background: hsl(var(--st-coral));
   box-shadow: 0 0 8px hsl(var(--st-coral) / 0.55);
