@@ -39,7 +39,7 @@ const STEM_CONFIG: Record<
     iso: string;
     nameText: string;
     isoText: string;
-    badgeBg: string;
+    badgeBgClass: string;
     waveBg: string;
     dotGlow: string;
     activeColor: string;
@@ -55,7 +55,9 @@ const STEM_CONFIG: Record<
     iso: "ISO-1",
     nameText: "text-purple-300",
     isoText: "text-purple-400/70",
-    badgeBg: "#1b1724",
+    // Stitch skin 10: the badge column tint is desktop-only (sm:). Literal
+    // strings so Tailwind's content scan emits the arbitrary bg classes.
+    badgeBgClass: "sm:bg-[#1b1724]",
     waveBg: "#0d0c13",
     dotGlow: "#c084fc",
   },
@@ -68,7 +70,7 @@ const STEM_CONFIG: Record<
     iso: "ISO-2",
     nameText: "text-indigo-300",
     isoText: "text-indigo-400/70",
-    badgeBg: "#171827",
+    badgeBgClass: "sm:bg-[#171827]",
     waveBg: "#0b0c16",
     dotGlow: "#818cf8",
   },
@@ -81,7 +83,7 @@ const STEM_CONFIG: Record<
     iso: "ISO-3",
     nameText: "text-amber-300",
     isoText: "text-amber-400/70",
-    badgeBg: "#221c13",
+    badgeBgClass: "sm:bg-[#221c13]",
     waveBg: "#130f08",
     dotGlow: "#f59e0b",
   },
@@ -94,7 +96,7 @@ const STEM_CONFIG: Record<
     iso: "ISO-4",
     nameText: "text-cyan-300",
     isoText: "text-cyan-400/70",
-    badgeBg: "#121f24",
+    badgeBgClass: "sm:bg-[#121f24]",
     waveBg: "#091114",
     dotGlow: "#22d3ee",
   },
@@ -275,17 +277,26 @@ export const StemStrip: React.FC<StemStripProps> = ({
       role="group"
       aria-label={`${config.label} Stem`}
       className={cn(
-        "group flex flex-col sm:flex-row items-stretch sm:items-center rounded border border border-st-hairline/80 hover:border-zinc-700 transition-colors overflow-hidden bg-st-panel shadow-xs",
+        // Stitch skin 10 (stem-card fidelity pass): flex-wrap layout — the
+        // mobile target renders a 3-line card (header row: badge + M/S + %;
+        // full-width waveform; full-width slider row), the sm+ target the
+        // mockup's single h-14 row (badge | waveform | rack). Controls are
+        // rendered ONCE: flex order classes swap the pieces between layouts
+        // (the slider wrapper goes `contents` on sm+, dissolving into the
+        // rack). Behavior, aria, and handlers untouched.
+        "group flex flex-wrap items-center gap-y-2 rounded-lg border border border-st-hairline/80 hover:border-zinc-700 transition-colors overflow-hidden bg-st-panel shadow-xs sm:h-14 sm:flex-nowrap sm:items-center sm:gap-y-0 sm:rounded",
         isSilenced && "opacity-65 bg-card/30",
         className
       )}
     >
-      {/* Channel header badge (Stitch skin): the mockup's tinted badge column —
-            glowing stem dot + mono bold stem-tinted name + ISO identity tag. The
-            grizzly-era lucide stem icons are gone; the dot carries the identity. */}
+      {/* Channel header badge (Stitch skin 10): mobile — transparent badge
+          riding the header row's left, name+ISO grouped; desktop — the
+          mockup's w-32 tinted badge column with hairline seam. */}
       <div
-        className="flex w-32 shrink-0 items-center px-3 justify-between rounded-none border-e border-st-hairline"
-        style={{ backgroundColor: config.badgeBg }}
+        className={cn(
+          "order-1 flex flex-1 items-center gap-2 px-3 py-1 sm:h-full sm:flex-none sm:w-32 sm:justify-between sm:border-e sm:border-st-hairline sm:py-0",
+          config.badgeBgClass
+        )}
       >
         <div className="flex items-center gap-2">
           <span
@@ -305,78 +316,85 @@ export const StemStrip: React.FC<StemStripProps> = ({
         </span>
       </div>
 
-      {/* Waveform Display Area (Stitch skin): the mockup's borderless tinted
-            waveform field — the canvas paints the per-stem wash itself now. */}
+      {/* M/S + readout group (Stitch skin 10): mobile — right end of the
+          header row (the target's `M S 100%` cluster); desktop — the rack's
+          M/S block welded to the rack hairline. Single instance; order
+          classes do the moving. Compact mono M/S caps. Behavior, aria, and
+          handlers untouched. */}
+      <div className="order-2 ml-auto flex shrink-0 items-center gap-1 pr-3 sm:order-3 sm:h-full sm:ml-0 sm:border-s sm:border-st-hairline sm:bg-st-panel sm:px-3 sm:pr-2">
+        <button
+          type="button"
+          aria-label={`Mute ${config.label}`}
+          aria-pressed={muted}
+          onClick={onToggleMute}
+          title={`Mute ${config.label}`}
+          className={cn(
+            "h-6 w-6 rounded border font-mono font-bold text-[10px] flex items-center justify-center transition-colors",
+            muted
+              ? "border-st-danger bg-st-danger text-st-surface"
+              : "border-zinc-700 bg-st-surface text-zinc-400 hover:text-white"
+          )}
+        >
+          M
+        </button>
+        <button
+          type="button"
+          aria-label={`Solo ${config.label}`}
+          aria-pressed={solo}
+          onClick={onToggleSolo}
+          title={`Solo ${config.label}`}
+          className={cn(
+            "h-6 w-6 rounded border font-mono font-bold text-[10px] flex items-center justify-center transition-colors",
+            solo
+              ? "border-st-coral bg-st-coral text-st-surface shadow-chip-glow"
+              : cn(
+                  "border-zinc-700 bg-st-surface hover:text-white",
+                  config.nameText
+                )
+          )}
+        >
+          S
+        </button>
+        <span className="w-9 text-right font-mono text-[10px] text-st-ink-dim">
+          {Math.round(volume * 100)}%
+        </span>
+      </div>
+
+      {/* Waveform Display Area (Stitch skin 10): mobile — full-width bordered
+          rounded field on its own line; desktop — the mockup's borderless
+          flex-1 field welded between badge and rack. The canvas paints the
+          per-stem wash itself. */}
       <div
         ref={containerRef}
         onClick={handleWaveformClick}
         role="presentation"
-        className="relative flex-1 overflow-hidden cursor-pointer min-w-[120px]"
+        className="order-3 basis-full w-full cursor-pointer overflow-hidden rounded-md border border-st-hairline/60 sm:order-2 sm:flex-1 sm:basis-auto sm:rounded-none sm:border-0 sm:h-full sm:min-w-[120px]"
         style={{ height }}
       >
         <canvas ref={canvasRef} className="block w-full h-full" />
       </div>
 
-      {/* Channel Controls Rack (Stitch skin): the mockup's w-64 rack welded to
-            the field with a hairline; compact mono M/S caps, speaker, slider,
-            and a w-8 percent readout. Behavior, aria, and handlers untouched. */}
-      <div className="flex items-center px-3 space-x-3 w-64 shrink-0 bg-st-panel rounded-none border-s border-st-hairline">
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            aria-label={`Mute ${config.label}`}
-            aria-pressed={muted}
-            onClick={onToggleMute}
-            title={`Mute ${config.label}`}
-            className={cn(
-              "h-6 w-6 rounded border font-mono font-bold text-[10px] flex items-center justify-center transition-colors",
-              muted
-                ? "border-st-danger bg-st-danger text-st-surface"
-                : "border-zinc-700 bg-st-surface text-zinc-400 hover:text-white"
-            )}
-          >
-            M
-          </button>
-          <button
-            type="button"
-            aria-label={`Solo ${config.label}`}
-            aria-pressed={solo}
-            onClick={onToggleSolo}
-            title={`Solo ${config.label}`}
-            className={cn(
-              "h-6 w-6 rounded border font-mono font-bold text-[10px] flex items-center justify-center transition-colors",
-              solo
-                ? "border-st-coral bg-st-coral text-st-surface shadow-chip-glow"
-                : cn(
-                    "border-zinc-700 bg-st-surface hover:text-white",
-                    config.nameText
-                  )
-            )}
-          >
-            S
-          </button>
-        </div>
-
-        <div className="flex-1 flex items-center gap-2">
-          {muted || isSilenced ? (
-            <VolumeX className="h-3 w-3 text-st-ink-faint shrink-0" />
-          ) : (
-            <Volume2 className="h-3 w-3 text-zinc-400 shrink-0" />
-          )}
-          <input
-            type="range"
-            min={0}
-            max={1}
-            step={0.01}
-            value={volume}
-            onChange={(e) => onVolumeChange(parseFloat(e.target.value))}
-            aria-label={`${config.label} Volume`}
-            className="w-full accent-primary cursor-pointer h-1.5 bg-secondary rounded appearance-none"
-          />
-          <span className="font-mono text-[10px] text-st-ink-dim w-8 text-right">
-            {Math.round(volume * 100)}%
-          </span>
-        </div>
+      {/* Volume row (Stitch skin 10): mobile — full-width slider row below
+          the waveform (the target's slim track + coral knob, no speaker);
+          desktop — `contents`: the speaker + slider dissolve into the rack
+          as the mockup's w-64 control strip. Single slider instance, aria
+          pinned. */}
+      <div className="order-4 flex w-full items-center gap-2 px-3 pb-1 sm:contents">
+        {muted || isSilenced ? (
+          <VolumeX className="hidden h-3 w-3 shrink-0 text-st-ink-faint sm:order-4 sm:block" />
+        ) : (
+          <Volume2 className="hidden h-3 w-3 shrink-0 text-zinc-400 sm:order-4 sm:block" />
+        )}
+        <input
+          type="range"
+          min={0}
+          max={1}
+          step={0.01}
+          value={volume}
+          onChange={(e) => onVolumeChange(parseFloat(e.target.value))}
+          aria-label={`${config.label} Volume`}
+          className="h-1.5 w-full flex-1 cursor-pointer appearance-none rounded bg-secondary accent-primary sm:order-5 sm:ml-2 sm:w-40 sm:flex-none"
+        />
       </div>
     </div>
   );

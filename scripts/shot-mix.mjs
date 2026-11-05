@@ -10,7 +10,7 @@ const log = console.log;
 const OUT = "C:/Users/Lorenzo06/AppData/Local/Temp/opencode";
 mkdirSync(OUT, { recursive: true });
 
-const URL = "https://localhost:5174/#debug";
+const URL = (process.argv[2] || "https://localhost:5174/") + "#debug";
 
 const browser = await chromium.launch();
 for (const [name, w, h] of [

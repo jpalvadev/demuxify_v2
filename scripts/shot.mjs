@@ -8,10 +8,12 @@ const log = console.log;
 
 const OUT = "C:/Users/Lorenzo06/AppData/Local/Temp/opencode";
 mkdirSync(OUT, { recursive: true });
+// Dev-server origin overridable: node scripts/shot.mjs [http(s)://host:port]
+const APP = process.argv[2] || "https://localhost:5174/";
 
 const shots = [
-  ["app-desktop", "https://localhost:5174/", 1440, 900],
-  ["app-mobile", "https://localhost:5174/", 390, 844],
+  ["app-desktop", APP, 1440, 900],
+  ["app-mobile", APP, 390, 844],
   [
     "mockup-desktop",
     "file:///C:/Programacion/demuxify_v2/view_target/stitch.html",
