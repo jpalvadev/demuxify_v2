@@ -321,7 +321,7 @@ export const StemStrip: React.FC<StemStripProps> = ({
           rack's M/S block welded to the rack hairline. Single instance; order
           classes do the moving. Compact mono M/S caps. Behavior, aria, and
           handlers untouched. */}
-      <div className="order-2 ml-auto flex shrink-0 items-center gap-1 pr-1 sm:order-3 sm:h-full sm:ml-0 sm:border-s sm:border-st-hairline sm:bg-st-panel sm:px-3 sm:pr-2">
+      <div className="order-2 ml-auto flex shrink-0 items-center gap-1 pr-1 sm:order-3 sm:h-full sm:ml-0 sm:border-s sm:border-st-hairline sm:bg-st-surface-light sm:pl-3 sm:pr-0">
         <button
           type="button"
           aria-label={`Mute ${config.label}`}
@@ -357,11 +357,12 @@ export const StemStrip: React.FC<StemStripProps> = ({
         </button>
       </div>
 
-      {/* Volume readout (Stitch skin 10b, the user's rack-crop fix): ONE
-          instance, moved out of the M/S group to the mockup's rack END —
-          mobile it closes the header row (`M S 100%`), desktop it closes
-          the rack AFTER speaker + slider (`M S 🔊 —— 100%`). */}
-      <span className="order-3 w-9 shrink-0 pr-3 text-right font-mono text-[10px] text-st-ink-dim sm:order-6 sm:w-10 sm:pr-3 sm:pl-1">
+      {/* Volume readout (Stitch skin 10b/10c, the user's rack-crop fix): the
+          mobile header closes with `M S 100%` (target); from sm+ the readout
+          lives at the mockup's rack END — inside the rack strip, after
+          speaker + slider. Two spans, one visible per viewport (display
+          swaps, single instance per breakpoint; no % test pins). */}
+      <span className="order-3 w-9 shrink-0 pr-3 text-right font-mono text-[10px] text-st-ink-dim sm:hidden">
         {Math.round(volume * 100)}%
       </span>
 
@@ -379,16 +380,17 @@ export const StemStrip: React.FC<StemStripProps> = ({
         <canvas ref={canvasRef} className="block w-full h-full" />
       </div>
 
-      {/* Volume row (Stitch skin 10): mobile — full-width slider row below
-          the waveform (the target's slim track + coral knob, no speaker);
-          desktop — `contents`: the speaker + slider dissolve into the rack
-          as the mockup's control strip, slider BEFORE the % readout. Single
+      {/* Volume row (Stitch skin 10c, user 2026-11-05 "#202028"): mobile —
+          full-width slider row below the waveform (the target's slim track +
+          coral knob, no speaker); desktop — the mockup's rack strip itself:
+          ONE continuous brand-surfaceLight #202028 band welded to the M/S
+          block's hairline, carrying speaker + slider + % readout. Single
           slider instance, aria pinned. */}
-      <div className="order-5 flex w-full items-center gap-2 px-3 pb-1 sm:contents">
+      <div className="order-5 flex w-full items-center gap-2 px-3 pb-1 sm:order-4 sm:h-full sm:w-auto sm:flex-none sm:bg-st-surface-light sm:px-3 sm:pb-0">
         {muted || isSilenced ? (
-          <VolumeX className="hidden h-3 w-3 shrink-0 text-st-ink-faint sm:order-4 sm:block" />
+          <VolumeX className="hidden h-3 w-3 shrink-0 text-st-ink-faint sm:block" />
         ) : (
-          <Volume2 className="hidden h-3 w-3 shrink-0 text-zinc-400 sm:order-4 sm:block" />
+          <Volume2 className="hidden h-3 w-3 shrink-0 text-zinc-400 sm:block" />
         )}
         <input
           type="range"
@@ -398,8 +400,11 @@ export const StemStrip: React.FC<StemStripProps> = ({
           value={volume}
           onChange={(e) => onVolumeChange(parseFloat(e.target.value))}
           aria-label={`${config.label} Volume`}
-          className="h-1.5 w-full flex-1 cursor-pointer appearance-none rounded bg-secondary accent-primary sm:order-5 sm:ml-2 sm:w-40 sm:flex-none"
+          className="h-1.5 w-full flex-1 cursor-pointer appearance-none rounded bg-secondary accent-primary sm:w-40 sm:flex-none"
         />
+        <span className="hidden w-9 shrink-0 text-right font-mono text-[10px] text-st-ink-dim sm:inline-block">
+          {Math.round(volume * 100)}%
+        </span>
       </div>
     </div>
   );
