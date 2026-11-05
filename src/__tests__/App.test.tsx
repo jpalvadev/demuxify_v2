@@ -242,8 +242,9 @@ describe("App UI Shell", () => {
 
     await waitFor(() => {
       expect(screen.getByText("song_master.mp3")).toBeInTheDocument();
-      // Metadata in SourceMixCard and MasterWaveform (getAllByText: the Band
-      // engine-badge placeholder now echoes the 44.1 kHz readout too).
+      // Metadata in SourceMixCard and MasterWaveform (08h cleanup erased the
+      // Band's fake engine badge, so only the two cards echo the 44.1 kHz
+      // readout now).
       expect(screen.getAllByText(/3:00/).length).toBeGreaterThanOrEqual(1);
       expect(screen.getAllByText(/44\.1\s*kHz/i).length).toBeGreaterThanOrEqual(
         1
@@ -2270,8 +2271,10 @@ describe("App UI Shell", () => {
 
     // Flat footer (ticket 05 + 06c mockup transport bar): one tan hairline cap;
     // 08d makes the bar LIVE chrome — its coral disc is the real Play/Pause
-    // control — while the mockup phantom clusters inside keep their own marks,
-    // still no copy lines under the hairline (100% absent).
+    // control — and 08h erases the mockup's fake button chips outright, so the
+    // surviving clusters are LIVE chrome and NO placeholder mark survives
+    // anywhere (the exemption is back to a hard ban; still no copy lines under
+    // the hairline, 100% absent).
     const footer = document.querySelectorAll("footer")[0];
     const footerClasses = (footer.getAttribute("class") ?? "").split(" ");
     expect(footerClasses).toContain("border-t");
@@ -2284,9 +2287,8 @@ describe("App UI Shell", () => {
       false
     );
     expect(footer.getAttribute("style") ?? "").not.toContain("gradient");
-    // 08d wiring contract: the bar itself is no longer marked dead; the coral
-    // disc is a real accessible button, and the phantom clusters around it
-    // carry their individual placeholder marks.
+    // 08h hard-ban contract: the bar is live chrome, the disc is a real
+    // accessible button, and the footer carries ZERO dead placeholder marks.
     expect(footer.getAttribute("data-mockup-placeholder")).toBeNull();
     expect(footer.getAttribute("aria-hidden")).toBeNull();
     expect(
@@ -2294,7 +2296,7 @@ describe("App UI Shell", () => {
     ).toBeInTheDocument();
     expect(
       footer.querySelectorAll('[data-mockup-placeholder="true"]').length
-    ).toBeGreaterThanOrEqual(6);
+    ).toBe(0);
     expect(screen.queryByText(/powered by/i)).toBeNull();
     expect(
       screen.queryByText(/client-side audio source separation/i)

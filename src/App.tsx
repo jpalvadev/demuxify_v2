@@ -912,75 +912,11 @@ export const App: React.FC = () => {
             })}
           </div>
         </div>
-        {/* Mockup phantom chrome (06b, data-mockup-placeholder): the stitch
-              mockup invented an engine status badge and an undo/redo/settings icon
-              cluster. Per the user 2026-11-04 override they render as VERBATIM
-              DEAD PLACEHOLDERS — no handlers, no state, aria-hidden so no phantom
-              roles leak into the Band subtree; a later cleanup commit erases them. */}
-        <div
-          data-mockup-placeholder="true"
-          aria-hidden="true"
-          className="flex flex-col gap-2 md:flex-row md:items-center md:gap-4"
-        >
-          <div className="hidden md:flex items-center gap-3 rounded border border-st-hairline bg-st-canvas px-3 py-1 font-mono text-[10px] text-zinc-400">
-            <span className="flex items-center gap-1.5">
-              <span className="inline-block h-1.5 w-1.5 rounded-full bg-st-ok mr-1.5" />
-              DSP WebAudio 44.1kHz
-            </span>
-            <span className="text-zinc-600">|</span>
-            <span>{"LATENCY: <1.8ms"}</span>
-            <span className="text-zinc-600">|</span>
-            <span className="text-zinc-300">BUFFERS: SYNCED</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <div className="p-1.5 rounded border border-transparent text-zinc-400 flex items-center justify-center">
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  d="M3 10h10a5 5 0 0 1 5 5v2m0 0l-3-3m3 3l3-3M3 10l3-3M3 10l3 3"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                />
-              </svg>
-            </div>
-            <div className="p-1.5 rounded border border-transparent text-zinc-400 flex items-center justify-center">
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  d="M21 10H11a5 5 0 0 0-5 5v2m0 0l3-3m-3 3L3 14m18-4l-3-3m3 3l-3 3"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                />
-              </svg>
-            </div>
-            <div className="p-1.5 rounded border border-transparent text-zinc-400 flex items-center justify-center">
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924-1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065 2.572c1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                />
-                <circle cx="12" cy="12" r="3" />
-              </svg>
-            </div>
-          </div>
-        </div>
+        {/* 08h cleanup commit: the mockup's phantom Band chrome — the fake engine
+              status badge and the undo/redo/settings icon trio — is ERASED outright.
+              The app ships no undo/redo affordance and will never lie about engine
+              telemetry; check-retired-affordances retired its placeholder exemption
+              to a HARD BAN this same commit, so none of it may ever render again. */}
       </nav>
 
       <main className="flex-1 w-full px-4 py-3 flex flex-col gap-3">
@@ -1372,40 +1308,31 @@ export const App: React.FC = () => {
       </main>
 
       {/* Footer transport (06c stitch.html port, 08d wiring): the bar's flat
-          tan hairline cap stays (ticket 05), and its coral disc is now the
-          app's live Play/Pause control — a real button dispatching play or
-          pause through the transport bridge by the engine's play-state mirror,
-          icon and aria-pressed flipping with it. The mockup's phantom clusters
-          around it (the clock readout, the SYNC pip, the loop / skip / fast-
-          forward glyphs, the beat-tap chip, the stereo peak pips and the
-          master-volume slider) keep their INDIVIDUAL data-mockup-placeholder +
-          aria-hidden marks, still dead until the cleanup commit erases them.
-          08e restacks the bar for phones (390 class): the clusters can no
-          longer ride one rail, so the bar WRAPS — clock cluster and readout
-          cluster share the first row (stacked inside the left cluster,
-          flex-col until sm), the transport row takes the second row centered
-          via order-last + mx-auto, and the tiny peak caption hides until sm
-          because it does not survive the narrow rail. 08f keeps that rail
-          contract byte-identical and only compacts the CHILD sizes below
-          sm (chip padding, mono sizes, transport glyphs, the disc and the
-          slider), so the one-rail composition from the user's phone crop
-          renders intact at ~480 and wider, while 442 and 390 keep wrapping.
-          08g re-copies the VIEW TARGET itself (mobile_stitch_target_design.png
-          footer band): ONE single row at every phone width — the clock chip
-          with a single green pip + SYNC word INLINE to its right, the full-
-          size coral disc CENTRED on the bar (the bar's own justify-between
-          plus the cluster's mx-auto centre it), and the peak pips + MST +
-          slider + 100% cluster at the right. The loop, seek, fast-forward
-          glyphs and the beat-tap chip simply do not exist on the phone
-          target, so they hide until sm; the readout column (READY word,
-          four-STEMS line) hides on phones too, replaced by the inline SYNC
-          word. sm: tokens keep the desktop rail byte-identical. */}
+          tan hairline cap stays (ticket 05), and its coral disc is the app's
+          live Play/Pause control — a real button dispatching play or pause
+          through the transport bridge by the engine's play-state mirror.
+          08e restacks the bar for phones (390 class): the bar WRAPS, the
+          transport cluster rides order-last + mx-auto until 08g replaced that
+          with source order + mx-auto centering, and the tiny peak caption hid
+          until sm because it does not survive the narrow rail. 08f compacted
+          the CHILD sizes below sm (chip padding, mono sizes, transport glyphs,
+          the disc and the slider) so the one-rail composition renders intact
+          at ~480 and wider while 442 and 390 keep wrapping — the user then
+          NOPE'd that crop and 08g re-copied the VIEW TARGET itself: ONE single
+          row at every phone width (clock chip with a green pip + SYNC word
+          INLINE, full-size coral disc CENTRED, peak pips + MST + slider + 100%
+          at the right; the glyph chips and the beat-tap chip are dead
+          placeholders hidden until sm, the readout column swaps for the inline
+          SYNC word, sm: tokens keep the desktop rail byte-identical).
+          08h CLEANUP commit: the mockup's fake transport buttons (the loop,
+          seek-to-start and fast-forward glyph chips and the all-caps beat-tap
+          chip) plus the fake decibel caption and the Band's phantom badge/icon
+          cluster above are ERASED outright, and the surviving clusters lose
+          their dead marks — the footer's remaining copy (clock, SYNC, peak
+          pips, master fader, 100%) is LIVE chrome; the pips re-tint to the
+          st-ok token, same paint, retired token gone. */}
       <footer className="w-full flex items-center justify-between shrink-0 z-30 border-t border-st-hairline bg-st-panel px-3 sm:px-6 py-3 sm:py-2 sm:h-16 flex-wrap sm:flex-nowrap gap-y-2 sm:gap-y-0">
-        <div
-          data-mockup-placeholder="true"
-          aria-hidden="true"
-          className="flex items-center gap-3 shrink-0 sm:gap-4 sm:w-72 sm:flex-row"
-        >
+        <div className="flex items-center gap-3 shrink-0 sm:gap-4 sm:w-72 sm:flex-row">
           <div className="font-mono bg-st-canvas px-2.5 sm:px-3 py-1 sm:py-1.5 rounded border border-st-hairline flex items-baseline gap-1.5">
             <span className="text-white text-sm sm:text-base font-bold tracking-wider">
               00:51
@@ -1415,7 +1342,7 @@ export const App: React.FC = () => {
           </div>
           <div className="hidden sm:flex flex-col">
             <span className="text-[9px] font-mono uppercase tracking-widest text-st-ok flex items-center">
-              <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1 shadow-[0_0_6px_#34d399]" />
+              <span className="inline-block w-1.5 h-1.5 rounded-full bg-st-ok mr-1 shadow-[0_0_6px_#34d399]" />
               SYNC READY
             </span>
             <span className="text-[9px] font-mono text-zinc-500">
@@ -1423,39 +1350,11 @@ export const App: React.FC = () => {
             </span>
           </div>
           <span className="flex items-center sm:hidden text-[9px] font-mono uppercase tracking-widest text-st-ok">
-            <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1 shadow-[0_0_6px_#34d399]" />
+            <span className="inline-block w-1.5 h-1.5 rounded-full bg-st-ok mr-1 shadow-[0_0_6px_#34d399]" />
             SYNC
           </span>
         </div>
         <div className="flex items-center gap-1.5 sm:gap-3 mx-auto sm:mx-0">
-          <div
-            data-mockup-placeholder="true"
-            aria-hidden="true"
-            className="p-1 sm:p-2 text-zinc-400 bg-st-surface rounded border border-st-hairline hidden sm:flex items-center justify-center"
-          >
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-              />
-            </svg>
-          </div>
-          <div
-            data-mockup-placeholder="true"
-            aria-hidden="true"
-            className="p-1 sm:p-2 text-zinc-300 bg-st-surface rounded border border-st-hairline hidden sm:flex items-center justify-center"
-          >
-            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-              <path d="M8.445 14.832A1 1 0 0010 14v-2.798l5.445 3.63A1 1 0 0017 14V6a1 1 0 00-1.555-.832L10 8.798V6a1 1 0 00-1.555-.832l-6 4a1 1 0 000 1.664l6 4z" />
-            </svg>
-          </div>
           <button
             type="button"
             data-testid="footer-play-pause"
@@ -1480,48 +1379,25 @@ export const App: React.FC = () => {
               </svg>
             )}
           </button>
-          <div
-            data-mockup-placeholder="true"
-            aria-hidden="true"
-            className="p-1 sm:p-2 text-zinc-300 bg-st-surface rounded border border-st-hairline hidden sm:flex items-center justify-center"
-          >
-            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-              <path d="M4.555 5.168A1 1 0 003 6v8a1 1 0 001.555.832L10 11.202V14a1 1 0 001.555.832l6-4a1 1 0 000-1.664l-6-4A1 1 0 0010 6v2.798L4.555 5.168z" />
-            </svg>
-          </div>
-          <div
-            data-mockup-placeholder="true"
-            aria-hidden="true"
-            className="px-2.5 py-1.5 bg-st-surface border border-st-hairline rounded text-zinc-400 font-mono text-[10px] font-semibold hidden sm:flex items-center justify-center"
-          >
-            TAP
-          </div>
         </div>
-        <div
-          data-mockup-placeholder="true"
-          aria-hidden="true"
-          className="flex items-center gap-3 shrink-0 justify-end sm:gap-4 sm:w-72"
-        >
+        <div className="flex items-center gap-3 shrink-0 justify-end sm:gap-4 sm:w-72">
           <div className="flex items-center gap-1">
             <div className="flex flex-col gap-0.5">
               <span className="inline-block w-1.5 h-1 bg-zinc-700" />
-              <span className="inline-block w-1.5 h-1 bg-emerald-500" />
-              <span className="inline-block w-1.5 h-1 bg-emerald-500" />
-              <span className="inline-block w-1.5 h-1 bg-emerald-400" />
-              <span className="inline-block w-1.5 h-1 bg-emerald-400" />
-              <span className="inline-block w-1.5 h-1 bg-emerald-400" />
+              <span className="inline-block w-1.5 h-1 bg-st-ok/60" />
+              <span className="inline-block w-1.5 h-1 bg-st-ok/60" />
+              <span className="inline-block w-1.5 h-1 bg-st-ok" />
+              <span className="inline-block w-1.5 h-1 bg-st-ok" />
+              <span className="inline-block w-1.5 h-1 bg-st-ok" />
             </div>
             <div className="flex flex-col gap-0.5">
               <span className="inline-block w-1.5 h-1 bg-zinc-700" />
               <span className="inline-block w-1.5 h-1 bg-zinc-700" />
-              <span className="inline-block w-1.5 h-1 bg-emerald-500" />
-              <span className="inline-block w-1.5 h-1 bg-emerald-400" />
-              <span className="inline-block w-1.5 h-1 bg-emerald-400" />
-              <span className="inline-block w-1.5 h-1 bg-emerald-400" />
+              <span className="inline-block w-1.5 h-1 bg-st-ok/60" />
+              <span className="inline-block w-1.5 h-1 bg-st-ok" />
+              <span className="inline-block w-1.5 h-1 bg-st-ok" />
+              <span className="inline-block w-1.5 h-1 bg-st-ok" />
             </div>
-            <span className="font-mono text-[9px] text-zinc-500 ml-1 hidden sm:block">
-              0 dB
-            </span>
           </div>
           <div className="flex items-center gap-2">
             <span className="font-mono text-[10px] text-zinc-400 uppercase font-semibold sm:hidden">

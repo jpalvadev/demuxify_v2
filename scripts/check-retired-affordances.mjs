@@ -49,15 +49,12 @@ import * as path from "path";
 // (DSP WebAudio / LATENCY / BUFFERS), loop/seek-to-start/ff/TAP transport
 // glyphs, Stereo VU pips with a 0 dB readout, beat-dot pips with a BAR
 // counter, a 4/4 Beat chip and a phantom third DSP-rack card (Click Track /
-// Metronome). The override renders these VERBATIM as DEAD PLACEHOLDERS:
-// marked data-mockup-placeholder="true", aria-hidden, wired to no behavior,
-// to be erased by a later cleanup commit when this exemption goes back to a
-// hard ban. So PLACEHOLDER_EXEMPT_IN_SRC below retires that phantom chrome in
-// LIVE markup while SKIPPING every line inside a placeholder subtree — one
-// scoped exemption, covering exactly this drop list. The strict BANNED_IN_SRC
-// list above stays strict everywhere, placeholders included: a grz class, a
-// Downbeat symbol or a Formant pill-slider may not hide behind a
-// data-mockup-placeholder either.
+// Metronome). The 08h CLEANUP commit erased that phantom chrome outright and
+// RETURNED ITS EXEMPTION TO A HARD BAN: PHANTOM_CHROME_BANNED_IN_SRC below now
+// retires it from LIVE markup with NO escape — no placeholder subtree shelters
+// it anymore, and a data-mockup-placeholder marker itself is banned. The strict
+// BANNED_IN_SRC list above stays strict everywhere: a grz class, a Downbeat
+// symbol or a Formant pill-slider may not hide behind any marker either.
 
 const SRC_DIR = path.resolve(process.cwd(), "src");
 
@@ -171,93 +168,75 @@ const BANNED_IN_SRC = [
   },
 ];
 
-// Phantom chrome the 2026-11-04 override admits ONLY inside a placeholder
-// subtree (see placeholderRanges below). Same identity convention as above:
-// every pattern names the mockup control it retires from LIVE markup.
-const PLACEHOLDER_EXEMPT_IN_SRC = [
+// Phantom chrome the 2026-11-04 override admitted ONLY inside a placeholder
+// subtree until the 08h cleanup commit erased it — now HARD-BANNED, no marker
+// shelters it. Same identity convention as above: every pattern names the
+// mockup control it retires from LIVE markup.
+const PHANTOM_CHROME_BANNED_IN_SRC = [
+  {
+    pattern: /data-mockup-placeholder/,
+    reason:
+      "the placeholder marker itself is dead since the 08h cleanup commit — no " +
+      "markup may claim to be mockup phantom chrome anymore (the exemption " +
+      "returned to a hard ban).",
+  },
   {
     pattern: /p-1\.5 rounded border border-transparent/,
     reason:
       "Stitch Skin drop list: the mockup's undo/redo/gear icon cluster is " +
-      "phantom chrome — the app has no undo/redo or settings buttons. Renders " +
-      'only inside an element marked data-mockup-placeholder="true".',
+      "phantom chrome — the app has no undo/redo or settings buttons. HARD BANNED " +
+      "since the 08h cleanup commit erased it from the Band.",
   },
   {
     pattern: /BUFFERS: SYNCED|LATENCY: <1\.8ms|DSP WebAudio/,
     reason:
       "the mockup's engine badge (DSP WebAudio / LATENCY: <1.8ms / " +
       "BUFFERS: SYNCED) is a fake telemetry readout the app never had. " +
-      "Placeholder-only.",
+      "HARD BANNED since the 08h cleanup commit erased it.",
   },
   {
     pattern: /Loop Section|M4 4v5h\.582/,
     reason:
       "the mockup's Loop toggle (Loop Section button + the M4 4v5h.582 loop " +
       "glyph) is phantom transport chrome — playback looping is not a shipped " +
-      "control. Placeholder-only.",
+      "control. HARD BANNED since cleanup.",
   },
   {
     pattern: /M8\.445 14\.832|M4\.555 5\.168/,
     reason:
       "the mockup's Seek-to-start and Fast-forward transport glyphs (the " +
-      "M8.445…/M4.555… skip-path families) never shipped. Placeholder-only.",
+      "M8.445…/M4.555… skip-path families) never shipped. HARD BANNED since cleanup.",
   },
   {
     pattern: /\bTAP\b/,
     reason:
       "the mockup's all-caps transport TAP button is phantom — the live " +
       "Hand Calibration asks for lowercase beat taps, never an all-caps TAP " +
-      "button on any rail. Placeholder-only.",
+      "button on any rail. HARD BANNED since cleanup.",
   },
   {
     pattern: /0 dB\b|bg-emerald-\d{3}/,
     reason:
       "the mockup's Stereo VU Peak Output Meters (emerald pips + 0 dB " +
       "readout) are phantom chrome — the app has no VU meter anywhere. " +
-      "Placeholder-only.",
+      "HARD BANNED since the 08h cleanup commit erased it.",
   },
   {
     pattern: /\bBAR \d/,
     reason:
       "the mockup's BAR + beat-number counter is a phantom Click Track " +
       "readout — the shipped Click Track shows no BAR display. " +
-      "Placeholder-only.",
+      "HARD BANNED since the 08h cleanup commit erased it.",
   },
   {
     pattern: /4\/4 Beat/,
     reason:
       "the mockup's 4/4 Beat chip on its phantom metronome card; the shipped " +
-      "DSP rack has two cards, never a third. Placeholder-only.",
+      "DSP rack has two cards, never a third. HARD BANNED since cleanup.",
   },
 ];
 
 let hasErrors = false;
-
-// A data-mockup-placeholder="true" element and its whole subtree. The marker
-// usually sits on an attribute line below the opening tag, so walk back to the
-// line that opens the tag; then walk forward adding opens minus closes minus
-// self-closes until depth returns to zero.
-function placeholderRanges(lines) {
-  const found = [];
-  for (let i = 0; i < lines.length; i++) {
-    if (!lines[i].includes('data-mockup-placeholder="true"')) continue;
-    let start = i;
-    while (start > 0 && !/<[A-Za-z]/.test(lines[start])) start--;
-    let depth = 0;
-    let end = start;
-    for (let j = start; j < lines.length; j++) {
-      const opens = (lines[j].match(/<(?!\/)[A-Za-z][A-Za-z0-9-]*/g) || [])
-        .length;
-      const closes = (lines[j].match(/<\/[A-Za-z][A-Za-z0-9-]*/g) || []).length;
-      const selfCloses = (lines[j].match(/\/>/g) || []).length;
-      depth += opens - closes - selfCloses;
-      end = j;
-      if (depth <= 0) break;
-    }
-    found.push([start, end]);
-  }
-  return found;
-}
 
 function scanDir(dir) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -273,7 +252,6 @@ function scanDir(dir) {
     if (!entry.name.endsWith(".ts") && !entry.name.endsWith(".tsx")) continue;
 
     const lines = fs.readFileSync(fullPath, "utf8").split("\n");
-    const exemptLines = placeholderRanges(lines);
 
     lines.forEach((line, lineIdx) => {
       // Comments record history legitimately; code does not.
@@ -298,17 +276,15 @@ function scanDir(dir) {
         hasErrors = true;
       }
 
-      for (const { pattern, reason } of PLACEHOLDER_EXEMPT_IN_SRC) {
-        if (
-          exemptLines.some(([start, end]) => lineIdx >= start && lineIdx <= end)
-        )
-          continue;
+      for (const { pattern, reason } of PHANTOM_CHROME_BANNED_IN_SRC) {
         if (!pattern.test(line)) continue;
         const relative = path
           .relative(process.cwd(), fullPath)
           .replace(/\\/g, "/");
         console.error(
-          `❌ Stitch mockup phantom chrome revived outside a placeholder in ${relative}:${lineIdx + 1}`
+          `❌ Stitch mockup phantom chrome revived in shipped code at ${relative}:${
+            lineIdx + 1
+          }`
         );
         console.error(`   "${trimmed}"`);
         console.error(`   👉 ${reason}\n`);
@@ -333,8 +309,8 @@ if (hasErrors) {
       "no Click Track mute control, no Formant pill-slider, no spine time " +
       "readout; the Stitch mockup's phantom chrome (undo/redo/gear, engine " +
       "badge, loop/ff/TAP transport, VU meters, BAR counters, the third DSP-rack " +
-      "card) renders only inside a data-mockup-placeholder dead placeholder in " +
-      "src/.\n"
+      "card) renders NOWHERE in src/ — the 08h cleanup commit returned the " +
+      "placeholder exemption to a hard ban and erased it all.\n"
   );
   process.exit(0);
 }
