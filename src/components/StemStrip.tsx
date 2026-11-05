@@ -316,12 +316,12 @@ export const StemStrip: React.FC<StemStripProps> = ({
         </span>
       </div>
 
-      {/* M/S + readout group (Stitch skin 10): mobile — right end of the
-          header row (the target's `M S 100%` cluster); desktop — the rack's
-          M/S block welded to the rack hairline. Single instance; order
+      {/* M/S group (Stitch skin 10b): mobile — right end of the header row
+          (the target's `M S` pair riding before the % readout); desktop — the
+          rack's M/S block welded to the rack hairline. Single instance; order
           classes do the moving. Compact mono M/S caps. Behavior, aria, and
           handlers untouched. */}
-      <div className="order-2 ml-auto flex shrink-0 items-center gap-1 pr-3 sm:order-3 sm:h-full sm:ml-0 sm:border-s sm:border-st-hairline sm:bg-st-panel sm:px-3 sm:pr-2">
+      <div className="order-2 ml-auto flex shrink-0 items-center gap-1 pr-1 sm:order-3 sm:h-full sm:ml-0 sm:border-s sm:border-st-hairline sm:bg-st-panel sm:px-3 sm:pr-2">
         <button
           type="button"
           aria-label={`Mute ${config.label}`}
@@ -355,10 +355,15 @@ export const StemStrip: React.FC<StemStripProps> = ({
         >
           S
         </button>
-        <span className="w-9 text-right font-mono text-[10px] text-st-ink-dim">
-          {Math.round(volume * 100)}%
-        </span>
       </div>
+
+      {/* Volume readout (Stitch skin 10b, the user's rack-crop fix): ONE
+          instance, moved out of the M/S group to the mockup's rack END —
+          mobile it closes the header row (`M S 100%`), desktop it closes
+          the rack AFTER speaker + slider (`M S 🔊 —— 100%`). */}
+      <span className="order-3 w-9 shrink-0 pr-3 text-right font-mono text-[10px] text-st-ink-dim sm:order-6 sm:w-10 sm:pr-3 sm:pl-1">
+        {Math.round(volume * 100)}%
+      </span>
 
       {/* Waveform Display Area (Stitch skin 10): mobile — full-width bordered
           rounded field on its own line; desktop — the mockup's borderless
@@ -368,7 +373,7 @@ export const StemStrip: React.FC<StemStripProps> = ({
         ref={containerRef}
         onClick={handleWaveformClick}
         role="presentation"
-        className="order-3 basis-full w-full cursor-pointer overflow-hidden rounded-md border border-st-hairline/60 sm:order-2 sm:flex-1 sm:basis-auto sm:rounded-none sm:border-0 sm:h-full sm:min-w-[120px]"
+        className="order-4 basis-full w-full cursor-pointer overflow-hidden rounded-md border border-st-hairline/60 sm:order-2 sm:flex-1 sm:basis-auto sm:rounded-none sm:border-0 sm:h-full sm:min-w-[120px]"
         style={{ height }}
       >
         <canvas ref={canvasRef} className="block w-full h-full" />
@@ -377,9 +382,9 @@ export const StemStrip: React.FC<StemStripProps> = ({
       {/* Volume row (Stitch skin 10): mobile — full-width slider row below
           the waveform (the target's slim track + coral knob, no speaker);
           desktop — `contents`: the speaker + slider dissolve into the rack
-          as the mockup's w-64 control strip. Single slider instance, aria
-          pinned. */}
-      <div className="order-4 flex w-full items-center gap-2 px-3 pb-1 sm:contents">
+          as the mockup's control strip, slider BEFORE the % readout. Single
+          slider instance, aria pinned. */}
+      <div className="order-5 flex w-full items-center gap-2 px-3 pb-1 sm:contents">
         {muted || isSilenced ? (
           <VolumeX className="hidden h-3 w-3 shrink-0 text-st-ink-faint sm:order-4 sm:block" />
         ) : (
