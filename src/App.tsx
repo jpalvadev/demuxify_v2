@@ -1390,21 +1390,30 @@ export const App: React.FC = () => {
           sm (chip padding, mono sizes, transport glyphs, the disc and the
           slider), so the one-rail composition from the user's phone crop
           renders intact at ~480 and wider, while 442 and 390 keep wrapping.
-          sm: tokens keep the desktop rail byte-identical. */}
+          08g re-copies the VIEW TARGET itself (mobile_stitch_target_design.png
+          footer band): ONE single row at every phone width — the clock chip
+          with a single green pip + SYNC word INLINE to its right, the full-
+          size coral disc CENTRED on the bar (the bar's own justify-between
+          plus the cluster's mx-auto centre it), and the peak pips + MST +
+          slider + 100% cluster at the right. The loop, seek, fast-forward
+          glyphs and the beat-tap chip simply do not exist on the phone
+          target, so they hide until sm; the readout column (READY word,
+          four-STEMS line) hides on phones too, replaced by the inline SYNC
+          word. sm: tokens keep the desktop rail byte-identical. */}
       <footer className="w-full flex items-center justify-between shrink-0 z-30 border-t border-st-hairline bg-st-panel px-3 sm:px-6 py-3 sm:py-2 sm:h-16 flex-wrap sm:flex-nowrap gap-y-2 sm:gap-y-0">
         <div
           data-mockup-placeholder="true"
           aria-hidden="true"
-          className="flex items-center gap-2 shrink-0 flex-col sm:gap-4 sm:w-72 sm:flex-row"
+          className="flex items-center gap-3 shrink-0 sm:gap-4 sm:w-72 sm:flex-row"
         >
-          <div className="font-mono bg-st-canvas px-2.5 py-1 rounded border border-st-hairline flex items-baseline gap-1.5">
+          <div className="font-mono bg-st-canvas px-2.5 sm:px-3 py-1 sm:py-1.5 rounded border border-st-hairline flex items-baseline gap-1.5">
             <span className="text-white text-sm sm:text-base font-bold tracking-wider">
               00:51
             </span>
             <span className="text-zinc-500 text-xs">/</span>
             <span className="text-zinc-400 text-xs">03:35</span>
           </div>
-          <div className="flex flex-col">
+          <div className="hidden sm:flex flex-col">
             <span className="text-[9px] font-mono uppercase tracking-widest text-st-ok flex items-center">
               <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1 shadow-[0_0_6px_#34d399]" />
               SYNC READY
@@ -1413,12 +1422,16 @@ export const App: React.FC = () => {
               4 STEMS PHASE-LOCKED
             </span>
           </div>
+          <span className="flex items-center sm:hidden text-[9px] font-mono uppercase tracking-widest text-st-ok">
+            <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1 shadow-[0_0_6px_#34d399]" />
+            SYNC
+          </span>
         </div>
-        <div className="flex items-center gap-1.5 sm:gap-3 order-last sm:order-none mx-auto sm:mx-0">
+        <div className="flex items-center gap-1.5 sm:gap-3 mx-auto sm:mx-0">
           <div
             data-mockup-placeholder="true"
             aria-hidden="true"
-            className="p-1 sm:p-2 text-zinc-400 bg-st-surface rounded border border-st-hairline flex items-center justify-center"
+            className="p-1 sm:p-2 text-zinc-400 bg-st-surface rounded border border-st-hairline hidden sm:flex items-center justify-center"
           >
             <svg
               className="w-4 h-4"
@@ -1437,7 +1450,7 @@ export const App: React.FC = () => {
           <div
             data-mockup-placeholder="true"
             aria-hidden="true"
-            className="p-1 sm:p-2 text-zinc-300 bg-st-surface rounded border border-st-hairline flex items-center justify-center"
+            className="p-1 sm:p-2 text-zinc-300 bg-st-surface rounded border border-st-hairline hidden sm:flex items-center justify-center"
           >
             <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
               <path d="M8.445 14.832A1 1 0 0010 14v-2.798l5.445 3.63A1 1 0 0017 14V6a1 1 0 00-1.555-.832L10 8.798V6a1 1 0 00-1.555-.832l-6 4a1 1 0 000 1.664l6 4z" />
@@ -1450,20 +1463,16 @@ export const App: React.FC = () => {
             aria-label="Play/Pause"
             aria-pressed={footerTransportPlaying}
             onClick={handleFooterPlayPause}
-            className="w-8 h-8 sm:w-11 sm:h-11 rounded-full bg-st-coral text-white flex items-center justify-center shadow-play-glow transition-all active:scale-95"
+            className="w-11 h-11 rounded-full bg-st-coral text-white flex items-center justify-center shadow-play-glow transition-all active:scale-95"
           >
             {footerTransportPlaying ? (
-              <svg
-                className="w-4 h-4 sm:w-5 sm:h-5"
-                fill="currentColor"
-                viewBox="0 0 24 24"
-              >
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                 <rect x="7" y="4" width="3.5" height="16" rx="1.25" />
                 <rect x="13.5" y="4" width="3.5" height="16" rx="1.25" />
               </svg>
             ) : (
               <svg
-                className="w-4 h-4 sm:w-5 sm:h-5 ml-0.5"
+                className="w-5 h-5 ml-0.5"
                 fill="currentColor"
                 viewBox="0 0 24 24"
               >
@@ -1474,7 +1483,7 @@ export const App: React.FC = () => {
           <div
             data-mockup-placeholder="true"
             aria-hidden="true"
-            className="p-1 sm:p-2 text-zinc-300 bg-st-surface rounded border border-st-hairline flex items-center justify-center"
+            className="p-1 sm:p-2 text-zinc-300 bg-st-surface rounded border border-st-hairline hidden sm:flex items-center justify-center"
           >
             <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
               <path d="M4.555 5.168A1 1 0 003 6v8a1 1 0 001.555.832L10 11.202V14a1 1 0 001.555.832l6-4a1 1 0 000-1.664l-6-4A1 1 0 0010 6v2.798L4.555 5.168z" />
@@ -1483,7 +1492,7 @@ export const App: React.FC = () => {
           <div
             data-mockup-placeholder="true"
             aria-hidden="true"
-            className="px-1.5 py-1 sm:px-2.5 sm:py-1.5 bg-st-surface border border-st-hairline rounded text-zinc-400 font-mono text-[10px] font-semibold flex items-center justify-center"
+            className="px-2.5 py-1.5 bg-st-surface border border-st-hairline rounded text-zinc-400 font-mono text-[10px] font-semibold hidden sm:flex items-center justify-center"
           >
             TAP
           </div>
@@ -1491,7 +1500,7 @@ export const App: React.FC = () => {
         <div
           data-mockup-placeholder="true"
           aria-hidden="true"
-          className="flex items-center gap-4 shrink-0 justify-end sm:w-72"
+          className="flex items-center gap-3 shrink-0 justify-end sm:gap-4 sm:w-72"
         >
           <div className="flex items-center gap-1">
             <div className="flex flex-col gap-0.5">
@@ -1515,13 +1524,16 @@ export const App: React.FC = () => {
             </span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="font-mono text-[10px] text-zinc-400 uppercase font-semibold">
+            <span className="font-mono text-[10px] text-zinc-400 uppercase font-semibold sm:hidden">
+              MST
+            </span>
+            <span className="font-mono text-[10px] text-zinc-400 uppercase font-semibold hidden sm:inline">
               Master
             </span>
-            <div className="w-12 sm:w-20 h-1 rounded bg-st-hairline relative">
+            <div className="w-14 sm:w-20 h-1 rounded bg-st-hairline relative">
               <span className="absolute right-0 top-[-2px] w-2 h-2 rounded-full bg-st-coral" />
             </div>
-            <span className="font-mono text-[10px] text-zinc-200 font-bold w-7 text-right">
+            <span className="font-mono text-[10px] text-zinc-200 font-bold w-6 sm:w-7 text-right">
               100%
             </span>
           </div>
