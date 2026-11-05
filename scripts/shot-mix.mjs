@@ -41,5 +41,22 @@ for (const [name, w, h] of [
   await page.waitForTimeout(1200);
   await page.screenshot({ path: `${OUT}/${name}.png`, fullPage: true });
   log(`${name} -> ${OUT}/${name}.png`);
+  // The workspace is a tab shell: main scrolls on desktop, each mobile tab
+  // panel is an `absolute inset-0 overflow-y-auto` section (App.tsx seam), and
+  // fullPage never expands clipped flex/absolute containers. Scroll every
+  // overflow container that actually overflows and capture the lower viewport.
+  await page.evaluate(() => {
+    for (const el of document.querySelectorAll("main, section, div")) {
+      const cs = getComputedStyle(el);
+      if (
+        /(auto|scroll)/.test(cs.overflowY) &&
+        el.scrollHeight > el.clientHeight + 4
+      )
+        el.scrollTop = el.scrollHeight;
+    }
+  });
+  await page.waitForTimeout(600);
+  await page.screenshot({ path: `${OUT}/${name}-lower.png` });
+  log(`${name}-lower -> ${OUT}/${name}-lower.png`);
 }
 await browser.close();
