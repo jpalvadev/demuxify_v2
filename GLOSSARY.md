@@ -60,6 +60,10 @@ _Avoid_: Download folder, zip file, audio package
 A single exported audio file (WAV or MP3) containing a user-selected combination of Stems summed together with custom volume levels and anti-clipping protection (e.g., Karaoke, Instrumental, or Custom Backing Track).
 _Avoid_: Mixed track, merged audio, bounce, blended song, exported song
 
+**Export Engine**:
+The headless audio processing core that produces **Export Bundles**, **Custom Mixdowns**, or single **Stems** — it coordinates offline time-stretching, anti-clipping protection, parallel WAV/MP3 encoders, and ZIP packaging behind a single command interface. The **Export Tab** drives it; it never renders UI or initiates browser DOM downloads.
+_Avoid_: Export service, exporter, download manager, export dialog backend
+
 **Master Waveform**:
 The full overview visual representation of the audio mix used for primary timeline navigation and scrubbing.
 _Avoid_: Timeline bar, progress bar, audio visualizer
