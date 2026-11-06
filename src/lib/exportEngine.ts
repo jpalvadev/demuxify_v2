@@ -16,10 +16,24 @@ import {
   formatClickTrackFileName,
   sanitizeSourceMixTitle,
 } from "./bundleZip";
-import { MixdownDescriptor } from "./customMixdown";
+import {
+  MixdownDescriptor,
+  mixAudioStems,
+  formatMixdownFileName,
+} from "./customMixdown";
 import { renderOfflineStems } from "./signalsmithStretchAdapter";
 
 export { VALID_MP3_BITRATES };
+export {
+  MIXDOWN_PRESETS,
+  DEFAULT_STEM_CONTROLS,
+  computeInitialStemControls,
+} from "./customMixdown";
+export type {
+  StemControlState,
+  MixdownPresetId,
+  MixdownPresetConfig,
+} from "./customMixdown";
 
 export type ExportFormat = "wav" | "mp3";
 export type ExportMode = "single" | "bundle" | "mixdown";
@@ -377,6 +391,67 @@ export async function exportAudio(
     };
   }
 
-  // mode: "mixdown" - stub for Ticket 01, completed in Ticket 02
-  throw new Error(`Mode "${(request as any).mode}" not yet implemented.`);
+  if (request.mode === "mixdown") {
+    options?.onProgress?.(25, "Summing stems & applying mixdown...");
+    checkAborted(options?.signal);
+
+    const mixResult = mixAudioStems(exportStems, {
+      stemGains: request.stemGains,
+      masterGain: request.masterGain,
+      antiClipping: request.antiClipping,
+      sourceMixTitle,
+      format: request.format,
+      preferInstrumental: request.preferInstrumental,
+    });
+
+    checkAborted(options?.signal);
+
+    const fileName =
+      mixResult.fileName ||
+      formatMixdownFileName(
+        sourceMixTitle,
+        mixResult.descriptor,
+        request.format
+      );
+
+    let blob: Blob;
+
+    if (request.format === "wav") {
+      options?.onProgress?.(50, `Encoding ${mixResult.descriptor}...`);
+      checkAborted(options?.signal);
+      blob = createWavBlob(mixResult.audio, {
+        sampleRate,
+        bitDepth: request.bitDepth ?? 16,
+      });
+      options?.onProgress?.(100, "Export complete");
+    } else {
+      blob = await runWithAbort(
+        createMp3Blob(mixResult.audio, {
+          sampleRate,
+          bitrate: request.bitrate ?? 192,
+          onProgress: (p) => {
+            checkAborted(options?.signal);
+            options?.onProgress?.(
+              Math.round(50 + p * 50),
+              `Encoding ${mixResult.descriptor}...`
+            );
+          },
+        }),
+        options?.signal
+      );
+      options?.onProgress?.(100, "Export complete");
+    }
+
+    checkAborted(options?.signal);
+
+    return {
+      blob,
+      fileName,
+      mimeType:
+        blob.type || (request.format === "wav" ? "audio/wav" : "audio/mp3"),
+      descriptor: mixResult.descriptor,
+    };
+  }
+
+  throw new Error(`Mode "${(request as any).mode}" is not recognized.`);
 }

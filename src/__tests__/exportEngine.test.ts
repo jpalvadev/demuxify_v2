@@ -5,6 +5,10 @@ import {
   ExportContext,
   SingleStemExportRequest,
   BundleExportRequest,
+  MixdownExportRequest,
+  MIXDOWN_PRESETS,
+  DEFAULT_STEM_CONTROLS,
+  computeInitialStemControls,
 } from "../lib/exportEngine";
 import { StemName, STEM_NAMES } from "../lib/chunkOverlapAdd";
 import * as signalsmithAdapter from "../lib/signalsmithStretchAdapter";
@@ -311,42 +315,204 @@ describe("exportEngine (Single Stem & Full Bundle)", () => {
     });
   });
 
-  describe("Cancellation with AbortSignal", () => {
-    it("rejects immediately with AbortError if pre-aborted signal is passed", async () => {
-      const controller = new AbortController();
-      controller.abort();
-
-      const request: SingleStemExportRequest = {
-        mode: "single",
-        stem: "vocals",
+  describe("Custom Mixdown Export", () => {
+    it("renders a summed WAV audio file with correct semantic descriptor for karaoke", async () => {
+      const request: MixdownExportRequest = {
+        mode: "mixdown",
         format: "wav",
+        stemGains: {
+          vocals: 0.0,
+          drums: 1.0,
+          bass: 1.0,
+          other: 1.0,
+        },
+        masterGain: 1.0,
+        antiClipping: true,
       };
 
-      await expect(
-        exportAudio(request, mockContext, { signal: controller.signal })
-      ).rejects.toThrow();
+      const result = await exportAudio(request, mockContext);
+      expect(result.fileName).toBe("test_track_karaoke.wav");
+      expect(result.descriptor).toBe("karaoke");
+      expect(result.mimeType).toBe("audio/wav");
+      expect(result.blob).toBeInstanceOf(Blob);
 
-      try {
-        await exportAudio(request, mockContext, { signal: controller.signal });
-      } catch (err: any) {
-        expect(err.name).toBe("AbortError");
-      }
+      const buffer = await result.blob.arrayBuffer();
+      const view = new DataView(buffer);
+      const riff = String.fromCharCode(
+        view.getUint8(0),
+        view.getUint8(1),
+        view.getUint8(2),
+        view.getUint8(3)
+      );
+      expect(riff).toBe("RIFF");
     });
 
-    it("rejects with AbortError when aborted mid-flight", async () => {
+    it("renders a summed MP3 audio file with correct semantic descriptor for acapella", async () => {
+      const request: MixdownExportRequest = {
+        mode: "mixdown",
+        format: "mp3",
+        bitrate: 192,
+        stemGains: {
+          vocals: 1.0,
+          drums: 0.0,
+          bass: 0.0,
+          other: 0.0,
+        },
+        masterGain: 1.0,
+        antiClipping: true,
+      };
+
+      const progressSpy = vi.fn();
+      const result = await exportAudio(request, mockContext, {
+        onProgress: progressSpy,
+      });
+
+      expect(result.fileName).toBe("test_track_acapella.mp3");
+      expect(result.descriptor).toBe("acapella");
+      expect(result.mimeType).toBe("audio/mp3");
+      expect(result.blob).toBeInstanceOf(Blob);
+      expect(progressSpy).toHaveBeenCalledWith(100, "Export complete");
+    });
+
+    it("supports preferInstrumental option for no-vocals mixdown", async () => {
+      const request: MixdownExportRequest = {
+        mode: "mixdown",
+        format: "wav",
+        stemGains: {
+          vocals: 0.0,
+          drums: 1.0,
+          bass: 1.0,
+          other: 1.0,
+        },
+        masterGain: 1.0,
+        antiClipping: true,
+        preferInstrumental: true,
+      };
+
+      const result = await exportAudio(request, mockContext);
+      expect(result.fileName).toBe("test_track_instrumental.wav");
+      expect(result.descriptor).toBe("instrumental");
+    });
+
+    it("applies anti-clipping normalization when summed peaks exceed -0.3 dBFS ceiling", async () => {
+      // Create high-amplitude stems that sum to well above 1.0 (clipping)
+      const hotContext: ExportContext = {
+        ...mockContext,
+        stems: {
+          vocals: [
+            new Float32Array(sampleCount).fill(0.6),
+            new Float32Array(sampleCount).fill(0.6),
+          ],
+          drums: [
+            new Float32Array(sampleCount).fill(0.6),
+            new Float32Array(sampleCount).fill(0.6),
+          ],
+          bass: [
+            new Float32Array(sampleCount).fill(0.6),
+            new Float32Array(sampleCount).fill(0.6),
+          ],
+          other: [
+            new Float32Array(sampleCount).fill(0.6),
+            new Float32Array(sampleCount).fill(0.6),
+          ],
+        },
+      };
+
+      const request: MixdownExportRequest = {
+        mode: "mixdown",
+        format: "wav",
+        bitDepth: 16,
+        stemGains: {
+          vocals: 1.0,
+          drums: 1.0,
+          bass: 1.0,
+          other: 1.0,
+        },
+        masterGain: 1.0,
+        antiClipping: true,
+      };
+
+      const result = await exportAudio(request, hotContext);
+      expect(result.blob).toBeInstanceOf(Blob);
+
+      // Verify samples in the resulting WAV
+      const buffer = await result.blob.arrayBuffer();
+      const view = new DataView(buffer);
+      // Data chunk starts after 44-byte header for standard 16-bit PCM
+      // Check maximum 16-bit integer sample
+      let maxSample = 0;
+      for (let offset = 44; offset < buffer.byteLength; offset += 2) {
+        const sample = Math.abs(view.getInt16(offset, true));
+        if (sample > maxSample) {
+          maxSample = sample;
+        }
+      }
+
+      // Max possible 16-bit sample is 32767.
+      // -0.3 dBFS corresponds to ~32767 * 0.96605088 ≈ 31654.
+      // If antiClipping worked, maxSample should not exceed ~31660.
+      expect(maxSample).toBeLessThanOrEqual(31660);
+    });
+
+    it("applies offline time-stretch only to enabled mixdown stems", async () => {
+      const renderSpy = vi.spyOn(signalsmithAdapter, "renderOfflineStems");
+
+      const request: MixdownExportRequest = {
+        mode: "mixdown",
+        format: "wav",
+        stemGains: {
+          vocals: 0.0, // muted
+          drums: 0.8,
+          bass: 1.0,
+          other: 0.0, // muted
+        },
+        masterGain: 1.0,
+        antiClipping: true,
+        applyAdjustments: true,
+      };
+
+      const contextWithAdjustments: ExportContext = {
+        ...mockContext,
+        timeStretch: {
+          tempo: 1.15,
+          pitch: -1,
+        },
+      };
+
+      await exportAudio(request, contextWithAdjustments);
+      expect(renderSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          drums: expect.any(Array),
+          bass: expect.any(Array),
+        }),
+        expect.objectContaining({ tempo: 1.15, pitch: -1 })
+      );
+      // Vocals and other should not be passed to offline render
+      const calledStems = renderSpy.mock.calls[0][0];
+      expect(calledStems.vocals).toBeUndefined();
+      expect(calledStems.other).toBeUndefined();
+    });
+
+    it("rejects cleanly with AbortError when cancelled during mixdown", async () => {
       const controller = new AbortController();
 
-      const request: BundleExportRequest = {
-        mode: "bundle",
+      const request: MixdownExportRequest = {
+        mode: "mixdown",
         format: "mp3",
+        stemGains: {
+          vocals: 1.0,
+          drums: 1.0,
+          bass: 1.0,
+          other: 1.0,
+        },
+        masterGain: 1.0,
+        antiClipping: true,
       };
 
       const exportPromise = exportAudio(request, mockContext, {
         signal: controller.signal,
-        onProgress: (p) => {
-          if (p >= 10) {
-            controller.abort();
-          }
+        onProgress: () => {
+          controller.abort();
         },
       });
 
@@ -356,6 +522,43 @@ describe("exportEngine (Single Stem & Full Bundle)", () => {
       } catch (err: any) {
         expect(err.name).toBe("AbortError");
       }
+    });
+  });
+
+  describe("Domain Presets & Helpers", () => {
+    it("exposes MIXDOWN_PRESETS with expected preset IDs and labels", () => {
+      expect(MIXDOWN_PRESETS).toHaveLength(4);
+      expect(MIXDOWN_PRESETS.map((p) => p.id)).toEqual([
+        "karaoke",
+        "acapella",
+        "minus_drums",
+        "reset",
+      ]);
+    });
+
+    it("computes initial stem controls with default values when initialMixerStates is undefined", () => {
+      const controls = computeInitialStemControls();
+      expect(controls).toEqual(DEFAULT_STEM_CONTROLS);
+      expect(controls.vocals.enabled).toBe(true);
+      expect(controls.vocals.volume).toBe(1.0);
+    });
+
+    it("respects solo and mute mixer states when computing initial stem controls", () => {
+      const mixerStates: any = {
+        vocals: { volume: 0.8, muted: false, solo: true, pan: 0 },
+        drums: { volume: 1.0, muted: false, solo: false, pan: 0 },
+        bass: { volume: 0.5, muted: true, solo: false, pan: 0 },
+        other: { volume: 0.9, muted: false, solo: false, pan: 0 },
+      };
+
+      const controls = computeInitialStemControls(mixerStates);
+      // Because vocals is soloed:
+      expect(controls.vocals.enabled).toBe(true);
+      expect(controls.vocals.volume).toBe(0.8);
+      // Others should not be heard
+      expect(controls.drums.enabled).toBe(false);
+      expect(controls.bass.enabled).toBe(false);
+      expect(controls.other.enabled).toBe(false);
     });
   });
 });

@@ -34,7 +34,15 @@ import {
   formatClickTrackFileName,
   sanitizeSourceMixTitle,
 } from "../lib/bundleZip";
-import { mixAudioStems, formatMixdownFileName } from "../lib/customMixdown";
+import {
+  mixAudioStems,
+  formatMixdownFileName,
+  StemControlState,
+  MixdownPresetId,
+  computeInitialStemControls,
+  DEFAULT_STEM_CONTROLS,
+  MIXDOWN_PRESETS as BASE_MIXDOWN_PRESETS,
+} from "../lib/customMixdown";
 import { renderOfflineStems } from "../lib/signalsmithStretchAdapter";
 import { toast } from "../lib/toast";
 import { cn } from "../lib/utils";
@@ -66,12 +74,8 @@ export interface ExportDialogProps {
 export type ExportMode = "single" | "bundle" | "mixdown";
 export type ExportFormat = "wav" | "mp3";
 
-export interface StemControlState {
-  enabled: boolean;
-  volume: number;
-}
-
-export type MixdownPresetId = "karaoke" | "acapella" | "minus_drums" | "reset";
+export type { StemControlState, MixdownPresetId };
+export { computeInitialStemControls, DEFAULT_STEM_CONTROLS };
 
 export interface MixdownPresetConfig {
   id: MixdownPresetId;
@@ -79,43 +83,9 @@ export interface MixdownPresetConfig {
   icon?: React.ComponentType<{ className?: string }>;
 }
 
-export const MIXDOWN_PRESETS: MixdownPresetConfig[] = [
-  { id: "karaoke", label: "Karaoke / Instrumental" },
-  { id: "acapella", label: "Acapella" },
-  { id: "minus_drums", label: "Minus Drums" },
-  { id: "reset", label: "Reset", icon: RotateCcw },
-];
-
-const DEFAULT_STEM_CONTROLS: Record<StemName, StemControlState> = {
-  vocals: { enabled: true, volume: 1.0 },
-  drums: { enabled: true, volume: 1.0 },
-  bass: { enabled: true, volume: 1.0 },
-  other: { enabled: true, volume: 1.0 },
-};
-
-export function computeInitialStemControls(
-  initialMixerStates?: StemMixerStates
-): Record<StemName, StemControlState> {
-  if (!initialMixerStates) {
-    return DEFAULT_STEM_CONTROLS;
-  }
-  const hasAnySolo = STEM_NAMES.some((s) => initialMixerStates[s]?.solo);
-  const controls: Record<StemName, StemControlState> = {} as any;
-  for (const stem of STEM_NAMES) {
-    const state = initialMixerStates[stem];
-    const isHeard = state
-      ? hasAnySolo
-        ? Boolean(state.solo && !state.muted)
-        : Boolean(!state.muted)
-      : true;
-    const vol = state ? state.volume : 1.0;
-    controls[stem] = {
-      enabled: isHeard,
-      volume: vol,
-    };
-  }
-  return controls;
-}
+export const MIXDOWN_PRESETS: MixdownPresetConfig[] = BASE_MIXDOWN_PRESETS.map(
+  (preset) => (preset.id === "reset" ? { ...preset, icon: RotateCcw } : preset)
+);
 
 function extractChannels(source: Float32Array[] | AudioBuffer): Float32Array[] {
   if ("numberOfChannels" in source) {
