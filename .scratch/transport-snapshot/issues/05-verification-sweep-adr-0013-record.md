@@ -4,13 +4,15 @@
 
 **Blocked by:** 01, 02, 03, 04.
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Parity guards green untouched: Stem Player component seam (bridge-channel tests — its interface is unchanged), the 42 engine seam tests, Master Waveform seam tests (repaint ceiling), sessionStore mixer-bridge/save-cadence tests, the Space keyboard test
-- [ ] Full pre-commit chain green: typecheck, full suite, `check:testids`, `check:retired-affordances`, `check:doc-anchors`, `check:dist-fresh`
-- [ ] stitch-skin loop: screenshots of the running app at desktop 1440×900 and mobile 390×844 show zero class-token diff against the view targets; the class-token pins needed no retarget (value sources changed, markup did not)
-- [ ] ADR-0013 amendment authored (append-only house format): the shell reads one Transport snapshot; App mirror states and the mid-render mutable ref are banned
-- [ ] Spec status updated to record the increment resolved (tickets 01–05)
-- [ ] Final commit gated green
+- [x] Parity guards green untouched: Stem Player component seam (bridge-channel tests — its interface is unchanged), the 42 engine seam tests, Master Waveform seam tests (repaint ceiling), sessionStore mixer-bridge/save-cadence tests, the Space keyboard test
+- [x] Full pre-commit chain green: typecheck, full suite, `check:testids`, `check:retired-affordances`, `check:doc-anchors`, `check:dist-fresh`
+- [x] stitch-skin loop: screenshots of the running app at desktop 1440×900 and mobile 390×844 show zero class-token diff against the view targets; the class-token pins needed no retarget (value sources changed, markup did not)
+- [x] ADR-0013 amendment authored (append-only house format): the shell reads one Transport snapshot; App mirror states and the mid-render mutable ref are banned
+- [x] Spec status updated to record the increment resolved (tickets 01–05)
+- [x] Final commit gated green
 
 ## Comments
+
+- 2026-11-06 (agent): Parity guards verified green untouched — StemPlayer.test.tsx + stemPlayerEngine.test.ts (the 42 engine seam tests) + MasterWaveform.test.tsx + sessionStore.test.ts = 87/87, zero retargets; the Space keyboard test rides green in the full suite (382/382 at ticket 04). ADR-0013 amendment appended at the file foot in house format (dense prose, `## Amendment (2026-11-06, transport-snapshot — …)`): snapshot fields + four verbs, live/scripted adapters, cadence rules moved into the module, seed/reset/idle rules, formatter single rule, live-mirror test survives verbatim, mirror states + mid-render ref BANNED. The amendment's deleted-state citations ride the gate's historical-skip convention (the doc-anchor guardrail's retire/deleted line rule) — `check:doc-anchors` and `check:glossary` green with the amendment in. stitch-skin screenshot loop run against the live dev server at desktop 1440×900 and mobile 390×844 — zero class-token diff (value expressions changed, markup byte-identical); the class-token pins needed no retarget. Spec status flipped to resolved-in-full.
