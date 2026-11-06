@@ -173,8 +173,6 @@ export interface StemPlayerEngineOptions {
 }
 
 export type PositionListener = (timeSec: number) => void;
-export type StateListener = (state: StemMixerStates) => void;
-export type TimeStretchListener = (state: TimeStretchState) => void;
 
 // Stereo Peak Meters (footer transport, 2026-11-05 user fix): post-fader L/R
 // meter levels normalized to 0..1 for the footer's peak pips. The scale floor
@@ -229,6 +227,27 @@ export interface TimeStretchCommand {
 export interface ClickTrackCommand {
   enabled?: boolean;
   volume?: number;
+}
+
+// Stem Player graph probe (ADR-0016, ticket 04): the interface's ONE node
+// exposure — the whole bundle the observables ride (master and per-Stem
+// gains, the click gain, the level analysers and taps, the active sources,
+// the stretch adapter, the Beat Grid). The nodes are the live graph's, not
+// snapshots: tests and the shell watch gain outcomes on the real nodes.
+export interface StemPlayerGraphProbe {
+  masterGain: GainNode;
+  stemGains: Record<StemName, GainNode>;
+  clickGain: GainNode | null;
+  analyser: AnalyserNode | null;
+  levelTaps: {
+    splitter: ChannelSplitterNode | null;
+    merger: AudioNode | null;
+    left: AnalyserNode | null;
+    right: AnalyserNode | null;
+  };
+  activeSources: AudioBufferSourceNode[];
+  stretchAdapter: MultiTrackStretchNode | null;
+  beatGrid: Float64Array | null;
 }
 
 function stemMixerStatesEqual(a: StemMixerStates, b: StemMixerStates): boolean {
@@ -303,8 +322,6 @@ export class StemPlayerEngine {
 
   private animationFrameId: number | null = null;
   private positionListeners: Set<PositionListener> = new Set();
-  private stateListeners: Set<StateListener> = new Set();
-  private timeStretchListeners: Set<TimeStretchListener> = new Set();
   // Engine Command Surface (ADR-0016): the ONE read channel.
   private snapshotListeners: Set<SnapshotListener> = new Set();
   private currentSnapshot: StemPlayerSnapshot | null = null;
@@ -653,22 +670,6 @@ export class StemPlayerEngine {
     }
   }
 
-  public getAudioContext(): AudioContext {
-    return this.audioContext;
-  }
-
-  public getMasterGainNode(): GainNode {
-    return this.masterGainNode;
-  }
-
-  public getStemGainNode(stem: StemName): GainNode {
-    return this.stemGainNodes[stem];
-  }
-
-  public getStemBuffer(stem: StemName): AudioBuffer {
-    return this.stemBuffers[stem];
-  }
-
   public getDuration(): number {
     return this.duration;
   }
@@ -742,21 +743,37 @@ export class StemPlayerEngine {
     };
   }
 
-  public getStemState(stem: StemName): StemMixerState {
-    return { ...this.stemStates[stem] };
+  /**
+   * The graph probe (ADR-0016, ticket 04): the single accessor handing out
+   * the node bundle. A fresh bundle per call; the nodes inside are the live
+   * graph's own, so gain outcomes are watched on the very nodes the sound
+   * passes through.
+   */
+  public graphProbe(): StemPlayerGraphProbe {
+    return {
+      masterGain: this.masterGainNode,
+      stemGains: { ...this.stemGainNodes },
+      clickGain: this.clickGainNode,
+      analyser: this.analyserL,
+      levelTaps: {
+        splitter: this.splitterNode,
+        merger: this.mergerNode,
+        left: this.analyserL,
+        right: this.analyserR,
+      },
+      activeSources: [...this.activeSources],
+      stretchAdapter: this.stretchAdapter,
+      beatGrid: this.beatGrid,
+    };
   }
 
-  public getAllStemStates(): StemMixerStates {
+  private getAllStemStates(): StemMixerStates {
     return {
       vocals: { ...this.stemStates.vocals },
       drums: { ...this.stemStates.drums },
       bass: { ...this.stemStates.bass },
       other: { ...this.stemStates.other },
     };
-  }
-
-  public getMasterVolume(): number {
-    return this.masterVolume;
   }
 
   public setMasterVolume(volume: number): void {
@@ -768,13 +785,13 @@ export class StemPlayerEngine {
     this.publish();
   }
 
-  public setStemVolume(stem: StemName, volume: number): void {
+  private setStemVolume(stem: StemName, volume: number): void {
     this.stemStates[stem].volume = Math.max(0, Math.min(1, volume));
     this.applyGainMatrix();
     this.notifyState();
   }
 
-  public setStemMute(stem: StemName, muted: boolean): void {
+  private setStemMute(stem: StemName, muted: boolean): void {
     this.stemStates[stem].muted = muted;
     // ADR-0012: solo and mute are per-Stem exclusive, last press wins —
     // pressing mute drops a held solo, so the matrix never falls to the
@@ -784,20 +801,12 @@ export class StemPlayerEngine {
     this.notifyState();
   }
 
-  public toggleStemMute(stem: StemName): void {
-    this.setStemMute(stem, !this.stemStates[stem].muted);
-  }
-
-  public setStemSolo(stem: StemName, solo: boolean): void {
+  private setStemSolo(stem: StemName, solo: boolean): void {
     this.stemStates[stem].solo = solo;
     // ADR-0012: pressing solo clears a held mute — the last press wins.
     if (solo) this.stemStates[stem].muted = false;
     this.applyGainMatrix();
     this.notifyState();
-  }
-
-  public toggleStemSolo(stem: StemName): void {
-    this.setStemSolo(stem, !this.stemStates[stem].solo);
   }
 
   /**
@@ -865,14 +874,6 @@ export class StemPlayerEngine {
     return { ...this.clickTrackState };
   }
 
-  public getBeatGrid(): Float64Array | null {
-    return this.beatGrid;
-  }
-
-  public getClickGainNode(): GainNode | null {
-    return this.clickGainNode;
-  }
-
   public setBeatGrid(beatGridSec: Float64Array | null): void {
     this.beatGrid = beatGridSec;
     this.regenerateClickBuffer();
@@ -897,10 +898,6 @@ export class StemPlayerEngine {
       this.stopClickSource();
     }
     this.publish();
-  }
-
-  public toggleClickTrack(): void {
-    this.setClickTrackEnabled(!this.clickTrackState.enabled);
   }
 
   // Mix Rail Tidy-Up (ticket 03, ADR-0010 Amendment): there is no setClickTrackMuted
@@ -1235,33 +1232,7 @@ export class StemPlayerEngine {
     };
   }
 
-  public subscribeState(listener: StateListener): () => void {
-    this.stateListeners.add(listener);
-    listener(this.getAllStemStates());
-    return () => {
-      this.stateListeners.delete(listener);
-    };
-  }
-
-  public getAnalyserNode(): AnalyserNode | null {
-    return this.analyserL;
-  }
-
-  public getLevelTapNodes(): {
-    splitter: ChannelSplitterNode | null;
-    merger: AudioNode | null;
-    left: AnalyserNode | null;
-    right: AnalyserNode | null;
-  } {
-    return {
-      splitter: this.splitterNode,
-      merger: this.mergerNode,
-      left: this.analyserL,
-      right: this.analyserR,
-    };
-  }
-
-  public getLevels(): StereoPeakLevels {
+  private getLevels(): StereoPeakLevels {
     return { left: this.smoothedLevelL, right: this.smoothedLevelR };
   }
 
@@ -1374,18 +1345,10 @@ export class StemPlayerEngine {
   }
 
   private notifyState(): void {
-    const states = this.getAllStemStates();
-    for (const listener of this.stateListeners) {
-      listener(states);
-    }
     this.publish();
   }
 
-  public getTempo(): number {
-    return this.tempo;
-  }
-
-  public setTempo(tempo: number): void {
+  private setTempo(tempo: number): void {
     const clamped = Math.max(0.5, Math.min(2.0, tempo));
     if (this.playing) {
       this.currentOffset = this.getCurrentTime();
@@ -1431,11 +1394,7 @@ export class StemPlayerEngine {
     this.notifyTimeStretch();
   }
 
-  public getPitch(): number {
-    return this.pitch;
-  }
-
-  public setPitch(semitones: number): void {
+  private setPitch(semitones: number): void {
     const clamped = Math.max(-12, Math.min(12, semitones));
     this.pitch = clamped;
     if (
@@ -1450,11 +1409,7 @@ export class StemPlayerEngine {
     this.notifyTimeStretch();
   }
 
-  public isFormantPreservationEnabled(): boolean {
-    return this.formantPreservation;
-  }
-
-  public setFormantPreservation(enabled: boolean): void {
+  private setFormantPreservation(enabled: boolean): void {
     this.formantPreservation = enabled;
     if (
       this.useWorklet &&
@@ -1484,35 +1439,8 @@ export class StemPlayerEngine {
     }
   }
 
-  public getTimeStretch(): TimeStretchState {
-    return {
-      tempo: this.tempo,
-      pitch: this.pitch,
-    };
-  }
-
-  public subscribeTimeStretch(listener: TimeStretchListener): () => void {
-    this.timeStretchListeners.add(listener);
-    listener(this.getTimeStretch());
-    return () => {
-      this.timeStretchListeners.delete(listener);
-    };
-  }
-
   private notifyTimeStretch(): void {
-    const state = this.getTimeStretch();
-    for (const listener of this.timeStretchListeners) {
-      listener(state);
-    }
     this.publish();
-  }
-
-  public isUsingWorklet(): boolean {
-    return (
-      this.useWorklet &&
-      (this.workletNode !== null ||
-        (this.stretchAdapter !== null && !this.stretchAdapter.isFallback))
-    );
   }
 
   /**
@@ -1533,14 +1461,6 @@ export class StemPlayerEngine {
       return "wsola";
     }
     return "basic";
-  }
-
-  public getStretchAdapter(): MultiTrackStretchNode | null {
-    return this.stretchAdapter;
-  }
-
-  public getActiveSources(): AudioBufferSourceNode[] {
-    return [...this.activeSources];
   }
 
   /**
@@ -1564,8 +1484,6 @@ export class StemPlayerEngine {
     this.pause();
     this.stopPositionLoop();
     this.positionListeners.clear();
-    this.stateListeners.clear();
-    this.timeStretchListeners.clear();
     this.levelsListeners.clear();
     this.snapshotListeners.clear();
 

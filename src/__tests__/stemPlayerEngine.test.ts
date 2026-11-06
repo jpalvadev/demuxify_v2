@@ -72,7 +72,7 @@ describe("StemPlayerEngine", () => {
       // analysers downmix stereo to mono, and Chrome only pulls analysers
       // that feed the destination). Post-fader, so Master Volume moves stay
       // visible on the pips.
-      const masterGain = engine.getMasterGainNode();
+      const masterGain = engine.graphProbe().masterGain;
       const splitter = mockCtx.createdSplitters[0];
       const merger = mockCtx.createdMergers[0];
       expect(splitter).toBeDefined();
@@ -104,7 +104,7 @@ describe("StemPlayerEngine", () => {
 
       const stemNames: StemName[] = ["vocals", "drums", "bass", "other"];
       for (const stem of stemNames) {
-        const stemGain = engine.getStemGainNode(stem);
+        const stemGain = engine.graphProbe().stemGains[stem];
         expect(stemGain).toBeDefined();
         expect(stemGain.connect).toHaveBeenCalledWith(masterGain);
       }
@@ -152,8 +152,9 @@ describe("StemPlayerEngine", () => {
         const unsub = engine.subscribeLevels((l) => emissions.push(l));
 
         // Idle: the channel reports a flat, honest zero — no frozen bars.
-        expect(engine.getLevels()).toEqual({ left: 0, right: 0 });
-        expect(emissions).toEqual([{ left: 0, right: 0 }]);
+        const zeroLevels: StereoPeakLevels = { left: 0, right: 0 };
+        expect(engine.snapshot().levels).toEqual(zeroLevels);
+        expect(emissions).toEqual([zeroLevels]);
 
         // Loud-left (0.5) / quieter-right (0.15) master bus: the sidecar
         // analysers stream that constant signal through getFloatTimeDomainData.
@@ -163,7 +164,7 @@ describe("StemPlayerEngine", () => {
         await engine.play();
         pumpRaf(mockCtx, 8);
 
-        const lit = engine.getLevels();
+        const lit = engine.snapshot().levels;
         expect(lit.left).toBeGreaterThan(0.7); // -6 dB RMS sits high on the ladder
         expect(lit.right).toBeGreaterThan(0.5);
         expect(lit.left).toBeGreaterThan(lit.right);
@@ -174,9 +175,8 @@ describe("StemPlayerEngine", () => {
         expect(coalesced).toBeLessThanOrEqual(12);
 
         engine.pause();
-        expect(engine.getLevels()).toEqual({ left: 0, right: 0 });
-        const zeroEmission: StereoPeakLevels = { left: 0, right: 0 };
-        expect(emissions[emissions.length - 1]).toEqual(zeroEmission);
+        expect(engine.snapshot().levels).toEqual(zeroLevels);
+        expect(emissions[emissions.length - 1]).toEqual(zeroLevels);
 
         unsub();
         engine.dispose();
@@ -194,11 +194,11 @@ describe("StemPlayerEngine", () => {
         sampleRate,
       });
 
-      expect(engine.getAnalyserNode()).toBeNull();
-      expect(engine.getMasterGainNode().connect).toHaveBeenCalledWith(
+      expect(engine.graphProbe().analyser).toBeNull();
+      expect(engine.graphProbe().masterGain.connect).toHaveBeenCalledWith(
         bareCtx.destination
       );
-      expect(engine.getLevels()).toEqual({ left: 0, right: 0 });
+      expect(engine.snapshot().levels).toEqual({ left: 0, right: 0 });
       engine.dispose();
     });
   });
@@ -307,11 +307,11 @@ describe("StemPlayerEngine", () => {
         sampleRate,
       });
 
-      engine.setStemVolume("vocals", 0.65);
-      expect(engine.getStemGainNode("vocals").gain.value).toBeCloseTo(0.65);
+      engine.applyMixer({ stems: { vocals: { volume: 0.65 } } });
+      expect(engine.graphProbe().stemGains.vocals.gain.value).toBeCloseTo(0.65);
 
-      engine.setStemVolume("bass", 0.4);
-      expect(engine.getStemGainNode("bass").gain.value).toBeCloseTo(0.4);
+      engine.applyMixer({ stems: { bass: { volume: 0.4 } } });
+      expect(engine.graphProbe().stemGains.bass.gain.value).toBeCloseTo(0.4);
     });
 
     it("mutes a stem and restores its volume when unmuted", () => {
@@ -320,16 +320,16 @@ describe("StemPlayerEngine", () => {
         sampleRate,
       });
 
-      engine.setStemVolume("drums", 0.8);
-      expect(engine.getStemGainNode("drums").gain.value).toBeCloseTo(0.8);
+      engine.applyMixer({ stems: { drums: { volume: 0.8 } } });
+      expect(engine.graphProbe().stemGains.drums.gain.value).toBeCloseTo(0.8);
 
-      engine.toggleStemMute("drums");
-      expect(engine.getStemState("drums").muted).toBe(true);
-      expect(engine.getStemGainNode("drums").gain.value).toBe(0);
+      engine.applyMixer({ stems: { drums: { muted: true } } });
+      expect(engine.snapshot().stems.drums.muted).toBe(true);
+      expect(engine.graphProbe().stemGains.drums.gain.value).toBe(0);
 
-      engine.toggleStemMute("drums");
-      expect(engine.getStemState("drums").muted).toBe(false);
-      expect(engine.getStemGainNode("drums").gain.value).toBeCloseTo(0.8);
+      engine.applyMixer({ stems: { drums: { muted: false } } });
+      expect(engine.snapshot().stems.drums.muted).toBe(false);
+      expect(engine.graphProbe().stemGains.drums.gain.value).toBeCloseTo(0.8);
     });
 
     it("solo logic: soloing one stem attenuates all other stems to 0 gain", () => {
@@ -338,18 +338,22 @@ describe("StemPlayerEngine", () => {
         sampleRate,
       });
 
-      engine.setStemVolume("vocals", 0.9);
-      engine.setStemVolume("drums", 0.8);
-      engine.setStemVolume("bass", 0.7);
-      engine.setStemVolume("other", 0.6);
+      engine.applyMixer({
+        stems: {
+          vocals: { volume: 0.9 },
+          drums: { volume: 0.8 },
+          bass: { volume: 0.7 },
+          other: { volume: 0.6 },
+        },
+      });
 
       // Solo drums
-      engine.setStemSolo("drums", true);
+      engine.applyMixer({ stems: { drums: { solo: true } } });
 
-      expect(engine.getStemGainNode("drums").gain.value).toBeCloseTo(0.8);
-      expect(engine.getStemGainNode("vocals").gain.value).toBe(0);
-      expect(engine.getStemGainNode("bass").gain.value).toBe(0);
-      expect(engine.getStemGainNode("other").gain.value).toBe(0);
+      expect(engine.graphProbe().stemGains.drums.gain.value).toBeCloseTo(0.8);
+      expect(engine.graphProbe().stemGains.vocals.gain.value).toBe(0);
+      expect(engine.graphProbe().stemGains.bass.gain.value).toBe(0);
+      expect(engine.graphProbe().stemGains.other.gain.value).toBe(0);
     });
 
     it("solo logic: multiple stems can be soloed concurrently", () => {
@@ -358,32 +362,37 @@ describe("StemPlayerEngine", () => {
         sampleRate,
       });
 
-      engine.setStemVolume("vocals", 0.9);
-      engine.setStemVolume("drums", 0.8);
-      engine.setStemVolume("bass", 0.7);
-      engine.setStemVolume("other", 0.6);
+      engine.applyMixer({
+        stems: {
+          vocals: { volume: 0.9 },
+          drums: { volume: 0.8 },
+          bass: { volume: 0.7 },
+          other: { volume: 0.6 },
+        },
+      });
 
       // Solo drums and bass
-      engine.setStemSolo("drums", true);
-      engine.setStemSolo("bass", true);
+      engine.applyMixer({
+        stems: { drums: { solo: true }, bass: { solo: true } },
+      });
 
-      expect(engine.getStemGainNode("drums").gain.value).toBeCloseTo(0.8);
-      expect(engine.getStemGainNode("bass").gain.value).toBeCloseTo(0.7);
-      expect(engine.getStemGainNode("vocals").gain.value).toBe(0);
-      expect(engine.getStemGainNode("other").gain.value).toBe(0);
+      expect(engine.graphProbe().stemGains.drums.gain.value).toBeCloseTo(0.8);
+      expect(engine.graphProbe().stemGains.bass.gain.value).toBeCloseTo(0.7);
+      expect(engine.graphProbe().stemGains.vocals.gain.value).toBe(0);
+      expect(engine.graphProbe().stemGains.other.gain.value).toBe(0);
 
       // Unsolo drums -> only bass remains soloed
-      engine.setStemSolo("drums", false);
-      expect(engine.getStemGainNode("bass").gain.value).toBeCloseTo(0.7);
-      expect(engine.getStemGainNode("drums").gain.value).toBe(0);
-      expect(engine.getStemGainNode("vocals").gain.value).toBe(0);
+      engine.applyMixer({ stems: { drums: { solo: false } } });
+      expect(engine.graphProbe().stemGains.bass.gain.value).toBeCloseTo(0.7);
+      expect(engine.graphProbe().stemGains.drums.gain.value).toBe(0);
+      expect(engine.graphProbe().stemGains.vocals.gain.value).toBe(0);
 
       // Unsolo bass -> all stems restore to their volume
-      engine.setStemSolo("bass", false);
-      expect(engine.getStemGainNode("vocals").gain.value).toBeCloseTo(0.9);
-      expect(engine.getStemGainNode("drums").gain.value).toBeCloseTo(0.8);
-      expect(engine.getStemGainNode("bass").gain.value).toBeCloseTo(0.7);
-      expect(engine.getStemGainNode("other").gain.value).toBeCloseTo(0.6);
+      engine.applyMixer({ stems: { bass: { solo: false } } });
+      expect(engine.graphProbe().stemGains.vocals.gain.value).toBeCloseTo(0.9);
+      expect(engine.graphProbe().stemGains.drums.gain.value).toBeCloseTo(0.8);
+      expect(engine.graphProbe().stemGains.bass.gain.value).toBeCloseTo(0.7);
+      expect(engine.graphProbe().stemGains.other.gain.value).toBeCloseTo(0.6);
     });
 
     it("solo logic: solo and mute are per-Stem exclusive, the last press wins", () => {
@@ -392,23 +401,22 @@ describe("StemPlayerEngine", () => {
         sampleRate,
       });
 
-      engine.setStemVolume("vocals", 0.9);
-      engine.setStemSolo("vocals", true);
-      expect(engine.getStemGainNode("vocals").gain.value).toBeCloseTo(0.9);
+      engine.applyMixer({ stems: { vocals: { volume: 0.9, solo: true } } });
+      expect(engine.graphProbe().stemGains.vocals.gain.value).toBeCloseTo(0.9);
       // Solo isolates: the others fall to silence.
-      expect(engine.getStemGainNode("drums").gain.value).toBe(0);
+      expect(engine.graphProbe().stemGains.drums.gain.value).toBe(0);
 
-      engine.setStemMute("vocals", true);
+      engine.applyMixer({ stems: { vocals: { muted: true } } });
       // Mix Rail Tidy-Up (ticket 04, ADR-0012): pressing M on the soloed Stem
       // drops the solo — the solo+mute pair is unrepresentable, so the matrix
       // has no all-silent state left to fall into and the others restore.
-      expect(engine.getStemGainNode("vocals").gain.value).toBe(0);
-      expect(engine.getStemGainNode("drums").gain.value).toBeCloseTo(1);
+      expect(engine.graphProbe().stemGains.vocals.gain.value).toBe(0);
+      expect(engine.graphProbe().stemGains.drums.gain.value).toBeCloseTo(1);
 
-      engine.setStemSolo("vocals", true);
+      engine.applyMixer({ stems: { vocals: { solo: true } } });
       // Pressing S again re-arms solo and clears the mute: last press wins.
-      expect(engine.getStemGainNode("vocals").gain.value).toBeCloseTo(0.9);
-      expect(engine.getStemGainNode("drums").gain.value).toBe(0);
+      expect(engine.graphProbe().stemGains.vocals.gain.value).toBeCloseTo(0.9);
+      expect(engine.graphProbe().stemGains.drums.gain.value).toBe(0);
     });
 
     it("updates master volume", () => {
@@ -417,9 +425,9 @@ describe("StemPlayerEngine", () => {
         sampleRate,
       });
 
-      engine.setMasterVolume(0.42);
-      expect(engine.getMasterVolume()).toBeCloseTo(0.42);
-      expect(engine.getMasterGainNode().gain.value).toBeCloseTo(0.42);
+      engine.applyMixer({ masterVolume: 0.42 });
+      expect(engine.snapshot().masterVolume).toBeCloseTo(0.42);
+      expect(engine.graphProbe().masterGain.gain.value).toBeCloseTo(0.42);
     });
   });
 
@@ -472,7 +480,7 @@ describe("StemPlayerEngine", () => {
       const engine = loadEngine();
       const first = engine.snapshot();
       expect(engine.snapshot()).toBe(first);
-      engine.setMasterVolume(0.5);
+      engine.applyMixer({ masterVolume: 0.5 });
       const second = engine.snapshot();
       expect(second).not.toBe(first);
       expect(second.masterVolume).toBe(0.5);
@@ -534,11 +542,12 @@ describe("StemPlayerEngine", () => {
       snap.stems.vocals.volume = 0.25;
       snap.levels.left = 99;
       snap.timeStretch.tempo = 4;
-      // The publish-time clones protect engine state: the getters (engine seam
-      // until ticket 04) still report the untouched facts.
-      expect(engine.getAllStemStates().vocals.volume).toBe(1);
-      expect(engine.getLevels().left).toBe(0);
-      expect(engine.getTempo()).toBe(1);
+      // The publish-time clones protect engine state: triggering a command
+      // publishes from the engine's un-mutated internal facts.
+      engine.applyMixer({ masterVolume: 0.5 });
+      expect(engine.snapshot().stems.vocals.volume).toBe(1);
+      expect(engine.snapshot().levels.left).toBe(0);
+      expect(engine.snapshot().timeStretch.tempo).toBe(1);
     });
 
     it("unsubscribe stops snapshot delivery", () => {
@@ -560,17 +569,17 @@ describe("StemPlayerEngine", () => {
       });
 
       const stateCallback = vi.fn();
-      const unsub = engine.subscribeState(stateCallback);
+      const unsub = engine.subscribe((snap) => stateCallback(snap.stems));
 
       // Called immediately on subscription
       expect(stateCallback).toHaveBeenCalledTimes(1);
 
-      engine.setStemVolume("drums", 0.5);
+      engine.applyMixer({ stems: { drums: { volume: 0.5 } } });
       expect(stateCallback).toHaveBeenCalledTimes(2);
       expect(stateCallback.mock.calls[1][0].drums.volume).toBeCloseTo(0.5);
 
       unsub();
-      engine.setStemVolume("drums", 0.2);
+      engine.applyMixer({ stems: { drums: { volume: 0.2 } } });
       expect(stateCallback).toHaveBeenCalledTimes(2);
     });
 
@@ -580,8 +589,8 @@ describe("StemPlayerEngine", () => {
         sampleRate,
       });
 
-      const masterGain = engine.getMasterGainNode();
-      const vocalsGain = engine.getStemGainNode("vocals");
+      const masterGain = engine.graphProbe().masterGain;
+      const vocalsGain = engine.graphProbe().stemGains.vocals;
 
       engine.dispose();
 
@@ -597,9 +606,14 @@ describe("StemPlayerEngine", () => {
         sampleRate,
       });
 
-      expect(engine.getTempo()).toBe(1.0);
-      expect(engine.getPitch()).toBe(0);
-      expect(engine.getTimeStretch()).toEqual({ tempo: 1.0, pitch: 0 });
+      const expectedTimeStretch: TimeStretchState = {
+        tempo: 1.0,
+        pitch: 0,
+        formantPreservation: true,
+      };
+      expect(engine.snapshot().timeStretch.tempo).toBe(1.0);
+      expect(engine.snapshot().timeStretch.pitch).toBe(0);
+      expect(engine.snapshot().timeStretch).toEqual(expectedTimeStretch);
     });
 
     it("clamps tempo to [0.5, 2.0] and quantizes to the 0.05 grid inside applyTimeStretch", () => {
@@ -675,18 +689,30 @@ describe("StemPlayerEngine", () => {
       });
 
       const listener = vi.fn();
-      const unsub = engine.subscribeTimeStretch(listener);
+      const unsub = engine.subscribe((snap) => listener(snap.timeStretch));
 
-      expect(listener).toHaveBeenCalledWith({ tempo: 1.0, pitch: 0 });
+      expect(listener).toHaveBeenCalledWith({
+        tempo: 1.0,
+        pitch: 0,
+        formantPreservation: true,
+      });
 
-      engine.setTempo(1.25);
-      expect(listener).toHaveBeenCalledWith({ tempo: 1.25, pitch: 0 });
+      engine.applyTimeStretch({ tempo: 1.25 });
+      expect(listener).toHaveBeenCalledWith({
+        tempo: 1.25,
+        pitch: 0,
+        formantPreservation: true,
+      });
 
-      engine.setPitch(2);
-      expect(listener).toHaveBeenCalledWith({ tempo: 1.25, pitch: 2 });
+      engine.applyTimeStretch({ pitch: 2 });
+      expect(listener).toHaveBeenCalledWith({
+        tempo: 1.25,
+        pitch: 2,
+        formantPreservation: true,
+      });
 
       unsub();
-      engine.setTempo(1.5);
+      engine.applyTimeStretch({ tempo: 1.5 });
       expect(listener).toHaveBeenCalledTimes(3);
     });
 
@@ -776,8 +802,7 @@ describe("StemPlayerEngine", () => {
       });
 
       await engine.waitForReady();
-      expect(engine.isUsingWorklet()).toBe(true);
-      expect(engine.snapshot().stretchMode).not.toBe("basic");
+      expect(engine.snapshot().stretchMode).toBe("wsola");
       expect(createdWorkletNodes).toHaveLength(1);
 
       const workletNode = createdWorkletNodes[0];
@@ -949,7 +974,7 @@ describe("StemPlayerEngine", () => {
       resolveAddModule();
       await engine.waitForReady();
 
-      expect(engine.isUsingWorklet()).toBe(true);
+      expect(engine.snapshot().stretchMode).toBe("wsola");
 
       // Fallback sources must be stopped and disconnected immediately without ghost audio
       for (const src of fallbackSources) {
@@ -1000,20 +1025,20 @@ describe("StemPlayerEngine", () => {
       await engine.play();
 
       // 4 sources active initially
-      expect(engine.getActiveSources()).toHaveLength(4);
+      expect(engine.graphProbe().activeSources).toHaveLength(4);
 
       // Scrub 3 times in rapid succession
       mockWorkletCtx.currentTime = 11.0;
       engine.seek(3.0);
-      expect(engine.getActiveSources()).toHaveLength(4);
+      expect(engine.graphProbe().activeSources).toHaveLength(4);
 
       mockWorkletCtx.currentTime = 11.5;
       engine.seek(6.0);
-      expect(engine.getActiveSources()).toHaveLength(4);
+      expect(engine.graphProbe().activeSources).toHaveLength(4);
 
       mockWorkletCtx.currentTime = 12.0;
       engine.seek(8.5);
-      expect(engine.getActiveSources()).toHaveLength(4);
+      expect(engine.graphProbe().activeSources).toHaveLength(4);
 
       expect(engine.getCurrentTime()).toBe(8.5);
 
@@ -1057,14 +1082,14 @@ describe("StemPlayerEngine", () => {
         volume: 1.0,
       };
       expect(lane).toEqual(expectedLaneOff);
-      expect(engine.getClickGainNode()).toBeNull();
+      expect(engine.graphProbe().clickGain).toBeNull();
       // Lane off: no click gain node and no click channel materialized.
       expect(mockCtx.createGain).toHaveBeenCalledTimes(5);
       expect(mockCtx.createBuffer).toHaveBeenCalledTimes(4);
 
       await engine.play();
       expect(mockCtx.createdSources).toHaveLength(4);
-      expect(engine.getActiveSources()).toHaveLength(4);
+      expect(engine.graphProbe().activeSources).toHaveLength(4);
     });
 
     it("turns the lane on without touching the four Stems' playback", async () => {
@@ -1073,23 +1098,23 @@ describe("StemPlayerEngine", () => {
         sampleRate,
         beatGrid: beatGridSec,
       });
-      engine.setStemVolume("drums", 0.5);
+      engine.applyMixer({ stems: { drums: { volume: 0.5 } } });
 
       engine.applyClickTrack({ enabled: true });
       // One gain node added (4 Stems + master + click), one channel synthesized.
       expect(mockCtx.createGain).toHaveBeenCalledTimes(6);
       expect(mockCtx.createBuffer).toHaveBeenCalledTimes(5);
-      const clickGain = engine.getClickGainNode();
+      const clickGain = engine.graphProbe().clickGain;
       if (!clickGain) return;
       expect(clickGain.connect).toHaveBeenCalledWith(
-        engine.getMasterGainNode()
+        engine.graphProbe().masterGain
       );
 
       await engine.play();
       // 4 Stem sources plus the click lane; the Stems' gain is untouched.
       expect(mockCtx.createdSources).toHaveLength(5);
-      expect(engine.getActiveSources()).toHaveLength(5);
-      expect(engine.getStemGainNode("drums").gain.value).toBe(0.5);
+      expect(engine.graphProbe().activeSources).toHaveLength(5);
+      expect(engine.graphProbe().stemGains.drums.gain.value).toBe(0.5);
 
       engine.applyClickTrack({ enabled: false });
       // Only the click lane source is stopped: the Stems keep playing.
@@ -1099,7 +1124,7 @@ describe("StemPlayerEngine", () => {
       for (let i = 0; i < 4; i++) {
         expect(mockCtx.createdSources[i].stop).not.toHaveBeenCalled();
       }
-      expect(engine.getActiveSources()).toHaveLength(4);
+      expect(engine.graphProbe().activeSources).toHaveLength(4);
     });
 
     it("re-enabling the Click Track mid-playback resumes at the live playhead, not at the last play/seek position", async () => {
@@ -1123,7 +1148,7 @@ describe("StemPlayerEngine", () => {
       // never where play() started, or the clicks shift off the drums.
       const resumed = mockCtx.createdSources[5];
       expect(resumed.start).toHaveBeenCalledWith(16, 6);
-      expect(engine.getActiveSources()).toHaveLength(5);
+      expect(engine.graphProbe().activeSources).toHaveLength(5);
     });
 
     it("re-locking the Beat Grid mid-playback relays the lane from the live playhead", async () => {
@@ -1150,7 +1175,7 @@ describe("StemPlayerEngine", () => {
         beatGrid: beatGridSec,
       });
       engine.applyClickTrack({ enabled: true });
-      const clickGain = engine.getClickGainNode();
+      const clickGain = engine.graphProbe().clickGain;
       if (!clickGain) return;
       expect(clickGain.gain.value).toBe(1.0);
 
@@ -1203,7 +1228,7 @@ describe("StemPlayerEngine", () => {
       // Scrubbing mid-stretch recreates the lane on the same rate.
       engine.seek(2.0);
       expect(mockCtx.createdSources).toHaveLength(10);
-      expect(engine.getActiveSources()).toHaveLength(5);
+      expect(engine.graphProbe().activeSources).toHaveLength(5);
       expect(mockCtx.createdSources[9].playbackRate.value).toBe(1.5);
       for (let i = 0; i < 5; i++) {
         expect(mockCtx.createdSources[i].stop).toHaveBeenCalled();
@@ -1264,9 +1289,9 @@ describe("StemPlayerEngine", () => {
       // grid arrived was retired and replaced: the heard clicks are the
       // new grid's, never the old grid's.
       expect(mockCtx.createBuffer).toHaveBeenCalledTimes(6);
-      expect(engine.getBeatGrid()).toEqual(doublingGrid);
+      expect(engine.graphProbe().beatGrid).toEqual(doublingGrid);
       expect(mockCtx.createdSources).toHaveLength(6);
-      expect(engine.getActiveSources()).toHaveLength(5);
+      expect(engine.graphProbe().activeSources).toHaveLength(5);
       const oldClickSource = mockCtx.createdSources[4];
       expect(oldClickSource.stop).toHaveBeenCalledTimes(1);
       for (let i = 0; i < 4; i++) {
@@ -1356,7 +1381,7 @@ describe("StemPlayerEngine", () => {
         throw new Error("clean taps must calibrate");
       }
       const handGrid = reanchorBeatGridToAnchor(
-        engine.getBeatGrid() ?? detectorGrid,
+        engine.graphProbe().beatGrid ?? detectorGrid,
         calibration.pulseSec,
         calibration.anchorSec
       );

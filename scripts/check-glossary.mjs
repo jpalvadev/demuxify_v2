@@ -16,9 +16,7 @@ const FORBIDDEN_PATTERNS = [
   },
 ];
 
-const IGNORED_FILES = [
-  "StemTrack.tsx", // Backwards compatibility alias re-export file
-];
+const IGNORED_FILES = [];
 
 // Patterns forbidden outside of modelConfig.ts
 const MODEL_CONFIG_RESTRICTED_PATTERNS = [

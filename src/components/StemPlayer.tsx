@@ -33,7 +33,11 @@ import {
 import { StemStrip } from "./StemStrip";
 import { MasterWaveform } from "./MasterWaveform";
 import { ExportDialog } from "./ExportDialog";
-import { WaveformPeaks } from "../lib/waveformPeaks";
+import {
+  WaveformPeaks,
+  computeWaveformPeaks,
+  AudioBufferLike,
+} from "../lib/waveformPeaks";
 import { cn } from "../lib/utils";
 import { DISPLAY_FONT_STACK, MONO_FONT_STACK } from "../lib/typography";
 import { formatTransportClock } from "../lib/transportClockFormat";
@@ -271,6 +275,39 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
   );
   const mixerStates = snapshot.stems;
   const masterVolume = snapshot.masterVolume;
+  // ADR-0016 (ticket 04): the engine's getStemBuffer wall is gone — each Stem
+  // Strip's waveform peaks are derived straight from the `stems` prop. The
+  // peaks reader is duck-typed on AudioBufferLike: AudioBuffer sources pass
+  // through untouched, and Float32Array[] channels expose exactly the members
+  // it reads. Computed once per Stem at mount; samples — and peak values —
+  // byte-identical.
+  const stemPeaks = useMemo<Record<StemName, WaveformPeaks | null>>(() => {
+    const sources = {} as Record<StemName, WaveformPeaks | null>;
+    for (const stem of STEM_NAMES) {
+      const source = stems[stem];
+      if (!source) {
+        sources[stem] = null;
+        continue;
+      }
+      let like: AudioBufferLike;
+      if (typeof (source as AudioBuffer).getChannelData === "function") {
+        like = source as AudioBuffer;
+      } else {
+        const channels = source as Float32Array[];
+        const length = channels[0]?.length ?? 0;
+        like = {
+          numberOfChannels: channels.length,
+          length,
+          sampleRate,
+          duration: sampleRate > 0 ? length / sampleRate : 0,
+          getChannelData: (channel: number) =>
+            channels[channel] ?? new Float32Array(0),
+        };
+      }
+      sources[stem] = computeWaveformPeaks(like);
+    }
+    return sources;
+  }, [stems, sampleRate]);
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
   // ADR-0016 (ticket 02): tempo, pitch, and Formant Preservation ride the
   // snapshot — the strip's stretch faces read the applied (quantized) values.
@@ -679,14 +716,13 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
             const isSilenced = hasAnySolo
               ? !state.solo || state.muted
               : state.muted;
-            const stemBuffer = engineRef.current?.getStemBuffer(stem);
 
             return (
               <StemStrip
                 key={stem}
                 stem={stem}
                 settings={state}
-                audioBuffer={stemBuffer}
+                peaks={stemPeaks[stem]}
                 duration={duration}
                 currentTime={currentTime}
                 isSilenced={isSilenced}

@@ -17,31 +17,31 @@ retargeted: commands in, Mixer State out, probe for observicals.
 
 **Blocked by:** 01, 02, 03 (all verbs live, so nothing left on the interface has a consumer below).
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Graph probe minted on the engine's public surface (one named accessor, node bundle: master/stem
+- [x] Graph probe minted on the engine's public surface (one named accessor, node bundle: master/stem
       gains, click gain, analysers, active sources, stretch adapter) — the interface's only node exposure
-- [ ] All fifteen node/state getters above leave the public interface (private internals untouched);
+- [x] All fifteen node/state getters above leave the public interface (private internals untouched);
       `check:doc-anchors` green — retired names cited on historical-skip lines only where an ADR names them
-- [ ] `getStemBuffer` deleted; `StemPlayer` derives per-Stem `peaks` from its `stems` prop via
+- [x] `getStemBuffer` deleted; `StemPlayer` derives per-Stem `peaks` from its `stems` prop via
       `computeWaveformPeaks` (memoized, once per Stem at mount); waveform paint, peak values, and the
       pinned Strip behavior byte-identical; `StemStrip.test.tsx` green untouched
-- [ ] `getStretchAdapter` deleted; `stemPlayerSignalsmith.test.ts` (3) retargeted onto the probe in THIS
+- [x] `getStretchAdapter` deleted; `stemPlayerSignalsmith.test.ts` (3) retargeted onto the probe in THIS
       commit (the ticket-02 deferral lands here); `mobileLightweightEndToEnd.test.ts` re-verified on the
       probe if it touches the adapter
-- [ ] `stemPlayerEngine.test.ts` (42) fully retargeted: every test crosses commands in / snapshot out,
+- [x] `stemPlayerEngine.test.ts` (42) fully retargeted: every test crosses commands in / snapshot out,
       ADR-0012 press-sequence observicals assert gain on live gain nodes **through the probe** — same
       numbers byte-identical
-- [ ] `StemTrack.tsx` deleted (zero importers, backwards-compatibility alias re-export) + its
+- [x] `StemTrack.tsx` deleted (zero importers, backwards-compatibility alias re-export) + its
       `IGNORED_FILES` entry deleted in the same commit; `check:glossary` green with no exemption
-- [ ] Zero-consumer deletions verified by grep before removal (`getLevelTapNodes`, `getStretchMode` have
+- [x] Zero-consumer deletions verified by grep before removal (`getLevelTapNodes`, `getStretchMode` have
       zero consumers repo-wide; `getAudioContext`'s apparent hits are `audioDecoder.ts`'s own local function)
-- [ ] Parity guards green untouched: `StemPlayer.test.tsx` (21), `stemPlayerTimeStretch.test.tsx` (9),
+- [x] Parity guards green untouched: `StemPlayer.test.tsx` (21), `stemPlayerTimeStretch.test.tsx` (9),
       `App.test.tsx` (60), `transportBridge.test.ts` (11), `StemStrip.test.tsx`, `MasterWaveform.test.tsx`,
       `sessionStore.test.ts`
-- [ ] `check:testids`: every existing pin resolves, zero new ids; class-token pins retargeted only if a
+- [x] `check:testids`: every existing pin resolves, zero new ids; class-token pins retargeted only if a
       Strip markup fact moved (it must not)
-- [ ] Gates green (full chain, dist rebuilt); no view designed — record: "no new look rendered; skin
+- [x] Gates green (full chain, dist rebuilt); no view designed — record: "no new look rendered; skin
       byte-untouched"
 
 ## Comments
