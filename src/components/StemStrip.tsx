@@ -272,8 +272,9 @@ export const StemStrip: React.FC<StemStripProps> = ({
         // full-width waveform; full-width slider row), the sm+ target the
         // mockup's single h-14 row (badge | waveform | rack). Controls are
         // rendered ONCE: flex order classes swap the pieces between layouts
-        // (the slider wrapper goes `contents` on sm+, dissolving into the
-        // rack). Behavior, aria, and handlers untouched.
+        // (from sm+ the slider wrapper IS the rack strip — the
+        // sm:bg-st-surface-light band carrying speaker + slider + %).
+        // Behavior, aria, and handlers untouched.
         "group flex flex-wrap items-center gap-y-2.5 rounded-lg border border border-st-hairline/80 hover:border-zinc-700 transition-colors overflow-hidden bg-st-panel shadow-xs sm:h-14 sm:flex-nowrap sm:items-center sm:gap-y-0 sm:rounded",
         isSilenced && "opacity-65 bg-card/30",
         className
