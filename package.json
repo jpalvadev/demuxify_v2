@@ -14,6 +14,7 @@
     "check:test-fixtures": "node scripts/check-test-fixtures.mjs",
     "check:testids": "node scripts/check-testids.mjs",
     "check:retired-affordances": "node scripts/check-retired-affordances.mjs",
+    "check:dist-fresh": "node scripts/check-dist-fresh.mjs",
     "test": "vitest run",
     "test:report": "node scripts/vitest-summary.mjs",
     "verify:beat-grid-anchor": "node scripts/verify_beat_grid_anchor.mjs",

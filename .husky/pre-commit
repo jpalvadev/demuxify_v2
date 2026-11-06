@@ -13,6 +13,7 @@ npm run check:doc-anchors
 npm run check:test-fixtures
 npm run check:testids
 npm run check:retired-affordances
+npm run check:dist-fresh
 npm run typecheck
 # The suite runs through scripts/vitest-summary.mjs, NOT raw vitest: same suite,
 # same exit code (red still aborts the commit), but `git commit` gets its compact

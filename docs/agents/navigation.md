@@ -22,3 +22,11 @@ check:testids` gates that drift at commit time — every id a PRESENCE accessor
   do not re-read raw vitest output (thousands of tokens of DOM dumps).
 - To anchor an edit inside a 1,100+ line file in one call, `npm run outline`
   prints every declaration (state hooks included) with its line number.
+- Playwright reads are Chromium truths. UA-painted controls (range sliders,
+  form controls, scrollbars) render with engine-specific chrome: a probe that
+  goes green in Playwright can stay broken in the user's browser. For those
+  surfaces ship NATIVE controls (accent-color sliders — every engine centers
+  its own thumb; the pseudo-thumb CSS ban rides
+  `check:retired-affordances`), quantify with a probe
+  (`scripts/tmp-probe-knob.mjs` compares the knob centroid to the track
+  center), and close the loop with the user's eyes.

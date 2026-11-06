@@ -236,6 +236,24 @@ const PHANTOM_CHROME_BANNED_IN_SRC = [
   },
 ];
 
+// Slider contract (stitch-skin 07, commit 93e65d1; spec.md story 11 FLIP):
+// every range input is a NATIVE accent-color control — the engine centers its
+// own thumb. The appearance-none + pseudo-thumb/track recipe centered the knob
+// ONLY inside Playwright's Chromium; the user's engine dropped it below the
+// line for two rounds. Pseudo-element slider CSS is BANNED in shipped code,
+// scanned in .tsx className variants AND .css rules.
+const SLIDER_CONTRACT_BANNED_IN_SRC = [
+  {
+    pattern:
+      /::-webkit-slider-thumb|::-moz-range-thumb|::-webkit-slider-runnable-track|::-moz-range-track/,
+    reason:
+      "Slider contract: range inputs are NATIVE accent-color controls " +
+      "(accent-primary / accent-st-coral); pseudo-thumb/track slider CSS " +
+      "drifts the knob off the line outside Playwright's Chromium and is " +
+      "BANNED (stitch-skin 07, commit 93e65d1, spec.md story 11 FLIP).",
+  },
+];
+
 let hasErrors = false;
 
 function scanDir(dir) {
@@ -249,14 +267,42 @@ function scanDir(dir) {
     }
 
     if (!entry.isFile()) continue;
-    if (!entry.name.endsWith(".ts") && !entry.name.endsWith(".tsx")) continue;
+    if (
+      !entry.name.endsWith(".ts") &&
+      !entry.name.endsWith(".tsx") &&
+      !entry.name.endsWith(".css")
+    )
+      continue;
 
     const lines = fs.readFileSync(fullPath, "utf8").split("\n");
 
+    // Block-comment state so CSS/jsdoc bodies skip: comment lines in a .css
+    // file do not gutter with `*`, the old per-line heuristic saw them as code.
+    let inBlockComment = false;
     lines.forEach((line, lineIdx) => {
       // Comments record history legitimately; code does not.
       const trimmed = line.trim();
+      const startsInComment = inBlockComment;
+      let pos = 0;
+      while (pos < line.length) {
+        if (!inBlockComment) {
+          const s = line.indexOf("/*", pos);
+          if (s < 0) break;
+          const e = line.indexOf("*/", s + 2);
+          if (e < 0) {
+            inBlockComment = true;
+            break;
+          }
+          pos = e + 2;
+        } else {
+          const e = line.indexOf("*/", pos);
+          if (e < 0) break;
+          inBlockComment = false;
+          pos = e + 2;
+        }
+      }
       if (
+        startsInComment ||
         trimmed.startsWith("//") ||
         trimmed.startsWith("/*") ||
         trimmed.startsWith("*")
@@ -290,6 +336,19 @@ function scanDir(dir) {
         console.error(`   👉 ${reason}\n`);
         hasErrors = true;
       }
+
+      for (const { pattern, reason } of SLIDER_CONTRACT_BANNED_IN_SRC) {
+        if (!pattern.test(line)) continue;
+        const relative = path
+          .relative(process.cwd(), fullPath)
+          .replace(/\\/g, "/");
+        console.error(
+          `❌ Slider-contract violation at ${relative}:${lineIdx + 1}`
+        );
+        console.error(`   "${trimmed}"`);
+        console.error(`   👉 ${reason}\n`);
+        hasErrors = true;
+      }
     });
   }
 }
@@ -310,7 +369,8 @@ if (hasErrors) {
       "readout; the Stitch mockup's phantom chrome (undo/redo/gear, engine " +
       "badge, loop/ff/TAP transport, VU meters, BAR counters, the third DSP-rack " +
       "card) renders NOWHERE in src/ — the 08h cleanup commit returned the " +
-      "placeholder exemption to a hard ban and erased it all.\n"
+      "placeholder exemption to a hard ban and erased it all; every range input " +
+      "is a NATIVE accent-color control with pseudo-thumb slider CSS banned.\n"
   );
   process.exit(0);
 }
