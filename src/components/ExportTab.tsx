@@ -1,6 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from "react";
 import {
-  X,
   Download,
   FileArchive,
   Music,
@@ -13,65 +12,33 @@ import {
   Radio,
   ShieldCheck,
   RotateCcw,
+  X,
 } from "lucide-react";
 import { StemName, STEM_NAMES } from "../lib/chunkOverlapAdd";
 import {
   StemMixerStates,
   TimeStretchState,
   ClickTrackMixerState,
-  synthesizeClickTrackChannel,
 } from "../lib/stemPlayerEngine";
-import { encodeWav, createWavBlob } from "../lib/wavEncoder";
 import {
-  encodeMp3,
-  createMp3Blob,
-  Mp3Bitrate,
+  exportAudio,
+  ExportFormat,
+  ExportMode,
+  ExportRequest,
+  ExportContext,
   VALID_MP3_BITRATES,
-} from "../lib/mp3Encoder";
-import {
-  createStemBundleZip,
-  formatStemFileName,
-  formatClickTrackFileName,
-  sanitizeSourceMixTitle,
-} from "../lib/bundleZip";
-import { mixAudioStems, formatMixdownFileName } from "../lib/customMixdown";
-import { renderOfflineStems } from "../lib/signalsmithStretchAdapter";
+  MIXDOWN_PRESETS as BASE_MIXDOWN_PRESETS,
+  DEFAULT_STEM_CONTROLS,
+  computeInitialStemControls,
+  StemControlState,
+  MixdownPresetId,
+} from "../lib/exportEngine";
+import type { Mp3Bitrate } from "../lib/mp3Encoder";
 import { toast } from "../lib/toast";
-import { cn } from "../lib/utils";
+import { cn, triggerDownload } from "../lib/utils";
 
-export interface ExportDialogProps {
-  isOpen: boolean;
-  // Inline hosted form (Tab Shell Export Tab) omits this: the panel is always
-  // on screen, so it renders no Close controls and Escape does nothing.
-  onClose?: () => void;
-  stems: Record<StemName, Float32Array[] | AudioBuffer>;
-  sampleRate?: number;
-  sourceMixTitle?: string;
-  initialMixerStates?: StemMixerStates;
-  initialMasterVolume?: number;
-  onExportComplete?: (fileName: string) => void;
-  activeTimeStretch?: TimeStretchState;
-  activeTempo?: number;
-  activePitch?: number;
-  activeFormantPreservation?: boolean;
-  // ADR-0010 Click Track lane (ticket 05): passive inputs, never controls —
-  // the dialog hosts no Click Track affordance of its own. When the lane is
-  // enabled and a Beat Grid exists, the bundle mode gains one extra Click
-  // Track file in the Stems' format; single-file and Custom Mixdown modes
-  // never see it.
-  clickTrackBeatGrid?: Float64Array;
-  clickTrackSettings?: ClickTrackMixerState;
-}
-
-export type ExportMode = "single" | "bundle" | "mixdown";
-export type ExportFormat = "wav" | "mp3";
-
-export interface StemControlState {
-  enabled: boolean;
-  volume: number;
-}
-
-export type MixdownPresetId = "karaoke" | "acapella" | "minus_drums" | "reset";
+export type { ExportFormat, ExportMode, StemControlState, MixdownPresetId };
+export { computeInitialStemControls, DEFAULT_STEM_CONTROLS };
 
 export interface MixdownPresetConfig {
   id: MixdownPresetId;
@@ -79,67 +46,30 @@ export interface MixdownPresetConfig {
   icon?: React.ComponentType<{ className?: string }>;
 }
 
-export const MIXDOWN_PRESETS: MixdownPresetConfig[] = [
-  { id: "karaoke", label: "Karaoke / Instrumental" },
-  { id: "acapella", label: "Acapella" },
-  { id: "minus_drums", label: "Minus Drums" },
-  { id: "reset", label: "Reset", icon: RotateCcw },
-];
+export const MIXDOWN_PRESETS: MixdownPresetConfig[] = BASE_MIXDOWN_PRESETS.map(
+  (preset) => (preset.id === "reset" ? { ...preset, icon: RotateCcw } : preset)
+);
 
-const DEFAULT_STEM_CONTROLS: Record<StemName, StemControlState> = {
-  vocals: { enabled: true, volume: 1.0 },
-  drums: { enabled: true, volume: 1.0 },
-  bass: { enabled: true, volume: 1.0 },
-  other: { enabled: true, volume: 1.0 },
-};
-
-export function computeInitialStemControls(
-  initialMixerStates?: StemMixerStates
-): Record<StemName, StemControlState> {
-  if (!initialMixerStates) {
-    return DEFAULT_STEM_CONTROLS;
-  }
-  const hasAnySolo = STEM_NAMES.some((s) => initialMixerStates[s]?.solo);
-  const controls: Record<StemName, StemControlState> = {} as any;
-  for (const stem of STEM_NAMES) {
-    const state = initialMixerStates[stem];
-    const isHeard = state
-      ? hasAnySolo
-        ? Boolean(state.solo && !state.muted)
-        : Boolean(!state.muted)
-      : true;
-    const vol = state ? state.volume : 1.0;
-    controls[stem] = {
-      enabled: isHeard,
-      volume: vol,
-    };
-  }
-  return controls;
+export interface ExportTabProps {
+  stems: Record<StemName, Float32Array[] | AudioBuffer>;
+  sampleRate?: number;
+  sourceMixTitle?: string;
+  initialMixerStates?: StemMixerStates;
+  initialMasterVolume?: number;
+  timeStretch?: TimeStretchState;
+  activeTimeStretch?: TimeStretchState;
+  activeTempo?: number;
+  activePitch?: number;
+  activeFormantPreservation?: boolean;
+  clickTrackBeatGrid?: Float64Array | null;
+  clickTrackSettings?: ClickTrackMixerState | null;
+  onExportComplete?: (fileName: string) => void;
+  // Optional backwards-compatibility props
+  isOpen?: boolean;
+  onClose?: () => void;
 }
 
-function extractChannels(source: Float32Array[] | AudioBuffer): Float32Array[] {
-  if ("numberOfChannels" in source) {
-    const channels: Float32Array[] = [];
-    for (let ch = 0; ch < source.numberOfChannels; ch++) {
-      channels.push(source.getChannelData(ch));
-    }
-    return channels;
-  }
-  return source;
-}
-
-function triggerDownload(blob: Blob, filename: string): void {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  setTimeout(() => {
-    URL.revokeObjectURL(url);
-  }, 1000);
-}
+export type ExportDialogProps = ExportTabProps;
 
 const STEM_ICONS: Record<
   StemName,
@@ -151,26 +81,26 @@ const STEM_ICONS: Record<
   other: Music,
 };
 
-export const ExportDialog: React.FC<ExportDialogProps> = ({
-  isOpen,
-  onClose,
+export const ExportTab: React.FC<ExportTabProps> = ({
   stems,
   sampleRate = 44100,
   sourceMixTitle = "source_mix",
   initialMixerStates,
   initialMasterVolume,
-  onExportComplete,
+  timeStretch,
   activeTimeStretch,
   activeTempo: propTempo,
   activePitch: propPitch,
   activeFormantPreservation: propFormant,
   clickTrackBeatGrid,
   clickTrackSettings,
+  onExportComplete,
 }) => {
-  const activeTempo = activeTimeStretch?.tempo ?? propTempo;
-  const activePitch = activeTimeStretch?.pitch ?? propPitch;
+  const effectiveStretch = timeStretch ?? activeTimeStretch;
+  const activeTempo = effectiveStretch?.tempo ?? propTempo;
+  const activePitch = effectiveStretch?.pitch ?? propPitch;
   const activeFormantPreservation =
-    activeTimeStretch?.formantPreservation ?? propFormant;
+    effectiveStretch?.formantPreservation ?? propFormant;
 
   const [mode, setMode] = useState<ExportMode>("single");
   const [selectedStem, setSelectedStem] = useState<StemName>("vocals");
@@ -202,10 +132,8 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
   const [successNotification, setSuccessNotification] = useState<string | null>(
     null
   );
-  // Ticket 03: the inline panel hosts its own Cancel; a cancelled Export
-  // Bundle writes nothing and reports the abort inside the panel.
   const [hasCancelledExport, setHasCancelledExport] = useState(false);
-  const cancelExportRef = useRef(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const isMixdownExportDisabled =
     mode === "mixdown" &&
@@ -247,61 +175,37 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
     }
   };
 
-  // Escape key handler
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !isExporting) {
-        onClose?.();
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, isExporting, onClose]);
-
-  const prevOpenRef = useRef(false);
   const prevMixerStatesRef = useRef<StemMixerStates | undefined>(undefined);
   const prevMasterVolumeRef = useRef<number | undefined>(undefined);
   const prevAdjustmentsRef = useRef<boolean | undefined>(undefined);
 
-  // Opening resets notifications; while the panel is open, every re-emitted
-  // bridge state (mixer levels, Master Volume, Time-Stretch/Pitch-Shift/
-  // Formant Preservation) re-syncs the mixdown controls live (ticket 03:
-  // tweaks made while the panel is on screen appear in it).
+  // Sync controls when upstream mixer or stretch facts change
   useEffect(() => {
-    const openedTransition = isOpen && !prevOpenRef.current;
     const mixerChanged = initialMixerStates !== prevMixerStatesRef.current;
     const masterVolumeChanged =
       initialMasterVolume !== prevMasterVolumeRef.current;
     const adjustmentsChanged =
       hasActiveAdjustments !== prevAdjustmentsRef.current;
-    if (openedTransition) {
-      setError(null);
-      setSuccessNotification(null);
-      setProgress(0);
-      setStatusMessage("");
-    }
-    if (
-      isOpen &&
-      (openedTransition ||
-        mixerChanged ||
-        masterVolumeChanged ||
-        adjustmentsChanged)
-    ) {
+
+    if (mixerChanged) {
+      prevMixerStatesRef.current = initialMixerStates;
       setStemControls(computeInitialStemControls(initialMixerStates));
-      setMasterGain(initialMasterVolume ?? 1.0);
+    }
+    if (masterVolumeChanged) {
+      prevMasterVolumeRef.current = initialMasterVolume;
+      if (initialMasterVolume !== undefined) {
+        setMasterGain(initialMasterVolume);
+      }
+    }
+    if (adjustmentsChanged) {
+      prevAdjustmentsRef.current = hasActiveAdjustments;
       setApplyAdjustments(hasActiveAdjustments);
     }
-    prevOpenRef.current = isOpen;
-    prevMixerStatesRef.current = initialMixerStates;
-    prevMasterVolumeRef.current = initialMasterVolume;
-    prevAdjustmentsRef.current = hasActiveAdjustments;
-  }, [isOpen, initialMixerStates, initialMasterVolume, hasActiveAdjustments]);
+  }, [initialMixerStates, initialMasterVolume, hasActiveAdjustments]);
 
-  // In-panel Cancel (ticket 03): flags the running export; every await/loop
-  // boundary below checks the flag and bails before any file is written.
+  // In-panel Cancel: aborts running export cleanly via AbortController
   const handleCancelExport = useCallback(() => {
-    cancelExportRef.current = true;
+    abortControllerRef.current?.abort();
   }, []);
 
   const handleExport = useCallback(async () => {
@@ -309,240 +213,93 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
     setProgress(0);
     setError(null);
     setSuccessNotification(null);
-    cancelExportRef.current = false;
     setHasCancelledExport(false);
 
-    const wasCancelled = () => {
-      setHasCancelledExport(true);
-      setStatusMessage("Export cancelled · nothing written");
-      toast.info("encoding cancelled · nothing written");
-    };
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
 
     try {
-      let exportStems = stems;
-      if (applyAdjustments && hasActiveAdjustments) {
-        setStatusMessage("Applying active pitch and tempo adjustments...");
-        let stemsToRender: Partial<
-          Record<StemName, Float32Array[] | AudioBuffer>
-        > = stems;
-        if (mode === "single") {
-          stemsToRender = { [selectedStem]: stems[selectedStem] };
-        } else if (mode === "mixdown") {
-          stemsToRender = {};
-          for (const name of STEM_NAMES) {
-            if (stemControls[name]?.enabled) {
-              stemsToRender[name] = stems[name];
-            }
-          }
-        }
-        const rendered = await renderOfflineStems(stemsToRender as any, {
-          sampleRate,
-          tempo: activeTempo ?? 1.0,
-          pitch: activePitch ?? 0,
-          formantPreservation: activeFormantPreservation ?? true,
-        });
-        exportStems = { ...stems, ...rendered };
-        if (cancelExportRef.current) {
-          wasCancelled();
-          return;
-        }
-      }
-
+      let request: ExportRequest;
       if (mode === "single") {
-        setStatusMessage(`Encoding ${selectedStem}...`);
-        const stemData = exportStems[selectedStem];
-        if (!stemData) {
-          throw new Error(`Stem "${selectedStem}" is not available.`);
-        }
-        const channels = extractChannels(stemData);
-        let blob: Blob;
-        let fileName: string;
-
-        if (format === "wav") {
-          setProgress(30);
-          blob = createWavBlob(channels, { sampleRate, bitDepth });
-          fileName = formatStemFileName(sourceMixTitle, selectedStem, "wav");
-          setProgress(100);
-        } else {
-          blob = await createMp3Blob(channels, {
-            sampleRate,
-            bitrate,
-            onProgress: (p) => setProgress(Math.round(p * 100)),
-          });
-          fileName = formatStemFileName(sourceMixTitle, selectedStem, "mp3");
-          setProgress(100);
-        }
-
-        if (cancelExportRef.current) {
-          wasCancelled();
-          return;
-        }
-        setStatusMessage("Triggering download...");
-        triggerDownload(blob, fileName);
-        const successMsg = `Export complete! Downloaded ${fileName}`;
-        setSuccessNotification(successMsg);
-        toast.success(successMsg);
-        onExportComplete?.(fileName);
-      } else if (mode === "bundle") {
-        // Full Export Bundle (ZIP)
-        setStatusMessage("Encoding all 4 stems for bundle packaging...");
-        const encodedStems: Record<StemName, Uint8Array> = {} as any;
-
-        const stemCount = STEM_NAMES.length;
-        for (let i = 0; i < stemCount; i++) {
-          if (cancelExportRef.current) {
-            wasCancelled();
-            return;
-          }
-          const stemName = STEM_NAMES[i];
-          const stemData = exportStems[stemName];
-          if (!stemData) {
-            throw new Error(`Stem "${stemName}" is missing from stems set.`);
-          }
-          const channels = extractChannels(stemData);
-          setStatusMessage(`Encoding ${stemName} (${i + 1}/${stemCount})...`);
-
-          if (format === "wav") {
-            encodedStems[stemName] = encodeWav(channels, {
-              sampleRate,
-              bitDepth,
-            });
-            setProgress(Math.round(((i + 1) / stemCount) * 75));
-          } else {
-            const startPct = (i / stemCount) * 75;
-            const rangePct = 75 / stemCount;
-            encodedStems[stemName] = await encodeMp3(channels, {
-              sampleRate,
-              bitrate,
-              onProgress: (subP) => {
-                setProgress(Math.round(startPct + subP * rangePct));
-              },
-            });
-          }
-        }
-
-        if (cancelExportRef.current) {
-          wasCancelled();
-          return;
-        }
-
-        // ADR-0010 (ticket 05): a live Click Track lane adds exactly one
-        // Click Track file to the bundle, encoded through the very same WAV/
-        // MP3 encoders as the Stems. The Beat Grid is scaled by the active
-        // Time-Stretch factor so clicks align with stretched Stems in a DAW.
-        let clickTrackBytes: Uint8Array | undefined;
-        const clickLaneLive = Boolean(
-          clickTrackSettings?.enabled && clickTrackBeatGrid?.length
-        );
-        if (clickLaneLive && clickTrackBeatGrid && clickTrackSettings) {
-          setStatusMessage(
-            `Encoding ${formatClickTrackFileName(sourceMixTitle, format)}...`
-          );
-          const stretchFactor =
-            applyAdjustments && hasActiveAdjustments && activeTempo
-              ? activeTempo
-              : 1.0;
-          const clickGrid = Float64Array.from(
-            Array.from(clickTrackBeatGrid).map((t) => t / stretchFactor)
-          );
-          const exportChannel = extractChannels(exportStems[STEM_NAMES[0]])[0];
-          const clickDurationSec =
-            (exportChannel?.length ?? 0) / (sampleRate || 44100);
-          const clickChannels = [
-            synthesizeClickTrackChannel(
-              clickGrid,
-              sampleRate,
-              clickDurationSec
-            ),
-          ];
-          clickTrackBytes =
-            format === "wav"
-              ? encodeWav(clickChannels, { sampleRate, bitDepth })
-              : await encodeMp3(clickChannels, {
-                  sampleRate,
-                  bitrate,
-                  onProgress: (p) => setProgress(Math.round(75 + p * 20)),
-                });
-          setProgress(95);
-          if (cancelExportRef.current) {
-            wasCancelled();
-            return;
-          }
-        }
-
-        setStatusMessage("Packaging ZIP bundle...");
-        const zipBlob = await createStemBundleZip(encodedStems, {
-          sourceMixTitle,
+        request = {
+          mode: "single",
+          stem: selectedStem,
           format,
-          clickTrack: clickTrackBytes,
-          onProgress: (zipPct) => {
-            setProgress(Math.round(75 + zipPct * 0.25));
-          },
-        });
-        if (cancelExportRef.current) {
-          wasCancelled();
-          return;
-        }
-
-        const zipFileName = `${sanitizeSourceMixTitle(sourceMixTitle)}_stems.zip`;
-        setStatusMessage("Triggering download...");
-        triggerDownload(zipBlob, zipFileName);
-        const successMsg = `Export complete! Downloaded ${zipFileName}`;
-        setSuccessNotification(successMsg);
-        toast.success(successMsg);
-        onExportComplete?.(zipFileName);
+          bitDepth,
+          bitrate,
+          applyAdjustments,
+        };
+      } else if (mode === "bundle") {
+        request = {
+          mode: "bundle",
+          format,
+          bitDepth,
+          bitrate,
+          applyAdjustments,
+          includeClickTrack: Boolean(
+            clickTrackSettings?.enabled && clickTrackBeatGrid?.length
+          ),
+        };
       } else {
-        // Custom Mixdown
-        setStatusMessage("Summing stems & applying mixdown...");
-        const stemGains: Partial<Record<StemName, number>> = {};
+        const stemGains: Record<StemName, number> = {} as any;
         for (const name of STEM_NAMES) {
           const ctrl = stemControls[name];
           stemGains[name] = ctrl.enabled ? ctrl.volume : 0;
         }
-
-        const mixResult = mixAudioStems(exportStems, {
+        request = {
+          mode: "mixdown",
+          format,
+          bitDepth,
+          bitrate,
+          applyAdjustments,
           stemGains,
           masterGain,
           antiClipping,
-          sourceMixTitle,
-          format,
-        });
-
-        let blob: Blob;
-        const fileName =
-          mixResult.fileName ||
-          formatMixdownFileName(sourceMixTitle, mixResult.descriptor, format);
-
-        if (format === "wav") {
-          setProgress(30);
-          blob = createWavBlob(mixResult.audio, { sampleRate, bitDepth });
-          setProgress(100);
-        } else {
-          blob = await createMp3Blob(mixResult.audio, {
-            sampleRate,
-            bitrate,
-            onProgress: (p) => setProgress(Math.round(p * 100)),
-          });
-          setProgress(100);
-        }
-
-        if (cancelExportRef.current) {
-          wasCancelled();
-          return;
-        }
-        setStatusMessage("Triggering download...");
-        triggerDownload(blob, fileName);
-        const successMsg = `Export complete! Downloaded ${fileName}`;
-        setSuccessNotification(successMsg);
-        toast.success(successMsg);
-        onExportComplete?.(fileName);
+        };
       }
-    } catch (err) {
-      const errText = err instanceof Error ? err.message : String(err);
-      setError(errText);
-      toast.error(errText);
+
+      const context: ExportContext = {
+        stems,
+        sampleRate,
+        sourceMixTitle,
+        timeStretch: {
+          tempo: activeTempo ?? 1.0,
+          pitch: activePitch ?? 0,
+          formantPreservation: activeFormantPreservation ?? true,
+        },
+        clickTrack: {
+          beatGrid: clickTrackBeatGrid,
+          settings: clickTrackSettings,
+        },
+      };
+
+      const result = await exportAudio(request, context, {
+        signal: controller.signal,
+        onProgress: (p, stageMsg) => {
+          setProgress(p);
+          setStatusMessage(stageMsg);
+        },
+      });
+
+      setStatusMessage("Triggering download...");
+      triggerDownload(result.blob, result.fileName);
+      const successMsg = `Export complete! Downloaded ${result.fileName}`;
+      setSuccessNotification(successMsg);
+      toast.success(successMsg);
+      onExportComplete?.(result.fileName);
+    } catch (err: any) {
+      if (err?.name === "AbortError" || controller.signal.aborted) {
+        setHasCancelledExport(true);
+        setStatusMessage("Export cancelled · nothing written");
+        toast.info("encoding cancelled · nothing written");
+      } else {
+        const errText = err instanceof Error ? err.message : String(err);
+        setError(errText);
+        toast.error(errText);
+      }
     } finally {
       setIsExporting(false);
+      abortControllerRef.current = null;
     }
   }, [
     mode,
@@ -550,23 +307,20 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
     format,
     bitDepth,
     bitrate,
-    stems,
-    sampleRate,
-    sourceMixTitle,
+    applyAdjustments,
     stemControls,
     masterGain,
     antiClipping,
-    onExportComplete,
-    applyAdjustments,
-    hasActiveAdjustments,
+    clickTrackSettings,
+    clickTrackBeatGrid,
+    stems,
+    sampleRate,
+    sourceMixTitle,
     activeTempo,
     activePitch,
     activeFormantPreservation,
-    clickTrackBeatGrid,
-    clickTrackSettings,
+    onExportComplete,
   ]);
-
-  if (!isOpen) return null;
 
   return (
     <section
@@ -592,17 +346,6 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
             </p>
           </div>
         </div>
-        {onClose && (
-          <button
-            type="button"
-            aria-label="Close dialog"
-            onClick={onClose}
-            disabled={isExporting}
-            className="rounded p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground transition-all disabled:opacity-50"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        )}
       </div>
 
       {/* Form Body */}
@@ -1053,9 +796,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
           </div>
         )}
 
-        {/* Export success (ADR-0009): the toast DOM surface is dead, so the
-            result announces itself inline in the Export Tab — one mono micro
-            line at the surface the user acted on, keeping the toast copy. */}
+        {/* Export success */}
         {successNotification && (
           <p
             role="status"
@@ -1092,16 +833,6 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
 
       {/* Panel Actions */}
       <div className="flex items-center justify-end gap-3 border-t border-border/60 pt-4">
-        {onClose && (
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={isExporting}
-            className="px-4 py-2 text-sm font-medium rounded border border-border bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground transition-all disabled:opacity-50"
-          >
-            Close
-          </button>
-        )}
         <button
           type="button"
           onClick={handleExport}
@@ -1134,3 +865,5 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
     </section>
   );
 };
+
+export const ExportDialog = ExportTab;

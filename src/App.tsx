@@ -12,8 +12,8 @@ import { FallbackAdvisory } from "./components/FallbackAdvisory";
 import { SourceMixCard } from "./components/SourceMixCard";
 import { MasterWaveform } from "./components/MasterWaveform";
 import { BeatGridTapCalibration } from "./components/BeatGridTapCalibration";
-import { StemPlayer, ExportDialogState } from "./components/StemPlayer";
-import { ExportDialog } from "./components/ExportDialog";
+import { StemPlayer } from "./components/StemPlayer";
+import { ExportTab } from "./components/ExportTab";
 import { SessionRecovery } from "./components/SessionRecovery";
 import { WebGPUStatusBadge } from "./components/WebGPUStatusBadge";
 import {
@@ -53,6 +53,7 @@ import {
 } from "./lib/sessionStore";
 import {
   StemMixerStates,
+  StemPlayerSnapshot,
   ClickTrackMixerState,
   CalibratedClickGrid,
   calibrateClickGrid,
@@ -245,10 +246,10 @@ export const App: React.FC<AppProps> = ({ transport }) => {
   const [restoredMixerState, setRestoredMixerState] =
     useState<SessionMixerState | null>(null);
 
-  // Export Tab panel state (Tab Shell): fed live from the Stem Player bridge.
-  // Ticket 03: the panel is inline, so there is no open/closed state anymore.
-  const [exportDialogState, setExportDialogState] =
-    useState<ExportDialogState | null>(null);
+  // Active player snapshot: feeds mixer, master volume, time-stretch and
+  // click track facts directly to the Export Tab panel (Ticket 04).
+  const [playerSnapshot, setPlayerSnapshot] =
+    useState<StemPlayerSnapshot | null>(null);
 
   // Transport bridge (transport-snapshot spec, 2026-11-06): the one deep
   // module at the shell seam between the Stem Player and everything the Tab
@@ -742,10 +743,6 @@ export const App: React.FC<AppProps> = ({ transport }) => {
 
   const handleChangeFile = () => {
     fileInputRef.current?.click();
-  };
-
-  const handleExportDialogStateChange = (state: ExportDialogState) => {
-    setExportDialogState(state);
   };
 
   // Re-lock (ticket 06): the Mix-tab rail's picker chose a Tempo Detector
@@ -1285,7 +1282,7 @@ export const App: React.FC<AppProps> = ({ transport }) => {
                   }
                   sourceMixTitle={decodedSourceMix.metadata.fileName}
                   exportDialogHosted
-                  onExportDialogState={handleExportDialogStateChange}
+                  onSnapshot={setPlayerSnapshot}
                   onTransportControls={(controls) =>
                     liveTransportRef.current?.handoff(controls)
                   }
@@ -1347,16 +1344,24 @@ export const App: React.FC<AppProps> = ({ transport }) => {
                   </div>
                 </div>
                 <div className="pt-1">
-                  <ExportDialog
-                    isOpen
+                  <ExportTab
                     stems={separatedStems}
                     sampleRate={decodedSourceMix.metadata.sampleRate}
                     sourceMixTitle={decodedSourceMix.metadata.fileName}
-                    initialMixerStates={exportDialogState?.mixerStates}
-                    initialMasterVolume={exportDialogState?.masterVolume}
-                    activeTimeStretch={exportDialogState?.timeStretch}
+                    initialMixerStates={
+                      playerSnapshot?.stems ??
+                      cachedSessionRef.current?.mixer.stems
+                    }
+                    initialMasterVolume={
+                      playerSnapshot?.masterVolume ?? snapshot.masterVolume
+                    }
+                    timeStretch={playerSnapshot?.timeStretch}
                     clickTrackBeatGrid={tempoAnalysis?.beatGrid}
-                    clickTrackSettings={clickTrackStateRef.current ?? undefined}
+                    clickTrackSettings={
+                      playerSnapshot?.clickTrack ??
+                      clickTrackStateRef.current ??
+                      undefined
+                    }
                   />
                 </div>
               </>

@@ -1,5 +1,56 @@
 import { StemName, STEM_NAMES } from "./chunkOverlapAdd";
 import { sanitizeSourceMixTitle } from "./bundleZip";
+import type { StemMixerStates } from "./stemPlayerEngine";
+
+export interface StemControlState {
+  enabled: boolean;
+  volume: number;
+}
+
+export type MixdownPresetId = "karaoke" | "acapella" | "minus_drums" | "reset";
+
+export interface MixdownPresetConfig {
+  id: MixdownPresetId;
+  label: string;
+}
+
+export const MIXDOWN_PRESETS: MixdownPresetConfig[] = [
+  { id: "karaoke", label: "Karaoke / Instrumental" },
+  { id: "acapella", label: "Acapella" },
+  { id: "minus_drums", label: "Minus Drums" },
+  { id: "reset", label: "Reset" },
+];
+
+export const DEFAULT_STEM_CONTROLS: Record<StemName, StemControlState> = {
+  vocals: { enabled: true, volume: 1.0 },
+  drums: { enabled: true, volume: 1.0 },
+  bass: { enabled: true, volume: 1.0 },
+  other: { enabled: true, volume: 1.0 },
+};
+
+export function computeInitialStemControls(
+  initialMixerStates?: StemMixerStates
+): Record<StemName, StemControlState> {
+  if (!initialMixerStates) {
+    return DEFAULT_STEM_CONTROLS;
+  }
+  const hasAnySolo = STEM_NAMES.some((s) => initialMixerStates[s]?.solo);
+  const controls: Record<StemName, StemControlState> = {} as any;
+  for (const stem of STEM_NAMES) {
+    const state = initialMixerStates[stem];
+    const isHeard = state
+      ? hasAnySolo
+        ? Boolean(state.solo && !state.muted)
+        : Boolean(!state.muted)
+      : true;
+    const vol = state ? state.volume : 1.0;
+    controls[stem] = {
+      enabled: isHeard,
+      volume: vol,
+    };
+  }
+  return controls;
+}
 
 export type MixdownDescriptor =
   "karaoke" | "instrumental" | "acapella" | "minus_drums" | "mixdown";

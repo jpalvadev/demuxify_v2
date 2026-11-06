@@ -1,14 +1,14 @@
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { ExportDialog } from "../components/ExportDialog";
+import { ExportTab } from "../components/ExportTab";
 import { StemName } from "../lib/chunkOverlapAdd";
 import { StemMixerStates } from "../lib/stemPlayerEngine";
 import type { ClickTrackMixerState } from "../lib/stemPlayerEngine";
 import * as bundleZip from "../lib/bundleZip";
 import * as customMixdown from "../lib/customMixdown";
 
-describe("ExportDialog", () => {
+describe("ExportTab", () => {
   const mockStems: Record<StemName, Float32Array[]> = {
     vocals: [new Float32Array(1152 * 2), new Float32Array(1152 * 2)],
     drums: [new Float32Array(1152 * 2), new Float32Array(1152 * 2)],
@@ -20,21 +20,18 @@ describe("ExportDialog", () => {
     vi.clearAllMocks();
   });
 
-  it("does not render when isOpen is false", () => {
-    const { container } = render(
-      <ExportDialog
-        isOpen={false}
-        onClose={vi.fn()}
-        stems={mockStems}
-        sourceMixTitle="audioslave_stone.mp3"
-      />
+  it("renders as persistent tool panel in the Tab Shell", () => {
+    render(
+      <ExportTab stems={mockStems} sourceMixTitle="audioslave_stone.mp3" />
     );
-    expect(container.firstChild).toBeNull();
+    expect(
+      screen.getByRole("region", { name: /export audio stems/i })
+    ).toBeInTheDocument();
   });
 
   it("renders modal with mode selection and format options when isOpen is true", () => {
     render(
-      <ExportDialog
+      <ExportTab
         isOpen={true}
         onClose={vi.fn()}
         stems={mockStems}
@@ -63,7 +60,7 @@ describe("ExportDialog", () => {
   it("allows toggling between Single Stem and Full Bundle mode", async () => {
     const user = userEvent.setup();
     render(
-      <ExportDialog
+      <ExportTab
         isOpen={true}
         onClose={vi.fn()}
         stems={mockStems}
@@ -88,7 +85,7 @@ describe("ExportDialog", () => {
   it("renders Custom Mixdown mode controls and presets correctly", async () => {
     const user = userEvent.setup();
     render(
-      <ExportDialog
+      <ExportTab
         isOpen={true}
         onClose={vi.fn()}
         stems={mockStems}
@@ -147,7 +144,7 @@ describe("ExportDialog", () => {
   it("updates stem selection and volumes when preset buttons are clicked", async () => {
     const user = userEvent.setup();
     render(
-      <ExportDialog
+      <ExportTab
         isOpen={true}
         onClose={vi.fn()}
         stems={mockStems}
@@ -198,7 +195,7 @@ describe("ExportDialog", () => {
   it("disables export button when no stems are selected or when active stem volumes are zero", async () => {
     const user = userEvent.setup();
     render(
-      <ExportDialog
+      <ExportTab
         isOpen={true}
         onClose={vi.fn()}
         stems={mockStems}
@@ -247,7 +244,7 @@ describe("ExportDialog", () => {
     const handleExportComplete = vi.fn();
 
     render(
-      <ExportDialog
+      <ExportTab
         isOpen={true}
         onClose={vi.fn()}
         stems={mockStems}
@@ -284,7 +281,7 @@ describe("ExportDialog", () => {
     const handleExportComplete = vi.fn();
 
     render(
-      <ExportDialog
+      <ExportTab
         isOpen={true}
         onClose={vi.fn()}
         stems={mockStems}
@@ -326,7 +323,7 @@ describe("ExportDialog", () => {
     const mixAudioStemsSpy = vi.spyOn(customMixdown, "mixAudioStems");
 
     render(
-      <ExportDialog
+      <ExportTab
         isOpen={true}
         onClose={vi.fn()}
         stems={mockStems}
@@ -376,7 +373,7 @@ describe("ExportDialog", () => {
   it("allows selecting format and sub-parameters (WAV bit-depth & MP3 bitrate)", async () => {
     const user = userEvent.setup();
     render(
-      <ExportDialog
+      <ExportTab
         isOpen={true}
         onClose={vi.fn()}
         stems={mockStems}
@@ -411,7 +408,7 @@ describe("ExportDialog", () => {
     const removeChildSpy = vi.spyOn(document.body, "removeChild");
 
     render(
-      <ExportDialog
+      <ExportTab
         isOpen={true}
         onClose={handleClose}
         stems={mockStems}
@@ -454,7 +451,7 @@ describe("ExportDialog", () => {
     const handleExportComplete = vi.fn();
 
     render(
-      <ExportDialog
+      <ExportTab
         isOpen={true}
         onClose={vi.fn()}
         stems={mockStems}
@@ -502,7 +499,7 @@ describe("ExportDialog", () => {
     const bundleSpy = vi.spyOn(bundleZip, "createStemBundleZip");
 
     render(
-      <ExportDialog
+      <ExportTab
         isOpen={true}
         onClose={vi.fn()}
         stems={stems}
@@ -550,7 +547,7 @@ describe("ExportDialog", () => {
     const bundleSpy = vi.spyOn(bundleZip, "createStemBundleZip");
 
     render(
-      <ExportDialog
+      <ExportTab
         isOpen={true}
         onClose={vi.fn()}
         stems={stems}
@@ -590,7 +587,7 @@ describe("ExportDialog", () => {
     const spy = vi.spyOn(bundleZip, "createStemBundleZip");
 
     render(
-      <ExportDialog
+      <ExportTab
         isOpen={true}
         onClose={vi.fn()}
         stems={mockStems}
@@ -622,7 +619,7 @@ describe("ExportDialog", () => {
       volume: 1,
     };
     render(
-      <ExportDialog
+      <ExportTab
         isOpen={true}
         onClose={vi.fn()}
         stems={mockStems}
@@ -663,7 +660,7 @@ describe("ExportDialog", () => {
     };
 
     render(
-      <ExportDialog
+      <ExportTab
         isOpen={true}
         onClose={vi.fn()}
         stems={brokenStems}
@@ -692,7 +689,7 @@ describe("ExportDialog", () => {
       };
 
       render(
-        <ExportDialog
+        <ExportTab
           isOpen={true}
           onClose={vi.fn()}
           stems={mockStems}
@@ -753,7 +750,7 @@ describe("ExportDialog", () => {
       };
 
       render(
-        <ExportDialog
+        <ExportTab
           isOpen={true}
           onClose={vi.fn()}
           stems={mockStems}
@@ -789,7 +786,7 @@ describe("ExportDialog", () => {
       };
 
       render(
-        <ExportDialog
+        <ExportTab
           isOpen={true}
           onClose={vi.fn()}
           stems={mockStems}
@@ -816,7 +813,7 @@ describe("ExportDialog", () => {
       expect(masterSlider).toHaveValue("0.85");
     });
 
-    it("re-synchronizes with new mixer settings when closed and re-opened", async () => {
+    it("re-synchronizes with new mixer settings live when upstream mixer states update", async () => {
       const user = userEvent.setup();
       const initialMixerStates1: StemMixerStates = {
         vocals: { volume: 0.5, muted: false, solo: false },
@@ -826,9 +823,7 @@ describe("ExportDialog", () => {
       };
 
       const { rerender } = render(
-        <ExportDialog
-          isOpen={true}
-          onClose={vi.fn()}
+        <ExportTab
           stems={mockStems}
           sourceMixTitle="audioslave_stone.mp3"
           initialMixerStates={initialMixerStates1}
@@ -841,19 +836,7 @@ describe("ExportDialog", () => {
         screen.getByRole("slider", { name: /master mixdown volume/i })
       ).toHaveValue("0.5");
 
-      // Close dialog
-      rerender(
-        <ExportDialog
-          isOpen={false}
-          onClose={vi.fn()}
-          stems={mockStems}
-          sourceMixTitle="audioslave_stone.mp3"
-          initialMixerStates={initialMixerStates1}
-          initialMasterVolume={0.5}
-        />
-      );
-
-      // Re-open with new mixer states
+      // Update with new mixer states
       const initialMixerStates2: StemMixerStates = {
         vocals: { volume: 0.9, muted: true, solo: false },
         drums: { volume: 0.8, muted: false, solo: false },
@@ -862,9 +845,7 @@ describe("ExportDialog", () => {
       };
 
       rerender(
-        <ExportDialog
-          isOpen={true}
-          onClose={vi.fn()}
+        <ExportTab
           stems={mockStems}
           sourceMixTitle="audioslave_stone.mp3"
           initialMixerStates={initialMixerStates2}
@@ -889,7 +870,7 @@ describe("ExportDialog", () => {
   describe("Active Pitch & Tempo Adjustments Export", () => {
     it("displays 'Apply active Pitch & Tempo adjustments' checkbox with informative label when session values are non-neutral", () => {
       render(
-        <ExportDialog
+        <ExportTab
           isOpen={true}
           onClose={vi.fn()}
           stems={mockStems}
@@ -909,7 +890,7 @@ describe("ExportDialog", () => {
 
     it("does not display adjustments checkbox when session values are at neutral default (1.00x, 0 st)", () => {
       render(
-        <ExportDialog
+        <ExportTab
           isOpen={true}
           onClose={vi.fn()}
           stems={mockStems}
@@ -931,7 +912,7 @@ describe("ExportDialog", () => {
       const mixAudioSpy = vi.spyOn(customMixdown, "mixAudioStems");
 
       render(
-        <ExportDialog
+        <ExportTab
           isOpen={true}
           onClose={vi.fn()}
           stems={mockStems}
@@ -969,7 +950,7 @@ describe("ExportDialog", () => {
       const mixAudioSpy = vi.spyOn(customMixdown, "mixAudioStems");
 
       render(
-        <ExportDialog
+        <ExportTab
           isOpen={true}
           onClose={vi.fn()}
           stems={mockStems}
