@@ -52,6 +52,10 @@ _Avoid_: Formant filter, vocal enhancer, autotune
 The active working state containing the Source Mix, separated Stems, playback position, and mixer settings persisted in local storage.
 _Avoid_: Project, document, workspace
 
+**Session Manager**:
+The headless coordinator that owns the active in-memory Session, autonomous storage persistence, and recovery lifecycle behind a command and snapshot seam. The application drives it; it never renders UI or talks directly to WebAudio.
+_Avoid_: Session store, session controller, session handler, auto-saver
+
 **Export Bundle**:
 The package of separated Stems exported to the user's filesystem as individual files (WAV/MP3) or a compressed archive.
 _Avoid_: Download folder, zip file, audio package
