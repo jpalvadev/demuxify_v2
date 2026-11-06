@@ -14,6 +14,10 @@ import * as toastModule from "../lib/toast";
 import * as bundleZip from "../lib/bundleZip";
 import { WorkerOutMessage } from "../workers/beatDetection.worker";
 import { decodeWavOnsets } from "./wavOnsetsHelper";
+import {
+  createScriptedTransport,
+  TransportCommand,
+} from "./scriptedTransportAdapter";
 
 // --- Tempo Detector Worker stub (ticket 06) ---------------------------------
 // The app only ever reaches the heavy BPM pass through the Web Worker seam, so
@@ -2301,109 +2305,142 @@ describe("App UI Shell", () => {
     });
   });
 
-  // 2026-11-05 footer fix: the footer's peak pips read the engine's post-fader
-  // stereo levels. With a mock master bus carrying 0.5 on L and 0.15 on R,
-  // the left ladder lights higher than the right one while playing, and both
-  // fall dark on pause.
-  it("drives the footer peak pips from the engine's stereo levels", async () => {
+  // Transport snapshot (ticket 02): the footer Master fader crosses exactly
+  // the bridge's setMasterVolume command, and the snapshot's masterVolume —
+  // restated at the command and by the engine's echo — paints the % readout
+  // and the fader. Scripted: no audio machinery, no disc.
+  it("crosses the footer Master fader as a setMasterVolume command onto the snapshot", async () => {
     vi.spyOn(webgpuModule, "detectWebGPUCapability").mockResolvedValue({
       supported: true,
       isFallback: false,
     });
     completeSeparationMocks();
 
-    const meterCtx: { ctx: any } = { ctx: null };
-    const OrigAudioContext = window.AudioContext;
-    const MeterAudioContext = function (_options?: AudioContextOptions) {
-      meterCtx.ctx ??= new OrigAudioContext();
-      // Loud-left (0.5) / quieter-right (0.15) master bus for the pump
-      // below: the engine builds the sidecar as splitter → two mono
-      // analysers, sampled via getFloatTimeDomainData (Chrome's API shape).
-      let tapChannel = 0;
-      meterCtx.ctx.createAnalyser = vi.fn(() => {
-        const fill = tapChannel++ === 0 ? 0.5 : 0.15;
-        return {
-          fftSize: 2048,
-          smoothingTimeConstant: 0,
-          channelCount: 1,
-          fillValue: fill,
-          connect: vi.fn(),
-          disconnect: vi.fn(),
-          getFloatTimeDomainData: vi.fn((arr: Float32Array) => {
-            arr.fill(fill);
-          }),
-        };
-      });
-      meterCtx.ctx.createChannelSplitter = vi.fn(() => ({
-        channelCount: 2,
-        numberOfInputs: 1,
-        numberOfOutputs: 2,
-        connect: vi.fn(),
-        disconnect: vi.fn(),
-      }));
-      meterCtx.ctx.createChannelMerger = vi.fn(() => ({
-        channelCount: 2,
-        numberOfInputs: 2,
-        numberOfOutputs: 1,
-        connect: vi.fn(),
-        disconnect: vi.fn(),
-      }));
-      return meterCtx.ctx;
-    };
-    window.AudioContext = MeterAudioContext as any;
+    const scripted = createScriptedTransport();
+    render(<App transport={scripted.bridge} />);
+    await loadAndSeparate();
 
-    const rafQueue: (() => void)[] = [];
-    const OrigRaf = window.requestAnimationFrame;
-    window.requestAnimationFrame = ((callback: () => void) => {
-      rafQueue.push(callback);
-      return rafQueue.length;
-    }) as any;
+    const fader = screen.getByRole("slider", { name: /^master volume$/i });
+    expect(fader).toHaveValue("100");
+    expect(screen.getByTestId("footer-master-percent")).toHaveTextContent(
+      "100%"
+    );
+
+    fireEvent.change(fader, { target: { value: "60" } });
+
+    // One command, exactly one verb — the shell crosses setMasterVolume and
+    // nothing else.
+    const expectedCommands: TransportCommand[] = [
+      { type: "setMasterVolume", volume: 0.6 },
+    ];
+    expect(scripted.commands).toEqual(expectedCommands);
+
+    // The engine's echo restates the snapshot, and the readouts follow it.
+    scripted.push({ masterVolume: 0.6 });
+    await waitFor(() => {
+      expect(screen.getByTestId("footer-master-percent")).toHaveTextContent(
+        "60%"
+      );
+    });
+    expect(fader).toHaveValue("60");
+
+    // Clamp ends: a drag to 0 silences the Master and paints 0%.
+    fireEvent.change(fader, { target: { value: "0" } });
+    const expectedClamp: TransportCommand = {
+      type: "setMasterVolume",
+      volume: 0,
+    };
+    expect(scripted.commands[1]).toEqual(expectedClamp);
+    scripted.push({ masterVolume: 0 });
+    await waitFor(() => {
+      expect(screen.getByTestId("footer-master-percent")).toHaveTextContent(
+        "0%"
+      );
+    });
+  });
+
+  // Transport snapshot (ticket 02): the footer's peak pips paint the
+  // snapshot's levels field — the scripted twin of the engine's coalesced
+  // post-fader stereo sample. Loud left lights higher than quieter right;
+  // a silenced sample falls dark at once.
+  it("drives the footer peak pips from the Transport snapshot levels", async () => {
+    vi.spyOn(webgpuModule, "detectWebGPUCapability").mockResolvedValue({
+      supported: true,
+      isFallback: false,
+    });
+    completeSeparationMocks();
 
     const litCount = (testId: string) =>
       Array.from(screen.getByTestId(testId).querySelectorAll("span")).filter(
         (seg) => /bg-st-ok/.test(seg.className)
       ).length;
 
-    try {
-      render(<App />);
-      await loadAndSeparate();
+    const scripted = createScriptedTransport();
+    render(<App transport={scripted.bridge} />);
+    await loadAndSeparate();
 
-      // Idle: both ladders are dark — six unlit segments each.
+    // Idle: both ladders are dark — six unlit segments each.
+    expect(litCount("footer-peak-pips-left")).toBe(0);
+    expect(litCount("footer-peak-pips-right")).toBe(0);
+    expect(
+      screen.getByTestId("footer-peak-pips-left").querySelectorAll("span")
+    ).toHaveLength(6);
+
+    // A coalesced stereo sample on the levels channel: loud left lights
+    // higher than quieter right, the honest stereo reading.
+    scripted.push({ levels: { left: 0.75, right: 0.3 } });
+    await waitFor(() => {
+      expect(litCount("footer-peak-pips-left")).toBeGreaterThanOrEqual(4);
+    });
+    expect(litCount("footer-peak-pips-right")).toBeGreaterThanOrEqual(2);
+    expect(litCount("footer-peak-pips-left")).toBeGreaterThan(
+      litCount("footer-peak-pips-right")
+    );
+
+    // Silence: a zeroed sample falls dark at once.
+    scripted.push({ levels: { left: 0, right: 0 } });
+    await waitFor(() => {
       expect(litCount("footer-peak-pips-left")).toBe(0);
       expect(litCount("footer-peak-pips-right")).toBe(0);
-      expect(
-        screen.getByTestId("footer-peak-pips-left").querySelectorAll("span")
-      ).toHaveLength(6);
+    });
+  });
 
-      const footerDisc = screen.getByRole("button", {
-        name: /^play\/pause$/i,
-      });
-      fireEvent.click(footerDisc);
-      for (let i = 0; i < 8; i++) {
-        meterCtx.ctx!.currentTime += 0.5;
-        rafQueue.shift()!();
-      }
+  // Transport snapshot (ticket 01): the footer disc runs on the module's
+  // snapshot through the scripted adapter — commands in, snapshots out, zero
+  // audio machinery. This retargets the disc semantics the AudioContext
+  // class-swap used to fake: the swap stays only where the LIVE engine's own
+  // cadence is under test (the ADR-0013 live-mirror seam).
+  it("drives the footer disc on the Transport snapshot: press plays, scripted stop flips back", async () => {
+    const scripted = createScriptedTransport();
 
-      // Playing: the pips light with signal — and louder L lights higher
-      // than quieter R, the honest stereo reading.
-      await waitFor(() => {
-        expect(litCount("footer-peak-pips-left")).toBeGreaterThanOrEqual(4);
-      });
-      expect(litCount("footer-peak-pips-right")).toBeGreaterThanOrEqual(2);
-      expect(litCount("footer-peak-pips-left")).toBeGreaterThan(
-        litCount("footer-peak-pips-right")
-      );
+    render(<App transport={scripted.bridge} />);
 
-      // Pause: the meters fall silent at once.
-      fireEvent.click(footerDisc);
-      await waitFor(() => {
-        expect(litCount("footer-peak-pips-left")).toBe(0);
-        expect(litCount("footer-peak-pips-right")).toBe(0);
-      });
-    } finally {
-      window.AudioContext = OrigAudioContext as any;
-      window.requestAnimationFrame = OrigRaf as any;
-    }
+    const footerDisc = screen.getByRole("button", {
+      name: /^play\/pause$/i,
+    });
+    // Idle: the unwired snapshot reads stopped, the icon is the play triangle.
+    expect(footerDisc).toHaveAttribute("aria-pressed", "false");
+
+    // Press: the disc dispatches play through the module's command side.
+    fireEvent.click(footerDisc);
+    expect(scripted.commands[0]).toEqual({ type: "play" });
+
+    // The play-state restatement lands on the snapshot: icon + aria-pressed
+    // flip to the pause bars.
+    scripted.push({ playing: true });
+    await waitFor(() => {
+      expect(footerDisc).toHaveAttribute("aria-pressed", "true");
+    });
+
+    // A press while playing dispatches pause — the same single toggle.
+    fireEvent.click(footerDisc);
+    expect(scripted.commands[1]).toEqual({ type: "pause" });
+
+    // End-of-track stop, scripted: the disc flips back to play on its own.
+    scripted.push({ playing: false });
+    await waitFor(() => {
+      expect(footerDisc).toHaveAttribute("aria-pressed", "false");
+    });
   });
 
   it("keeps the toast DOM surface dead: no notice container anywhere, notices only in the manager", async () => {

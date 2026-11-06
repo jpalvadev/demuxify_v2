@@ -4,7 +4,7 @@
 
 **Blocked by:** None (can start immediately).
 
-**Status:** ready-for-agent
+**Status:** claimed
 
 - [ ] Module interface is `subscribe(listener) → unsubscribe` + `getSnapshot()` returning `{ playing, playheadSec, masterVolume, levels }` (prototype-derived shape, from the spec) plus the four commands `play · pause · seek(seekSec) · setMasterVolume(volume)`
 - [ ] Snapshot reference is stable between changes (`useSyncExternalStore` semantics) — equal snapshots never re-render readers
