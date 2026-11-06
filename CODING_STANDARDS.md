@@ -30,6 +30,8 @@ Always use canonical domain terms defined in `GLOSSARY.md`.
 
 - Production web workers (e.g. `src/workers/inference.worker.ts`, `src/workers/mp3Encoder.worker.ts`) must contain real processing code only.
 - Test doubles, synthetic DSP generators, and offline mocks belong exclusively in `src/__tests__/` or `src/test/`.
+- Browser storage isolation: tests interacting with persistent storage (`sessionStore` or `fake-indexeddb`) must cleanly isolate state by invoking `clearActiveSession()` before setting up test fixtures and in test cleanups (`afterEach`), ensuring background debounced writes from prior tests never bleed across suites.
+- Full-shell startup assertions that await asynchronous initialization (e.g. concurrent WebGPU capability probing and storage inspection) must provide sufficient `waitFor(..., { timeout: 4000 })` headroom under high-concurrency test runs.
 
 ## 5. Centralized Model Profiles & Identity (ADR 0005)
 
@@ -79,3 +81,8 @@ Always use canonical domain terms defined in `GLOSSARY.md`.
 - When an ADR records a numeric fact about what the code runs with, it must be written in the pinned shape: a `NAME = <number>` span in the ADR **and** a named `const NAME = <number>` in `src/` the component actually uses — ADR-0011's `SNAP_TOLERANCE_SEC = 0.08` (`src/lib/beatGridRepair.ts`) and ADR-0013's `PLAYHEAD_REPAINT_CEILING_MS = 66` (`src/components/MasterWaveform.tsx`) are the models. `npm run check:doc-anchors` already compares every such span in the ADRs against the constant `src/` runs with; a number outside that shape is simply invisible to the gate.
 - The failure this retires is ADR-0013's prose "24" for the Click Track lane's default height: no gate can pin a number in sentences, so the day the value changes the ADR becomes a lie nothing catches. If the number is a value the code reads, lift it to a named const and anchor both sides in the same commit that writes the ADR. If it is a look detail owned by the component (height defaults, spacing), the ADR must still name where the code keeps it — the `height = 24` default at `src/components/BeatGridTapCalibration.tsx:57` — instead of quoting the bare number, so an agent follows the pointer to the real source rather than trusting prose.
 - This is an authoring-time discipline; the gate stays unchanged. Drift of an anchored number is a per-commit event (`check:doc-anchors` is in the chain); drift of a prose number is silent forever.
+
+## 12. IndexedDB Connection Lifecycle & Transaction Boundaries
+
+- Any persistence helper that opens and manages its own `IDBDatabase` connection must close `db` (`db.close()`) strictly within transaction terminal events (`tx.oncomplete`, `tx.onerror`, `tx.onabort`), never prematurely inside individual request callbacks (`req.onsuccess`).
+- Calling `db.close()` while a transaction is active marks the connection closing, which risks aborting queued operations or dropping events under concurrent load or simulated database adapters (`fake-indexeddb`).

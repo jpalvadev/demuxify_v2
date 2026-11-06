@@ -218,15 +218,26 @@ export async function hasActiveSession(): Promise<boolean> {
     return new Promise((resolve) => {
       try {
         const tx = db.transaction(SESSIONS_STORE, "readonly");
+        let has = false;
+        tx.oncomplete = () => {
+          db.close();
+          resolve(has);
+        };
+        tx.onerror = () => {
+          db.close();
+          resolve(false);
+        };
+        tx.onabort = () => {
+          db.close();
+          resolve(false);
+        };
         const store = tx.objectStore(SESSIONS_STORE);
         const req = store.get(ACTIVE_SESSION_KEY);
         req.onsuccess = () => {
-          db.close();
-          resolve(Boolean(req.result));
+          has = Boolean(req.result);
         };
         req.onerror = () => {
-          db.close();
-          resolve(false);
+          has = false;
         };
       } catch {
         db.close();

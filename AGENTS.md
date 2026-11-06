@@ -73,7 +73,7 @@ Remote `origin` is connected to GitHub (`https://github.com/jpalvadev/demuxify_v
 1. **Branch:** For every feature, spec, or refactoring increment, branch from updated `main` (`git checkout -b <branch-name>`). Never build directly on `main`.
 2. **Commit:** Commit atomically per ticket or logical step. Every commit touching `src/` must rebuild `dist/` first (`npm run build`) so `check:dist-fresh` and the `.husky/pre-commit` chain pass green.
 3. **Push branch:** Push the feature/integration branch to GitHub (`git push origin <branch-name>`) to keep work backed up.
-4. **Merge:** Once the ticket sequence and full verification sweep pass, checkout `main` and integrate using a non-fast-forward merge commit (`git merge <branch-name> --no-ff -m "merge: ..."`).
+4. **Merge:** Once the ticket sequence and full verification sweep pass, checkout `main` and integrate using a non-fast-forward merge commit (`git merge <branch-name> --no-ff -m "merge: ..."`). After merging, if `src/` was modified, immediately rebuild `dist/` (`npm run build`) so `check:dist-fresh` stays satisfied on `main`.
 5. **Push main:** Push `main` to GitHub (`git push origin main`) immediately after integration, keeping local and remote in sync. Avoid destructive force-pushes on `main`.
 
 ### Stitch Skin — screenshot-driven fidelity
