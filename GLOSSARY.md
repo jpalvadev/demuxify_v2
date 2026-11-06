@@ -20,6 +20,10 @@ _Avoid_: Mixer, audio controls, music player
 The client-side execution runtime running the ONNX neural network model (Studio / BS-RoFormer on desktop, Balanced / HT-Demucs, or Ultra Fast / Open-Unmix on mobile devices) via WebGPU or WebAssembly.
 _Avoid_: RoFormer runner, backend, separator
 
+**Player Engine**:
+The WebAudio playback core the **Stem Player** drives — it owns the sound of a mix: the Stems, the Master bus, the Click Track, and Time-Stretch. Separation fills it; it never separates, so it is never the Inference Engine.
+_Avoid_: Audio engine, mixer engine, playback backend, bare "engine" when separation is in scope
+
 **Model Profile**:
 The hardware-adapted neural network specification (Studio Profile for high-end desktop environments, Balanced Profile for quality-oriented mobile/laptop separation, and Ultra Fast Profile for responsive low-latency separation on mobile devices) defining model weights, chunk size, and memory constraints.
 _Avoid_: Model type, model variant, quality setting
@@ -95,6 +99,10 @@ _Avoid_: Panel, card, section, toolbar
 **Stem Strip**:
 The per-Stem row in the Mix Tab carrying that Stem's volume, mute and solo controls, with its own waveform and its share of the Playhead. The mixer block is four Stem Strips plus at most one lane that is not a Stem (the Click Track).
 _Avoid_: Track row, channel, stem card
+
+**Mixer State**:
+Everything the **Stem Player** reports about a mix at one instant — each Stem's volume, mute and solo, the Master volume, the Click Track lane, and the Time-Stretch settings — read as one whole, never as per-control copies that can drift apart.
+_Avoid_: Mixer settings, gain state, mixer mirror, per-channel state
 
 **Tempo Detector**:
 The estimate of a Source Mix's dominant tempo in beats per minute, reported as a top candidate plus ranked alternatives because a true pulse and its metric doubling are genuinely ambiguous, and user-correctable.
