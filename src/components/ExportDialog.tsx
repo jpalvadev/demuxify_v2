@@ -842,7 +842,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
                           }
                           aria-label={`${stem} volume`}
                           disabled={!enabled || isExporting}
-                          className="w-full accent-primary cursor-pointer h-1.5 bg-secondary rounded appearance-none disabled:opacity-50"
+                          className="w-full accent-primary cursor-pointer h-4 disabled:opacity-50"
                         />
                         <span className="text-[11px] font-mono text-muted-foreground w-8 text-right">
                           {Math.round((enabled ? volume : 0) * 100)}%
@@ -874,7 +874,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
                   onChange={(e) => setMasterGain(parseFloat(e.target.value))}
                   aria-label="Master Mixdown Volume"
                   disabled={isExporting}
-                  className="w-full accent-primary cursor-pointer h-1.5 bg-secondary rounded appearance-none"
+                  className="w-full accent-primary cursor-pointer h-4"
                 />
               </div>
 

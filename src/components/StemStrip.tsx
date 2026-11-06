@@ -274,7 +274,7 @@ export const StemStrip: React.FC<StemStripProps> = ({
         // rendered ONCE: flex order classes swap the pieces between layouts
         // (the slider wrapper goes `contents` on sm+, dissolving into the
         // rack). Behavior, aria, and handlers untouched.
-        "group flex flex-wrap items-center gap-y-2 rounded-lg border border border-st-hairline/80 hover:border-zinc-700 transition-colors overflow-hidden bg-st-panel shadow-xs sm:h-14 sm:flex-nowrap sm:items-center sm:gap-y-0 sm:rounded",
+        "group flex flex-wrap items-center gap-y-2.5 rounded-lg border border border-st-hairline/80 hover:border-zinc-700 transition-colors overflow-hidden bg-st-panel shadow-xs sm:h-14 sm:flex-nowrap sm:items-center sm:gap-y-0 sm:rounded",
         isSilenced && "opacity-65 bg-card/30",
         className
       )}
@@ -284,7 +284,7 @@ export const StemStrip: React.FC<StemStripProps> = ({
           w-32 tinted badge column with hairline seam. */}
       <div
         className={cn(
-          "order-1 flex flex-1 items-center gap-2 px-3 py-1 sm:h-full sm:flex-none sm:w-32 sm:justify-between sm:border-e sm:border-st-hairline sm:py-0",
+          "order-1 flex flex-1 items-center gap-2 px-3 py-1.5 sm:h-full sm:flex-none sm:w-32 sm:justify-between sm:border-e sm:border-st-hairline sm:py-0",
           config.badgeBgClass
         )}
       >
@@ -361,7 +361,7 @@ export const StemStrip: React.FC<StemStripProps> = ({
         ref={containerRef}
         onClick={handleWaveformClick}
         role="presentation"
-        className="order-4 basis-full w-full cursor-pointer overflow-hidden rounded-md border border-st-hairline/60 sm:order-2 sm:flex-1 sm:basis-auto sm:rounded-none sm:border-0 sm:h-full sm:min-w-[120px]"
+        className="order-4 mx-3 basis-full w-full cursor-pointer overflow-hidden rounded-md border border-st-hairline/60 sm:mx-0 sm:order-2 sm:flex-1 sm:basis-auto sm:rounded-none sm:border-0 sm:h-full sm:min-w-[120px]"
         style={{ height }}
       >
         <canvas ref={canvasRef} className="block w-full h-full" />
@@ -373,7 +373,7 @@ export const StemStrip: React.FC<StemStripProps> = ({
           ONE continuous brand-surfaceLight #202028 band welded to the M/S
           block's hairline, carrying speaker + slider + % readout. Single
           slider instance, aria pinned. */}
-      <div className="order-5 flex w-full items-center gap-2 px-3 pb-1 sm:order-4 sm:h-full sm:w-auto sm:flex-none sm:bg-st-surface-light sm:px-3 sm:pb-0">
+      <div className="order-5 flex w-full items-center gap-2 px-3 pb-2 sm:order-4 sm:h-full sm:w-auto sm:flex-none sm:bg-st-surface-light sm:px-3 sm:pb-0">
         {muted || isSilenced ? (
           <VolumeX className="hidden h-3 w-3 shrink-0 text-st-ink-faint sm:block" />
         ) : (
@@ -387,7 +387,7 @@ export const StemStrip: React.FC<StemStripProps> = ({
           value={volume}
           onChange={(e) => onVolumeChange(parseFloat(e.target.value))}
           aria-label={`${config.label} Volume`}
-          className="h-1.5 w-full flex-1 cursor-pointer appearance-none rounded bg-secondary accent-primary sm:w-40 sm:flex-none"
+          className="h-4 w-full flex-1 cursor-pointer accent-primary sm:w-40 sm:flex-none"
         />
         <span className="hidden w-9 shrink-0 text-right font-mono text-[10px] text-st-ink-dim sm:inline-block">
           {Math.round(volume * 100)}%

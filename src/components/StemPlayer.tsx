@@ -702,7 +702,7 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
                     handleTempoChange(parseFloat(e.target.value))
                   }
                   aria-label="Playback Tempo"
-                  className="w-full accent-primary cursor-pointer h-1.5 bg-secondary rounded appearance-none"
+                  className="w-full accent-primary cursor-pointer h-4"
                 />
                 <span className="text-[11px] font-mono text-muted-foreground">
                   2.00x
@@ -809,7 +809,7 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
                     handlePitchChange(parseFloat(e.target.value))
                   }
                   aria-label="Pitch Shift"
-                  className="w-full accent-primary cursor-pointer h-1.5 bg-secondary rounded appearance-none"
+                  className="w-full accent-primary cursor-pointer h-4"
                 />
                 <span className="text-[11px] font-mono text-muted-foreground">
                   +12
@@ -1012,7 +1012,7 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
                     handleSetClickTrackVolume(parseFloat(e.target.value))
                   }
                   aria-label="Click Track Volume"
-                  className="w-full accent-primary cursor-pointer h-1.5 bg-secondary rounded appearance-none"
+                  className="w-full accent-primary cursor-pointer h-4"
                 />
                 <span className="text-[11px] font-mono text-muted-foreground w-7 text-right">
                   {Math.round(clickTrack.volume * 100)}%
@@ -1136,7 +1136,7 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
                 handleMasterVolumeChange(parseFloat(e.target.value))
               }
               aria-label="Master Volume"
-              className="flex-1 min-w-[96px] accent-primary cursor-pointer h-1.5 bg-secondary rounded appearance-none"
+              className="flex-1 min-w-[96px] accent-primary cursor-pointer h-4"
             />
             <span className="font-mono text-[10px] font-bold text-zinc-200 w-7 text-right">
               {Math.round(masterVolume * 100)}%

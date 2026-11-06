@@ -1518,7 +1518,7 @@ export const App: React.FC = () => {
               }
               aria-label="Master Volume"
               data-testid="footer-master-volume"
-              className="w-14 sm:w-20 h-1 rounded bg-st-hairline cursor-pointer appearance-none accent-st-coral [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-2.5 [&::-webkit-slider-thumb]:h-2.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-st-coral [&::-webkit-slider-thumb]:shadow-[0_0_8px_rgba(248,81,83,0.55)] [&::-moz-range-thumb]:w-2.5 [&::-moz-range-thumb]:h-2.5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-st-coral [&::-moz-range-thumb]:shadow-[0_0_8px_rgba(248,81,83,0.55)]"
+              className="w-14 sm:w-20 h-4 cursor-pointer accent-st-coral"
             />
             <span
               className="font-mono text-[10px] text-zinc-200 font-bold w-6 sm:w-7 text-right"
