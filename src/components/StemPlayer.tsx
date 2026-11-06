@@ -1,4 +1,11 @@
-import React, { useEffect, useState, useRef, useCallback } from "react";
+import React, {
+  useEffect,
+  useState,
+  useRef,
+  useCallback,
+  useMemo,
+  useSyncExternalStore,
+} from "react";
 import {
   Play,
   Pause,
@@ -17,6 +24,7 @@ import { StemName, STEM_NAMES } from "../lib/chunkOverlapAdd";
 import {
   StemPlayerEngine,
   StemMixerStates,
+  StemPlayerSnapshot,
   TimeStretchState,
   ClickTrackMixerState,
   CalibratedClickGrid,
@@ -25,9 +33,14 @@ import {
 import { StemStrip } from "./StemStrip";
 import { MasterWaveform } from "./MasterWaveform";
 import { ExportDialog } from "./ExportDialog";
-import { WaveformPeaks } from "../lib/waveformPeaks";
+import {
+  WaveformPeaks,
+  computeWaveformPeaks,
+  AudioBufferLike,
+} from "../lib/waveformPeaks";
 import { cn } from "../lib/utils";
 import { DISPLAY_FONT_STACK, MONO_FONT_STACK } from "../lib/typography";
+import { formatTransportClock } from "../lib/transportClockFormat";
 // Readout only: the Tempo Detector's ranked candidate shape (ticket 06). Type-
 // only import, so the player never pulls the beat-detection worker at runtime.
 import type { TempoCandidate } from "../workers/beatDetection.worker";
@@ -121,13 +134,6 @@ export interface StemPlayerProps {
   clickCalibration?: CalibratedClickGrid | null;
 }
 
-function formatTime(totalSeconds: number): string {
-  if (isNaN(totalSeconds) || totalSeconds < 0) return "00:00";
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = Math.floor(totalSeconds % 60);
-  return `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
-}
-
 // Click Track rail (ADR-0010, ticket 04): the lane's neutral default — off, so
 // opening the Mix tab never surprises the user with a metronome over the Stems.
 const CLICK_TRACK_DEFAULT: ClickTrackMixerState = {
@@ -150,6 +156,48 @@ const formatConfidence = (confidence: number): string =>
 // comparison is tolerant rather than exact.
 const isLockedCandidate = (bpm: number, lockedBpm: number | null): boolean =>
   lockedBpm !== null && Math.abs(bpm - lockedBpm) < 0.05;
+
+// Engine Command Surface (ADR-0016): the seeded pre-mount snapshot. The store
+// reads this until the engine attaches in the mount effect; it is built from
+// the same props the engine's constructor seeds from, so the first painted
+// frame carries exactly what the mirror states used to seed from (a restored
+// Session's mixer values, Master volume, Playhead, lane state).
+const DEFAULT_MIXER_STATES: StemMixerStates = {
+  vocals: { volume: 1.0, muted: false, solo: false },
+  drums: { volume: 1.0, muted: false, solo: false },
+  bass: { volume: 1.0, muted: false, solo: false },
+  other: { volume: 1.0, muted: false, solo: false },
+};
+
+const seedSnapshotFromProps = (seed: {
+  mixerStates?: StemMixerStates;
+  masterVolume?: number;
+  currentTime?: number;
+  duration?: number;
+  clickTrack?: ClickTrackMixerState;
+}): StemPlayerSnapshot => ({
+  playing: false,
+  playheadSec: seed.currentTime ?? 0,
+  duration: seed.duration ?? 0,
+  masterVolume: seed.masterVolume ?? 1.0,
+  stems: seed.mixerStates
+    ? {
+        vocals: { ...seed.mixerStates.vocals },
+        drums: { ...seed.mixerStates.drums },
+        bass: { ...seed.mixerStates.bass },
+        other: { ...seed.mixerStates.other },
+      }
+    : {
+        vocals: { ...DEFAULT_MIXER_STATES.vocals },
+        drums: { ...DEFAULT_MIXER_STATES.drums },
+        bass: { ...DEFAULT_MIXER_STATES.bass },
+        other: { ...DEFAULT_MIXER_STATES.other },
+      },
+  clickTrack: seed.clickTrack ?? CLICK_TRACK_DEFAULT,
+  timeStretch: { tempo: 1.0, pitch: 0, formantPreservation: true },
+  levels: { left: 0, right: 0 },
+  stretchMode: "basic",
+});
 
 export const StemPlayer: React.FC<StemPlayerProps> = ({
   stems,
@@ -184,23 +232,92 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(initialCurrentTime ?? 0);
   const [duration, setDuration] = useState(providedDuration ?? 0);
-  const [mixerStates, setMixerStates] = useState<StemMixerStates>(
-    initialMixerStates ?? {
-      vocals: { volume: 1.0, muted: false, solo: false },
-      drums: { volume: 1.0, muted: false, solo: false },
-      bass: { volume: 1.0, muted: false, solo: false },
-      other: { volume: 1.0, muted: false, solo: false },
+  // Engine Command Surface (ADR-0016, ticket 01): the per-Stem mixer mirror
+  // and the Master volume mirror are DEAD — the mixer facts ride the engine's
+  // one snapshot, read with useSyncExternalStore exactly like the shell reads
+  // the Transport snapshot (ADR-0013 amendment: mirrors are banned one layer
+  // down too).
+  const [playerEngine, setPlayerEngine] = useState<StemPlayerEngine | null>(
+    null
+  );
+  const seededSnapshot = useMemo(
+    () =>
+      seedSnapshotFromProps({
+        mixerStates: initialMixerStates,
+        masterVolume: initialMasterVolume,
+        currentTime: initialCurrentTime,
+        duration: providedDuration,
+        clickTrack: initialClickTrack,
+      }),
+    [
+      initialMixerStates,
+      initialMasterVolume,
+      initialCurrentTime,
+      providedDuration,
+      initialClickTrack,
+    ]
+  );
+  const subscribeSnapshot = useCallback(
+    (onStoreChange: () => void) => {
+      if (!playerEngine) return () => {};
+      return playerEngine.subscribe(onStoreChange);
+    },
+    [playerEngine]
+  );
+  const readSnapshot = useCallback(
+    () => (playerEngine ? playerEngine.snapshot() : seededSnapshot),
+    [playerEngine, seededSnapshot]
+  );
+  const snapshot = useSyncExternalStore(
+    subscribeSnapshot,
+    readSnapshot,
+    readSnapshot
+  );
+  const mixerStates = snapshot.stems;
+  const masterVolume = snapshot.masterVolume;
+  // ADR-0016 (ticket 04): the engine's getStemBuffer wall is gone — each Stem
+  // Strip's waveform peaks are derived straight from the `stems` prop. The
+  // peaks reader is duck-typed on AudioBufferLike: AudioBuffer sources pass
+  // through untouched, and Float32Array[] channels expose exactly the members
+  // it reads. Computed once per Stem at mount; samples — and peak values —
+  // byte-identical.
+  const stemPeaks = useMemo<Record<StemName, WaveformPeaks | null>>(() => {
+    const sources = {} as Record<StemName, WaveformPeaks | null>;
+    for (const stem of STEM_NAMES) {
+      const source = stems[stem];
+      if (!source) {
+        sources[stem] = null;
+        continue;
+      }
+      let like: AudioBufferLike;
+      if (typeof (source as AudioBuffer).getChannelData === "function") {
+        like = source as AudioBuffer;
+      } else {
+        const channels = source as Float32Array[];
+        const length = channels[0]?.length ?? 0;
+        like = {
+          numberOfChannels: channels.length,
+          length,
+          sampleRate,
+          duration: sampleRate > 0 ? length / sampleRate : 0,
+          getChannelData: (channel: number) =>
+            channels[channel] ?? new Float32Array(0),
+        };
+      }
+      sources[stem] = computeWaveformPeaks(like);
     }
-  );
-  const [masterVolume, setMasterVolume] = useState(initialMasterVolume ?? 1.0);
+    return sources;
+  }, [stems, sampleRate]);
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
-  const [tempo, setTempo] = useState(1.0);
-  const [pitch, setPitch] = useState(0);
-  const [formantPreservation, setFormantPreservation] = useState(true);
-  // Click Track lane state lives here (not in the mixer states): domain-separate.
-  const [clickTrack, setClickTrack] = useState<ClickTrackMixerState>(
-    initialClickTrack ?? CLICK_TRACK_DEFAULT
-  );
+  // ADR-0016 (ticket 02): tempo, pitch, and Formant Preservation ride the
+  // snapshot — the strip's stretch faces read the applied (quantized) values.
+  const tempo = snapshot.timeStretch.tempo;
+  const pitch = snapshot.timeStretch.pitch;
+  const formantPreservation =
+    snapshot.timeStretch.formantPreservation !== false;
+  // ADR-0016 (ticket 03): the Click Track lane rides the snapshot too — the
+  // lane's facts are engine-owned, domain-separate from the Stem mixer faces.
+  const clickTrack = snapshot.clickTrack;
 
   // Initialize engine
   useEffect(() => {
@@ -214,6 +331,10 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
       initialClickTrack,
     });
     engineRef.current = engine;
+    // ADR-0016: attach the engine to the snapshot store; the mixer faces read
+    // the snapshot from this instant on (the subscription's initial call
+    // delivers the engine's construction snapshot).
+    setPlayerEngine(engine);
 
     // Hand transport actions to the shell so the Listen Tab's Transport row
     // drives this same engine (ADR-0007 Tab Shell bridge).
@@ -228,15 +349,10 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
     });
 
     setDuration(engine.getDuration());
-    setMixerStates(engine.getAllStemStates());
-    setMasterVolume(engine.getMasterVolume());
     if (initialCurrentTime !== undefined) {
       setCurrentTime(initialCurrentTime);
     }
-    setTempo(engine.getTempo());
-    setPitch(engine.getPitch());
-    setFormantPreservation(engine.isFormantPreservationEnabled());
-    setClickTrack(engine.getClickTrackState());
+    // The rail reports its starting state out on attach (Session persistence).
     onClickTrackState?.(engine.getClickTrackState());
 
     const unsubPos = engine.subscribePosition((time) => {
@@ -249,17 +365,9 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
       onPlayheadChange?.(time);
     });
 
-    const unsubState = engine.subscribeState((states) => {
-      setMixerStates(states);
-    });
-
-    const unsubTimeStretch = engine.subscribeTimeStretch((ts) => {
-      setTempo(ts.tempo);
-      setPitch(ts.pitch);
-      if (ts.formantPreservation !== undefined) {
-        setFormantPreservation(ts.formantPreservation);
-      }
-    });
+    // ADR-0016 (ticket 02): the stretch faces read the snapshot; the
+    // subscribeTimeStretch mirror channel has no reader left in this component
+    // (the channel itself retires with ticket 04's getter purge).
 
     // Peak meters (2026-11-05): the engine samples the master bus in its own
     // play loop; the player only forwards the coalesced L/R levels out.
@@ -269,22 +377,20 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
 
     return () => {
       unsubPos();
-      unsubState();
-      unsubTimeStretch();
       unsubLevels();
       engine.dispose();
       engineRef.current = null;
+      setPlayerEngine(null);
     };
   }, [stems, sampleRate, providedDuration, audioContext]);
 
   // Beat Grid (ADR-0010): swapping the grid replaces the clicks' positions; a
-  // lane with no grid has no clicks.
+  // lane with no grid has no clicks. No lane facts change on a grid swap, so
+  // there is nothing to report out (ADR-0016: reports ride fact changes).
   useEffect(() => {
     const engine = engineRef.current;
     if (!engine) return;
     engine.setBeatGrid(beatGrid ?? null);
-    setClickTrack(engine.getClickTrackState());
-    onClickTrackState?.(engine.getClickTrackState());
   }, [beatGrid]);
 
   // Spacebar Hotkey listener for Play/Pause
@@ -351,9 +457,13 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
       if (!engine) return;
       engine.seek(seekTime);
       setCurrentTime(seekTime);
+      // The seek echo keeps its exact payload shape (currentTime is the
+      // scrubbed position the Session persists); the mixer facts ride the
+      // post-command snapshot.
+      const snap = engine.snapshot();
       onMixerChange?.({
-        stems: engine.getAllStemStates(),
-        masterVolume: engine.getMasterVolume(),
+        stems: snap.stems,
+        masterVolume: snap.masterVolume,
         currentTime: seekTime,
       });
     },
@@ -365,13 +475,14 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
     if (!onExportDialogState) return;
     const engine = engineRef.current;
     if (!engine) return;
+    const snap = engine.snapshot();
     onExportDialogState({
-      mixerStates: engine.getAllStemStates(),
-      masterVolume: engine.getMasterVolume(),
+      mixerStates: snap.stems,
+      masterVolume: snap.masterVolume,
       timeStretch: {
-        tempo: engine.getTempo(),
-        pitch: engine.getPitch(),
-        formantPreservation: engine.isFormantPreservationEnabled(),
+        tempo: snap.timeStretch.tempo,
+        pitch: snap.timeStretch.pitch,
+        formantPreservation: snap.timeStretch.formantPreservation !== false,
       },
     });
   };
@@ -384,11 +495,14 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
     (stem: StemName, volume: number) => {
       const engine = engineRef.current;
       if (!engine) return;
-      engine.setStemVolume(stem, volume);
+      // One command + one echo (ADR-0016): the mixer facts come back out of
+      // the post-command snapshot — no "set, re-get, re-emit" triplet.
+      engine.applyMixer({ stems: { [stem]: { volume } } });
+      const snap = engine.snapshot();
       onMixerChange?.({
-        stems: engine.getAllStemStates(),
-        masterVolume: engine.getMasterVolume(),
-        currentTime: engine.getCurrentTime(),
+        stems: snap.stems,
+        masterVolume: snap.masterVolume,
+        currentTime: snap.playheadSec,
       });
       emitExportDialogState();
     },
@@ -399,11 +513,15 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
     (stem: StemName) => {
       const engine = engineRef.current;
       if (!engine) return;
-      engine.toggleStemMute(stem);
+      // No toggle verb on the command surface: the next press is derived from
+      // the snapshot; ADR-0012's exclusivity resolves inside applyMixer.
+      const nextMuted = !engine.snapshot().stems[stem].muted;
+      engine.applyMixer({ stems: { [stem]: { muted: nextMuted } } });
+      const snap = engine.snapshot();
       onMixerChange?.({
-        stems: engine.getAllStemStates(),
-        masterVolume: engine.getMasterVolume(),
-        currentTime: engine.getCurrentTime(),
+        stems: snap.stems,
+        masterVolume: snap.masterVolume,
+        currentTime: snap.playheadSec,
       });
       emitExportDialogState();
     },
@@ -414,11 +532,13 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
     (stem: StemName) => {
       const engine = engineRef.current;
       if (!engine) return;
-      engine.toggleStemSolo(stem);
+      const nextSolo = !engine.snapshot().stems[stem].solo;
+      engine.applyMixer({ stems: { [stem]: { solo: nextSolo } } });
+      const snap = engine.snapshot();
       onMixerChange?.({
-        stems: engine.getAllStemStates(),
-        masterVolume: engine.getMasterVolume(),
-        currentTime: engine.getCurrentTime(),
+        stems: snap.stems,
+        masterVolume: snap.masterVolume,
+        currentTime: snap.playheadSec,
       });
       emitExportDialogState();
     },
@@ -429,89 +549,79 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
     (volume: number) => {
       const engine = engineRef.current;
       if (!engine) return;
-      engine.setMasterVolume(volume);
-      setMasterVolume(volume);
+      // The Transport bridge's setMasterVolume verb maps onto this same
+      // command (ticket 01): the bridge module and shell wiring are untouched.
+      engine.applyMixer({ masterVolume: volume });
+      const snap = engine.snapshot();
       onMixerChange?.({
-        stems: engine.getAllStemStates(),
-        masterVolume: volume,
-        currentTime: engine.getCurrentTime(),
+        stems: snap.stems,
+        masterVolume: snap.masterVolume,
+        currentTime: snap.playheadSec,
       });
       emitExportDialogState();
     },
     [onMixerChange]
   );
 
+  // ADR-0016 (ticket 02): each stretch face sends one command; the tempo
+  // 0.05x quantization (slider, +/- buttons, presets all land on exact grid
+  // values, no 1.3500000000000001-style drift) and the whole-semitone pitch
+  // rule with their range clamps resolve inside applyTimeStretch, and the
+  // faces read the applied values back out of the snapshot.
   const handleTempoChange = useCallback((newTempo: number) => {
-    // 0.05x quantization so the slider, +/- buttons and presets all land on
-    // exact grid values (avoids 1.3500000000000001-style float drift).
-    const quantized = Math.max(
-      0.5,
-      Math.min(2.0, Math.round(newTempo * 20) / 20)
-    );
-    engineRef.current?.setTempo(quantized);
-    setTempo(quantized);
+    engineRef.current?.applyTimeStretch({ tempo: newTempo });
     emitExportDialogState();
   }, []);
 
   const handleIncrementTempo = useCallback(() => {
-    // Engine-first: the fork defers state-updater callbacks, so side effects
-    // must run synchronously here (see handleTempoChange).
     const engine = engineRef.current;
-    const current = engine ? engine.getTempo() : tempo;
-    const next = Math.min(2.0, Math.round((current + 0.05) * 20) / 20);
-    engine?.setTempo(next);
-    setTempo(next);
+    if (!engine) return;
+    const current = engine.snapshot().timeStretch.tempo;
+    engine.applyTimeStretch({ tempo: current + 0.05 });
     emitExportDialogState();
   }, []);
 
   const handleDecrementTempo = useCallback(() => {
     const engine = engineRef.current;
-    const current = engine ? engine.getTempo() : tempo;
-    const next = Math.max(0.5, Math.round((current - 0.05) * 20) / 20);
-    engine?.setTempo(next);
-    setTempo(next);
+    if (!engine) return;
+    const current = engine.snapshot().timeStretch.tempo;
+    engine.applyTimeStretch({ tempo: current - 0.05 });
     emitExportDialogState();
   }, []);
 
   const handlePitchChange = useCallback((newPitch: number) => {
-    const quantized = Math.max(-12, Math.min(12, Math.round(newPitch)));
-    engineRef.current?.setPitch(quantized);
-    setPitch(quantized);
+    engineRef.current?.applyTimeStretch({ pitch: newPitch });
     emitExportDialogState();
   }, []);
 
   const handleIncrementPitch = useCallback(() => {
     const engine = engineRef.current;
-    const current = engine ? engine.getPitch() : pitch;
-    const next = Math.min(12, current + 1);
-    engine?.setPitch(next);
-    setPitch(next);
+    if (!engine) return;
+    const current = engine.snapshot().timeStretch.pitch;
+    engine.applyTimeStretch({ pitch: current + 1 });
     emitExportDialogState();
   }, []);
 
   const handleDecrementPitch = useCallback(() => {
     const engine = engineRef.current;
-    const current = engine ? engine.getPitch() : pitch;
-    const next = Math.max(-12, current - 1);
-    engine?.setPitch(next);
-    setPitch(next);
+    if (!engine) return;
+    const current = engine.snapshot().timeStretch.pitch;
+    engine.applyTimeStretch({ pitch: current - 1 });
     emitExportDialogState();
   }, []);
 
   const handleToggleFormant = useCallback(() => {
     const engine = engineRef.current;
-    const next = !(engine
-      ? engine.isFormantPreservationEnabled()
-      : formantPreservation);
-    engine?.setFormantPreservation(next);
-    setFormantPreservation(next);
+    if (!engine) return;
+    const next = engine.snapshot().timeStretch.formantPreservation === false;
+    engine.applyTimeStretch({ formantPreservation: next });
     emitExportDialogState();
   }, []);
 
+  // The shipped reset fact as a command (ticket 02): tempo -> 1.0, pitch -> 0,
+  // Formant Preservation untouched.
   const handleResetTimeStretch = useCallback(() => {
-    engineRef.current?.resetTimeStretch();
-    setTempo(1.0);
-    setPitch(0);
+    engineRef.current?.applyTimeStretch({ tempo: 1, pitch: 0 });
     emitExportDialogState();
   }, []);
 
@@ -521,9 +631,10 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
   const handleToggleClickTrack = useCallback(() => {
     const engine = engineRef.current;
     if (!engine) return;
-    engine.toggleClickTrack();
-    setClickTrack(engine.getClickTrackState());
-    onClickTrackState?.(engine.getClickTrackState());
+    // ADR-0016 (ticket 03): the flip is a command — read the lane's current
+    // enabled fact, send the opposite, echo the post-command snapshot out.
+    engine.applyClickTrack({ enabled: !engine.snapshot().clickTrack.enabled });
+    onClickTrackState?.(engine.snapshot().clickTrack);
   }, [onClickTrackState]);
 
   // Mix Rail Tidy-Up (ticket 03): no handleToggleClickTrackMute — the rail
@@ -533,9 +644,8 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
     (volume: number) => {
       const engine = engineRef.current;
       if (!engine) return;
-      engine.setClickTrackVolume(volume);
-      setClickTrack(engine.getClickTrackState());
-      onClickTrackState?.(engine.getClickTrackState());
+      engine.applyClickTrack({ volume });
+      onClickTrackState?.(engine.snapshot().clickTrack);
     },
     [onClickTrackState]
   );
@@ -606,14 +716,13 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
             const isSilenced = hasAnySolo
               ? !state.solo || state.muted
               : state.muted;
-            const stemBuffer = engineRef.current?.getStemBuffer(stem);
 
             return (
               <StemStrip
                 key={stem}
                 stem={stem}
                 settings={state}
-                audioBuffer={stemBuffer}
+                peaks={stemPeaks[stem]}
                 duration={duration}
                 currentTime={currentTime}
                 isSilenced={isSilenced}
@@ -1043,11 +1152,11 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
             style={{ fontFamily: MONO_FONT_STACK }}
           >
             <span className="text-white font-bold tracking-wider">
-              {formatTime(currentTime)}
+              {formatTransportClock(currentTime)}
             </span>
             <span className="text-zinc-500 text-xs">/</span>
             <span className="text-zinc-400 text-xs">
-              {formatTime(duration)}
+              {formatTransportClock(duration)}
             </span>
           </div>
 

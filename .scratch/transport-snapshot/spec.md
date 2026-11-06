@@ -1,6 +1,6 @@
 # Spec: Transport Snapshot — One Deep Transport Module at the Shell Seam
 
-Status: ready-for-agent
+Status: resolved-in-full (tickets `01`–`05` all resolved, landed on branch `transport-snapshot` 2026-11-06; the append-only ADR-0013 amendment — "the shell reads one Transport snapshot; mirror states banned" — is authored in `docs/adr/0013-mix-tab-cohesion-and-the-single-playhead-readout.md`)
 
 Recorded on the tracker 2026-11-06. This is the architecture-review increment (candidate 1 of the 2026-11-05 architecture report): a deepening of the **Transport** wiring, not a feature — the shipped Mix **Tab** behavior is the promise, byte-for-byte. It contradicts no ADR: ADR-0008's single **Play/Pause** toggle and ADR-0013's one Playhead channel, bridge meanings, and mixer-bridge cadence all survive exactly as recorded, moving from App convention into a module's implementation. An ADR-0013 amendment is authored at porting start. Glossary terms used throughout: **Transport**, **Playhead**, **Peak Pips**, **Master Waveform**, **Stem Player**, **Session**, **Tab Shell**, **Tab**, **Rail**, **Stem Strip**, **Source Mix**, **Time-Stretch**.
 

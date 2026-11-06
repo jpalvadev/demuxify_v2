@@ -64,8 +64,8 @@ describe("Stem Player Multi-Track Signalsmith Stretch Integration", () => {
       stretchAdapter: mockAdapter,
     });
 
-    expect(engine.isUsingWorklet()).toBe(true);
-    expect(engine.getStretchAdapter()).toBe(mockAdapter);
+    expect(engine.graphProbe().stretchAdapter !== null).toBe(true);
+    expect(engine.graphProbe().stretchAdapter).toBe(mockAdapter);
 
     await engine.play();
     expect(mockAdapter.start).toHaveBeenCalledWith(10.0, 0);
@@ -82,28 +82,28 @@ describe("Stem Player Multi-Track Signalsmith Stretch Integration", () => {
       stretchAdapter: mockAdapter,
     });
 
-    // Tempo stepping (0.05x grid; engine accepts any clamped value)
-    engine.setTempo(1.25);
+    // Tempo stepping (0.05x grid; the verb clamps and quantizes identically)
+    engine.applyTimeStretch({ tempo: 1.25 });
     expect(mockAdapter.setTempo).toHaveBeenCalledWith(1.25);
-    expect(engine.getTempo()).toBe(1.25);
-    engine.setTempo(1.35);
+    expect(engine.snapshot().timeStretch.tempo).toBe(1.25);
+    engine.applyTimeStretch({ tempo: 1.35 });
     expect(mockAdapter.setTempo).toHaveBeenCalledWith(1.35);
-    expect(engine.getTempo()).toBe(1.35);
+    expect(engine.snapshot().timeStretch.tempo).toBe(1.35);
 
     // Pitch stepping (1 semitone)
-    engine.setPitch(3);
+    engine.applyTimeStretch({ pitch: 3 });
     expect(mockAdapter.setPitch).toHaveBeenCalledWith(3);
-    expect(engine.getPitch()).toBe(3);
+    expect(engine.snapshot().timeStretch.pitch).toBe(3);
 
     // Vocal Formant Preservation toggle
-    expect(engine.isFormantPreservationEnabled()).toBe(true);
-    engine.setFormantPreservation(false);
+    expect(engine.snapshot().timeStretch.formantPreservation).toBe(true);
+    engine.applyTimeStretch({ formantPreservation: false });
     expect(mockAdapter.setFormantPreservation).toHaveBeenCalledWith(false);
-    expect(engine.isFormantPreservationEnabled()).toBe(false);
+    expect(engine.snapshot().timeStretch.formantPreservation).toBe(false);
 
-    engine.setFormantPreservation(true);
+    engine.applyTimeStretch({ formantPreservation: true });
     expect(mockAdapter.setFormantPreservation).toHaveBeenCalledWith(true);
-    expect(engine.isFormantPreservationEnabled()).toBe(true);
+    expect(engine.snapshot().timeStretch.formantPreservation).toBe(true);
   });
 
   it("anchors canonical duration while playhead advances proportionally to active tempo", async () => {
@@ -118,7 +118,7 @@ describe("Stem Player Multi-Track Signalsmith Stretch Integration", () => {
     expect(engine.getDuration()).toBe(5.0);
 
     // Start playback at 2.0x tempo
-    engine.setTempo(2.0);
+    engine.applyTimeStretch({ tempo: 2.0 });
     await engine.play();
 
     // Advance real time by 1.0s (10.0 -> 11.0)

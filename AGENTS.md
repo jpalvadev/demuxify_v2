@@ -36,7 +36,7 @@ Enforced conventions and architectural guardrails. See `CODING_STANDARDS.md`.
 
 ### Codebase navigation
 
-Test files pin DOM `data-testid` attributes across `src/__tests__`; grep the pinned names before touching or removing any rail control — `npm run check:testids` now gates exactly that drift at commit time (every presence pin must resolve to a rendered id). See `docs/agents/navigation.md`.
+Grep `src/__tests__` for pinned `data-testid` names before touching or removing any rail control — `npm run check:testids` gates that drift at commit time. `docs/agents/navigation.md` carries the full rule set: the presence/absence halves, the lint-staged quote-reflow grep trap, `test:report`, `npm run outline`, and the Playwright Chromium-truth rules.
 
 ### Model provisioning
 
@@ -44,11 +44,15 @@ The `scripts/provision_*.py` pair provisions ONNX models and lightweight weights
 
 ### Verification replays
 
-Before changing the Beat Grid's snap tolerance (`src/lib/beatGridRepair.ts`) or anything ADR-0011 records as a derived number, replay both halves of its derivation: `npm run verify:beat-grid-anchor` (the tracker half — ffmpeg-decodes the reference Source Mix and runs the shipped repair module) and `python scripts/check_bpm.py` (the librosa ground-truth half). They are deliberately NOT in the pre-commit chain — they decode a 294 s audio file — but `npm run check:doc-anchors` now compares every `NAME = <number>` span in the ADRs against the constant `src/` actually runs with, so a recorded number cannot silently drift.
+Before changing the Beat Grid's snap tolerance (`src/lib/beatGridRepair.ts`) or anything ADR-0011 records as a derived number, replay both halves of its derivation: `npm run verify:beat-grid-anchor` (the tracker half — ffmpeg-decodes the reference Source Mix and runs the shipped repair module) and `python scripts/check_bpm.py` (the librosa ground-truth half). They are deliberately NOT in the pre-commit chain — they decode a 294 s audio file — but `npm run check:doc-anchors` now compares every `NAME = <number>` span in the ADRs against the constant `src/` actually runs with, so a recorded number cannot silently drift. The same gate anchors every code identifier an ADR cites: write a deleted/renamed identifier's citation on a line that names it deleted/retired/history — the historical-skip rule skips that line, because an ADR records past states legitimately.
 
 ### Windows environment & worktrees
 
 When working on Windows, avoid cross-drive NTFS junctions to `node_modules` because native packages (such as Tailwind/PostCSS resolution like `@alloc/quick-lru`) can fail to resolve symlinks across boundaries. Prefer standard branch checkouts in the main repo or independent `npm install` runs. Run inline Python snippets as `python -c "…"`: a bare `python - << 'EOF'` heredoc hangs on this box (stdin gets intercepted by VS Code's Native REPL) and burns the shell timeout.
+
+Shell on this box: the bash has no `ls`/`tail`/`sed` and intermittently loses `grep`/`head`/`npm`, and npm shims die with a WSL `execvpe /bin/bash` error — sift output with `node -e` one-liners and run tools direct from `node_modules` (`node node_modules/vite/bin/vite.js build`, `node node_modules/typescript/bin/tsc --noEmit`, `node node_modules/vitest/vitest.mjs run …`).
+
+Dev-server probe: undici `fetch` ignores `rejectUnauthorized`, so a health-check fetch against the self-signed `https://localhost` server reports a LIVE server DEAD — probe with `require("https").get(url, {rejectUnauthorized: false}, …)`. vite auto-increments a busy port: read the running server's shell output for its real port, keep ONE server (memory-strict box), and kill a duplicate with `netstat -ano -p tcp` + `taskkill /PID <pid> /F`.
 
 ### Big-file editing
 
@@ -57,6 +61,8 @@ When working on Windows, avoid cross-drive NTFS junctions to `node_modules` beca
 ### Check cycle
 
 Every commit must pass the chain wired in `.husky/pre-commit` (read it for the current gate list). Never stage and commit blind to it: the hook re-runs the whole chain (~22–33 s) on every `git commit`.
+
+Any commit touching `src/` rebuilds `dist/` first (`npm run build`, or direct `tsc` + vite when the npm shim flakes): `check:dist-fresh` gates EVERY commit — the stitch-skin loop's rebuild step is not skin-only — and forgetting it costs an aborted chain run at the commit itself.
 
 When the suite fails, do NOT re-read raw vitest output (thousands of tokens of DOM dumps). Run `npm run test:report` (`scripts/vitest-summary.mjs`) and work from its compact failure list — the hook's last gate is that same command, so `git commit` itself already prints the compact list (and aborts on red) instead of flooding ~40 k lines of raw vitest into the commit result.
 

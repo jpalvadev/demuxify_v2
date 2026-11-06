@@ -1,4 +1,10 @@
-import React, { useEffect, useState, useRef, ChangeEvent } from "react";
+import React, {
+  useEffect,
+  useState,
+  useRef,
+  useSyncExternalStore,
+  ChangeEvent,
+} from "react";
 import { AlertCircle, Loader2, CheckCircle2, Music } from "lucide-react";
 import { BrandUnit } from "./components/BrandUnit";
 import { SourceMixDropzone } from "./components/SourceMixDropzone";
@@ -6,11 +12,7 @@ import { FallbackAdvisory } from "./components/FallbackAdvisory";
 import { SourceMixCard } from "./components/SourceMixCard";
 import { MasterWaveform } from "./components/MasterWaveform";
 import { BeatGridTapCalibration } from "./components/BeatGridTapCalibration";
-import {
-  StemPlayer,
-  ExportDialogState,
-  TransportControls,
-} from "./components/StemPlayer";
+import { StemPlayer, ExportDialogState } from "./components/StemPlayer";
 import { ExportDialog } from "./components/ExportDialog";
 import { SessionRecovery } from "./components/SessionRecovery";
 import { WebGPUStatusBadge } from "./components/WebGPUStatusBadge";
@@ -55,12 +57,17 @@ import {
   CalibratedClickGrid,
   calibrateClickGrid,
   reanchorBeatGridToAnchor,
-  StereoPeakLevels,
 } from "./lib/stemPlayerEngine";
 import {
   createDebugSessionFixture,
   isDebugModeRequested,
 } from "./lib/debugSession";
+import {
+  createLiveTransportBridge,
+  LiveTransportBridge,
+  TransportBridge,
+} from "./lib/transportBridge";
+import { formatTransportClock } from "./lib/transportClockFormat";
 import { DISPLAY_FONT_STACK, MONO_FONT_STACK } from "./lib/typography";
 
 // Bold pairing (ticket 10): the bundled display face paints the focal Tab banners and
@@ -108,16 +115,8 @@ const TAB_GATING_REASON = "no Stems yet";
 // Footer transport readouts (2026-11-05 user fix): the bar's clock, peak pips
 // and master fader are LIVE chrome fed by the engine — a frozen mockup frame
 // (the literal 00:51 / 03:35, static pips, pinned 100% fader) is a bug, not
-// the design truth.
-function formatTransportTime(totalSeconds: number): string {
-  const safe =
-    isNaN(totalSeconds) || totalSeconds < 0 ? 0 : Math.floor(totalSeconds);
-  const minutes = Math.floor(safe / 60);
-  const seconds = safe % 60;
-  return `${minutes.toString().padStart(2, "0")}:${seconds
-    .toString()
-    .padStart(2, "0")}`;
-}
+// the design truth. The clock's `mm:ss` rule is the shared formatter in
+// lib/transportClockFormat (ticket 03 consolidation) — no App-local twin.
 
 // Peak pip ladder: PEAK_METER_SEGMENTS segments per channel, painted top →
 // bottom. A segment lights when the normalized level reaches its rank from
@@ -156,7 +155,15 @@ const tabPanelClass = (gated: boolean, active: boolean) =>
     ? "hidden"
     : "absolute inset-0 overflow-y-auto overflow-x-hidden space-y-3 transition-colors";
 
-export const App: React.FC = () => {
+// Transport bridge seam (transport-snapshot spec, 2026-11-06): the App owns
+// the live adapter; the scripted adapter (tests' mock home) is the seam's
+// second reader — a test renders <App transport={scripted.bridge} /> and
+// drives the whole transport surface with no audio machinery at all.
+export interface AppProps {
+  transport?: TransportBridge;
+}
+
+export const App: React.FC<AppProps> = ({ transport }) => {
   // Dark-only contract (ticket 09): no theme state — html keeps `dark` forever
   // and there is no light-token override block to switch into.
 
@@ -191,9 +198,9 @@ export const App: React.FC = () => {
   const [waveformPeaks, setWaveformPeaks] = useState<WaveformPeaks | null>(
     debugSession?.waveformPeaks ?? null
   );
-  const [currentTime, setCurrentTime] = useState(
-    debugSession?.currentTime ?? 0
-  );
+  // transport-snapshot ticket 03: the Playhead mirror state is gone — the
+  // spine, the clock chip and every Playhead face read the snapshot's
+  // playheadSec through the one bridge subscription.
   const [isDecoding, setIsDecoding] = useState(false);
   const [decodeError, setDecodeError] = useState<string | null>(null);
 
@@ -243,54 +250,56 @@ export const App: React.FC = () => {
   const [exportDialogState, setExportDialogState] =
     useState<ExportDialogState | null>(null);
 
-  // Transport bridge: the Mix Tab's spine scrubbing drives the Stem Player
-  // engine (registered by StemPlayer on init, ADR-0008 Tab Shell bridge).
-  const transportActionsRef = useRef<TransportControls>({
-    play: () => {},
-    pause: () => {},
-    seekToStart: () => {},
-    seek: () => {},
-    setMasterVolume: () => {},
-  });
+  // Transport bridge (transport-snapshot spec, 2026-11-06): the one deep
+  // module at the shell seam between the Stem Player and everything the Tab
+  // Shell shows. App owns the live adapter; the Stem Player hands its bridge
+  // over at the onTransportControls moment, and every shell surface reads the
+  // one snapshot through one subscription. No mid-render mutable ref, no
+  // per-surface play-state mirror (ADR-0013 amendment: mirror states banned).
+  const liveTransportRef = useRef<LiveTransportBridge | null>(null);
+  if (!liveTransportRef.current) {
+    liveTransportRef.current = createLiveTransportBridge({
+      // Debug mode boots with the fixture's synthetic Playhead seeded.
+      playheadSec: debugSession?.currentTime ?? 0,
+    });
+  }
+  const bridge = transport ?? liveTransportRef.current.bridge;
+  const snapshot = useSyncExternalStore(
+    bridge.subscribe,
+    bridge.getSnapshot,
+    bridge.getSnapshot
+  );
+
+  // 2026-11-05 user fix / transport-snapshot ticket 02: the footer's peak
+  // pips and Master fader read the Transport snapshot — no per-surface mirror
+  // states. The fader's own moves cross the bridge as the setMasterVolume
+  // command (the live adapter restates the snapshot on the spot, mirroring
+  // the drag, and the engine's echo through the mixer bridge lands the same
+  // value, so it stays a no-op), the pips ride the engine's coalesced levels
+  // channel through the adapter, and the engine stays the single owner of
+  // the master fader.
 
   // Stitch skin 08d: the footer bar's coral disc is the app's one live
   // Play/Pause control (the hosted player's own transport row was erased,
-  // ADR-0013). This mirrors the engine's play-state channel; the disc's icon,
-  // aria-pressed and which bridge action a click sends all follow it.
-  const [footerTransportPlaying, setFooterTransportPlaying] = useState(false);
-
-  // 2026-11-05 user fix: the footer's clock chip, peak pips and Master fader
-  // read live engine state. The fader mirror rides the existing mixer bridge
-  // (onMixerChange), the pips ride the engine's new levels channel, and the
-  // fader's own moves route back through the transport bridge — the engine
-  // stays the single owner of the master fader.
-  const [footerMasterVolume, setFooterMasterVolume] = useState(
-    restoredMixerState?.masterVolume ?? 1.0
-  );
-  const [footerPeakLevels, setFooterPeakLevels] = useState<StereoPeakLevels>({
-    left: 0,
-    right: 0,
-  });
-
-  const handleFooterTransportStateChange = (playing: boolean) => {
-    setFooterTransportPlaying(playing);
-  };
-
+  // ADR-0013). Its icon, aria-pressed and click dispatch read the snapshot's
+  // playing; the "dispatch play or pause by state" decision stays UI-side
+  // over a transport that acts.
   const handleFooterPlayPause = () => {
-    const actions = transportActionsRef.current;
-    if (footerTransportPlaying) {
-      actions.pause();
+    if (bridge.getSnapshot().playing) {
+      bridge.pause();
     } else {
-      actions.play();
+      bridge.play();
     }
   };
 
   const handleFooterMasterVolumeChange = (percent: number) => {
     const volume = Math.max(0, Math.min(1, percent / 100));
-    // Optimistic mirror so the fader and its % readout track the drag; the
-    // mixer bridge re-states the same value on the way through the engine.
-    setFooterMasterVolume(volume);
-    transportActionsRef.current.setMasterVolume(volume);
+    // The command crosses the bridge; the live adapter restates the
+    // snapshot's masterVolume on the spot so the fader and its % readout
+    // track the drag (the engine's echo back through the mixer bridge lands
+    // the same value — an equal restatement, a no-op publish).
+    bridge.setMasterVolume(volume);
+    liveTransportRef.current?.restateMasterVolume(volume);
   };
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -513,7 +522,10 @@ export const App: React.FC = () => {
     setSelectedFile(file);
     setIsDecoding(true);
     setDecodeError(null);
-    setCurrentTime(0);
+    // transport-snapshot ticket 04: a new Source Mix wipes the transport —
+    // the player unmounts (commands go inert) and the snapshot reads idle.
+    liveTransportRef.current?.release();
+    liveTransportRef.current?.reset();
     setSeparationPhase("idle");
     setSeparatedStems(null);
     setTempoAnalysis(null);
@@ -563,7 +575,10 @@ export const App: React.FC = () => {
     setSelectedFile(null);
     setDecodedSourceMix(null);
     setWaveformPeaks(null);
-    setCurrentTime(0);
+    // transport-snapshot ticket 04: the purge wipe releases the player and
+    // returns the snapshot to idle fresh defaults.
+    liveTransportRef.current?.release();
+    liveTransportRef.current?.reset();
     setDecodeError(null);
     setSeparationPhase("idle");
     setSeparatedStems(null);
@@ -657,8 +672,13 @@ export const App: React.FC = () => {
       } else if (session.metadata.modelProfileId) {
         setSelectedModelId(session.metadata.modelProfileId);
       }
-      setCurrentTime(session.mixer.currentTime ?? 0);
-      setFooterMasterVolume(session.mixer.masterVolume ?? 1.0);
+      // transport-snapshot ticket 03/04: the recovered Session seeds the
+      // snapshot's Master volume and Playhead before the player mounts, so
+      // the footer and the spine never flash defaults.
+      liveTransportRef.current?.seed({
+        masterVolume: session.mixer.masterVolume ?? 1.0,
+        playheadSec: session.mixer.currentTime ?? 0,
+      });
       setSeparationPhase("completed");
       setDetectedSession(null);
       // ADR-0008: resuming lands on the Mix Tab, where playback lives
@@ -698,9 +718,10 @@ export const App: React.FC = () => {
     // Mix Tab cohesion (ADR-0013): this bridge is mixer-and-Session only — the
     // live Playhead reaches the spine via onPlayheadChange below, so the
     // bridge never runs per frame and the Session save cadence is untouched.
-    // 2026-11-05: the footer fader mirrors every master-volume restatement
-    // here, whatever fired the bridge.
-    setFooterMasterVolume(mixer.masterVolume);
+    // 2026-11-05 / transport-snapshot ticket 02: every master-volume
+    // restatement lands on the snapshot's masterVolume here, whatever fired
+    // the bridge.
+    liveTransportRef.current?.restateMasterVolume(mixer.masterVolume);
     if (!cachedSessionRef.current) return;
     const updatedSession: DemuxifySession = {
       ...cachedSessionRef.current,
@@ -771,8 +792,8 @@ export const App: React.FC = () => {
     // the engine's seek notifies its position, which lands on the app's
     // Playhead through the one onPlayheadChange channel below.
     // Shared spine (ADR-0008): scrubbing on the Mix Tab's spine drives the
-    // same Stem Player engine through the transport bridge.
-    transportActionsRef.current.seek(seekTime);
+    // same Stem Player engine through the transport bridge's seek verb.
+    bridge.seek(seekTime);
   };
 
   const handleStartSeparation = async () => {
@@ -781,6 +802,12 @@ export const App: React.FC = () => {
     try {
       setSeparationPhase("downloading");
       setSeparationError(null);
+      // transport-snapshot ticket 04: a fresh separation starts from idle —
+      // any mounted player is about to unmount (commands go inert), and the
+      // snapshot resets to fresh defaults (not playing, Playhead 0, 1.0,
+      // silent) alongside the fresh mixer state below.
+      liveTransportRef.current?.release();
+      liveTransportRef.current?.reset();
       setSeparatedStems(null);
 
       if (!inferenceClientRef.current) {
@@ -824,6 +851,11 @@ export const App: React.FC = () => {
         }
       );
 
+      // transport-snapshot ticket 04: separation completion lands fresh
+      // defaults on the snapshot as the player mounts — not playing,
+      // Playhead 0, volume 1.0, silent levels (the engine's own mixer mirror
+      // lands the same values, an equal restatement, a no-op publish).
+      liveTransportRef.current?.reset();
       setSeparatedStems(result.stems);
       setSeparationPhase("completed");
       // Ticket 07 (ADR-0010 Amendment): the Beat Grid gets re-read where the
@@ -1213,7 +1245,7 @@ export const App: React.FC = () => {
                   peaks={waveformPeaks}
                   audioBuffer={decodedSourceMix.buffer}
                   duration={decodedSourceMix.metadata.duration}
-                  currentTime={currentTime}
+                  currentTime={snapshot.playheadSec}
                   onSeek={handleSeek}
                   height={96}
                   metaRight={
@@ -1236,20 +1268,27 @@ export const App: React.FC = () => {
                   // Mix Tab cohesion (ADR-0013): the spine's clock is fed by
                   // the engine's one position subscription, not by the mixer
                   // bridge — press play with no mixer event and it walks.
-                  onPlayheadChange={(timeSec) => setCurrentTime(timeSec)}
+                  onPlayheadChange={(timeSec) =>
+                    liveTransportRef.current?.setPlayheadSec(timeSec)
+                  }
                   // Stitch skin 08d: the same engine also reports play/pause
-                  // truth, which feeds the footer disc's icon, aria-pressed
-                  // and click dispatch.
-                  onPlayStateChange={handleFooterTransportStateChange}
-                  // 2026-11-05 footer fix: the engine's post-fader stereo
-                  // levels feed the footer's peak pips.
-                  onLevelsChange={setFooterPeakLevels}
+                  // truth, which the live adapter lands on the snapshot — the
+                  // disc's icon, aria-pressed and click dispatch read it.
+                  onPlayStateChange={(playing) =>
+                    liveTransportRef.current?.setPlaying(playing)
+                  }
+                  // 2026-11-05 footer fix / transport-snapshot ticket 02: the
+                  // engine's post-fader stereo levels ride the levels channel
+                  // into the snapshot the peak pips read.
+                  onLevelsChange={(levels) =>
+                    liveTransportRef.current?.setLevels(levels)
+                  }
                   sourceMixTitle={decodedSourceMix.metadata.fileName}
                   exportDialogHosted
                   onExportDialogState={handleExportDialogStateChange}
-                  onTransportControls={(controls) => {
-                    transportActionsRef.current = controls;
-                  }}
+                  onTransportControls={(controls) =>
+                    liveTransportRef.current?.handoff(controls)
+                  }
                   masterWaveformHosted
                   // Click Track rail (ADR-0010, ticket 04): the Beat Grid comes
                   // straight off the Tempo Detector, and the rail reports its own
@@ -1421,14 +1460,14 @@ export const App: React.FC = () => {
               data-testid="footer-time-current"
               className="text-white text-sm sm:text-base font-bold tracking-wider"
             >
-              {formatTransportTime(currentTime)}
+              {formatTransportClock(snapshot.playheadSec)}
             </span>
             <span className="text-zinc-500 text-xs">/</span>
             <span
               data-testid="footer-time-total"
               className="text-zinc-400 text-xs"
             >
-              {formatTransportTime(decodedSourceMix?.metadata.duration ?? 0)}
+              {formatTransportClock(decodedSourceMix?.metadata.duration ?? 0)}
             </span>
           </div>
           <div className="hidden sm:flex flex-col">
@@ -1451,11 +1490,11 @@ export const App: React.FC = () => {
             data-testid="footer-play-pause"
             title="Play/Pause the Mix transport"
             aria-label="Play/Pause"
-            aria-pressed={footerTransportPlaying}
+            aria-pressed={snapshot.playing}
             onClick={handleFooterPlayPause}
             className="w-11 h-11 rounded-full bg-st-coral text-white flex items-center justify-center shadow-play-glow transition-all active:scale-95"
           >
-            {footerTransportPlaying ? (
+            {snapshot.playing ? (
               <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                 <rect x="7" y="4" width="3.5" height="16" rx="1.25" />
                 <rect x="13.5" y="4" width="3.5" height="16" rx="1.25" />
@@ -1481,7 +1520,7 @@ export const App: React.FC = () => {
               className="flex flex-col gap-0.5"
               data-testid="footer-peak-pips-left"
             >
-              {peakMeterSegClasses(footerPeakLevels.left).map((cls, i) => (
+              {peakMeterSegClasses(snapshot.levels.left).map((cls, i) => (
                 <span
                   key={`peak-l-${i}`}
                   className={`inline-block w-1.5 h-1 ${cls}`}
@@ -1492,7 +1531,7 @@ export const App: React.FC = () => {
               className="flex flex-col gap-0.5"
               data-testid="footer-peak-pips-right"
             >
-              {peakMeterSegClasses(footerPeakLevels.right).map((cls, i) => (
+              {peakMeterSegClasses(snapshot.levels.right).map((cls, i) => (
                 <span
                   key={`peak-r-${i}`}
                   className={`inline-block w-1.5 h-1 ${cls}`}
@@ -1512,7 +1551,7 @@ export const App: React.FC = () => {
               min={0}
               max={100}
               step={1}
-              value={Math.round(footerMasterVolume * 100)}
+              value={Math.round(snapshot.masterVolume * 100)}
               onChange={(e) =>
                 handleFooterMasterVolumeChange(parseFloat(e.target.value))
               }
@@ -1524,7 +1563,7 @@ export const App: React.FC = () => {
               className="font-mono text-[10px] text-zinc-200 font-bold w-6 sm:w-7 text-right"
               data-testid="footer-master-percent"
             >
-              {Math.round(footerMasterVolume * 100)}%
+              {Math.round(snapshot.masterVolume * 100)}%
             </span>
           </div>
         </div>

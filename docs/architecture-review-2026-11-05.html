@@ -1,0 +1,949 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Architecture review — Demuxify Web — 2026-11-05</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="module">
+      import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+      mermaid.initialize({
+        startOnLoad: true,
+        theme: "neutral",
+        securityLevel: "loose",
+      });
+    </script>
+    <style>
+      .seam {
+        stroke-dasharray: 4 4;
+      }
+      .leak {
+        stroke: #dc2626;
+      }
+      .deep {
+        background: linear-gradient(135deg, #0f172a, #1e293b);
+      }
+      .fade {
+        opacity: 0.4;
+      }
+      .schematic {
+        font-size: 0.6rem;
+        letter-spacing: 0.09em;
+        text-transform: uppercase;
+      }
+    </style>
+  </head>
+  <body class="bg-stone-50 text-slate-900 font-sans">
+    <main class="max-w-5xl mx-auto px-6 py-12 space-y-14">
+      <header class="space-y-4">
+        <h1 class="font-serif text-3xl font-semibold tracking-tight">
+          Architecture review — Demuxify Web
+        </h1>
+        <p class="text-sm text-slate-500">
+          2026-11-05 · scoped by the last 100 commits: stitch-skin
+          footer/transport wiring, Mix Tab cohesion, Tempo Detector flow · 6
+          deepening candidates
+        </p>
+        <div
+          class="flex flex-wrap gap-5 text-xs text-slate-600 border border-slate-200 rounded-lg bg-white px-4 py-3"
+        >
+          <span class="flex items-center gap-2"
+            ><span
+              class="inline-block w-5 h-3 border-2 border-slate-800 bg-slate-100"
+            ></span>
+            module</span
+          >
+          <span class="flex items-center gap-2"
+            ><span
+              class="inline-block w-8 border-t-2 border-dashed border-slate-500"
+            ></span>
+            seam</span
+          >
+          <span class="flex items-center gap-2"
+            ><span class="inline-block w-8 border-t-2 border-red-600"></span>
+            leakage</span
+          >
+          <span class="flex items-center gap-2"
+            ><span
+              class="inline-block w-5 h-3 deep border-2 border-slate-900"
+            ></span>
+            deep module</span
+          >
+        </div>
+      </header>
+
+      <section id="candidates" class="space-y-14">
+        <!-- ============ C1: Transport bridge ============ -->
+        <article
+          id="c1"
+          class="rounded-xl border border-slate-200 bg-white p-8 space-y-6"
+        >
+          <div class="flex items-start justify-between gap-4 flex-wrap">
+            <h2 class="font-serif text-2xl">
+              1 · Collapse the engine→App transport mirroring into one Transport
+              snapshot
+            </h2>
+            <div class="flex gap-2 shrink-0">
+              <span
+                class="text-xs font-semibold px-3 py-1 rounded-full bg-emerald-100 text-emerald-800"
+                >Strong</span
+              >
+              <span
+                class="text-xs px-3 py-1 rounded-full bg-slate-100 text-slate-600"
+                >ports &amp; adapters</span
+              >
+            </div>
+          </div>
+          <p class="font-mono text-sm text-slate-600">
+            src/App.tsx:248–293, 693–721, 1251, 1440–1537 ·
+            src/components/StemPlayer.tsx:220–268 ·
+            src/lib/stemPlayerEngine.ts:1008–1054
+          </p>
+          <div class="grid md:grid-cols-2 gap-6">
+            <div class="rounded-lg border border-slate-200 bg-white p-4">
+              <p class="schematic text-slate-500 mb-2">
+                Before — four channels, three mirrored states, one mutable ref
+              </p>
+              <pre class="mermaid">
+flowchart LR
+  E[Engine subscriptions] -->|position+phase| SP[Stem Player]
+  E -->|state| SP
+  E -->|levels| SP
+  SP -.->|onTransportControls| R[transportActionsRef mutable]
+  SP -.->|onPlayheadChange| A1[App currentTime]
+  SP -.->|onPlayStateChange| A2[footerTransportPlaying]
+  SP -.->|onLevelsChange| A3[footerPeakLevels]
+  SP -.->|onMixerChange| A4[footerMasterVolume]
+  R --> F[Footer chrome]
+  A2 --> F
+  A3 --> F
+  A4 --> F
+  A1 --> S[Master Waveform spine]
+  A4 --> S
+  classDef leak stroke:#dc2626,stroke-width:2px;
+  class SP,A1,A2,A3,A4,R leak
+              </pre>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-white p-4">
+              <p class="schematic text-slate-500 mb-2">
+                After — one deep Transport module at the shell seam
+              </p>
+              <div class="relative h-[300px]">
+                <div
+                  class="deep text-slate-100 rounded-lg border-2 border-slate-900 px-4 py-3 mx-auto w-[86%] h-[130px]"
+                >
+                  <p class="schematic text-slate-300">
+                    Transport module · interface = snapshot {playing, playhead,
+                    masterVolume, levels} + play · pause · seek ·
+                    setMasterVolume
+                  </p>
+                  <div
+                    class="fade grid grid-cols-2 gap-1 mt-3 schematic text-slate-400"
+                  >
+                    <span>engine.subscribePosition</span
+                    ><span>engine.subscribeLevels</span>
+                    <span>engine.subscribeState</span
+                    ><span>footer mirror, one place</span>
+                  </div>
+                </div>
+                <div
+                  class="absolute bottom-2 left-2 w-[46%] border-2 border-slate-700 bg-slate-100 rounded px-3 py-2"
+                >
+                  <p class="schematic">Footer chrome</p>
+                  <p class="text-xs text-slate-500">
+                    reads snapshot · commands on disc + fader
+                  </p>
+                </div>
+                <div
+                  class="absolute bottom-2 right-2 w-[46%] border-2 border-slate-700 bg-slate-100 rounded px-3 py-2"
+                >
+                  <p class="schematic">Spine · Stem Strips · readout</p>
+                  <p class="text-xs text-slate-500">reads the same snapshot</p>
+                </div>
+                <div
+                  class="absolute bottom-[128px] left-1/2 -translate-x-1/2 text-slate-500 text-lg"
+                >
+                  ↑ engine adapter · ↓ snapshot to readers · scripted adapter in
+                  tests
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="grid md:grid-cols-2 gap-6 text-sm">
+            <div>
+              <p class="schematic text-slate-500 mb-1">Problem</p>
+              <p>
+                Every engine fact the shell shows is mirrored a second time:
+                play-state, peak levels, master volume, and the Playhead cross
+                the Stem Player interface as four channels, land in three App
+                states plus a mutable ref assigned during render, and the footer
+                JSX reads the mirrors. Understanding "what the footer displays"
+                bounces across three modules — and this wiring is the repo's hot
+                zone (every stitch-skin footer commit edits it).
+              </p>
+            </div>
+            <div>
+              <p class="schematic text-slate-500 mb-1">Solution</p>
+              <p>
+                One Transport module (the glossary's name for the row that acts
+                on position) sits at the shell seam: live adapter subscribes the
+                engine's existing channels once and exposes one snapshot + four
+                commands; App keeps no mirror states; footer, spine, and readout
+                read the same snapshot. A scripted adapter replaces the App-seam
+                AudioContext swapping tests.
+              </p>
+            </div>
+          </div>
+          <ul
+            class="text-sm text-slate-700 grid md:grid-cols-2 gap-x-8 gap-y-1 list-disc pl-5"
+          >
+            <li>locality: footer-fidelity work lands in one module</li>
+            <li>leverage: one snapshot, all shell readers</li>
+            <li>mutable ref + 3 mirror states deleted</li>
+            <li>tests hit the snapshot interface, not full App render</li>
+            <li>
+              ADR-0013 channels keep their meaning — cadence rules move inside
+              the implementation, not the interface
+            </li>
+          </ul>
+          <div
+            class="rounded-md bg-amber-50 border border-amber-200 px-4 py-2 text-sm text-amber-900"
+          >
+            ADR note: respects ADR-0013's rejected "per-frame mixer bridge" —
+            the snapshot must feed on the existing single position channel, and
+            the mixer bridge keeps its save cadence inside the module.
+          </div>
+        </article>
+
+        <!-- ============ C2: Tempo Detector flow ============ -->
+        <article
+          id="c2"
+          class="rounded-xl border border-slate-200 bg-white p-8 space-y-6"
+        >
+          <div class="flex items-start justify-between gap-4 flex-wrap">
+            <h2 class="font-serif text-2xl">
+              2 · Collapse the Tempo Detector call choreography into one flow
+              module
+            </h2>
+            <div class="flex gap-2 shrink-0">
+              <span
+                class="text-xs font-semibold px-3 py-1 rounded-full bg-emerald-100 text-emerald-800"
+                >Strong</span
+              >
+              <span
+                class="text-xs px-3 py-1 rounded-full bg-slate-100 text-slate-600"
+                >ports &amp; adapters</span
+              >
+            </div>
+          </div>
+          <p class="font-mono text-sm text-slate-600">
+            src/App.tsx:219–230, 401–510, 584–671, 735–760, 829–843 ·
+            src/lib/beatClient.ts
+          </p>
+          <div class="grid md:grid-cols-2 gap-6">
+            <div class="rounded-lg border border-slate-200 bg-white p-4">
+              <p class="schematic text-slate-500 mb-2">
+                Before — the rules live in how the handlers are called
+              </p>
+              <pre class="mermaid">
+flowchart TD
+  D[decode] --> SA[startTempoAnalysis]
+  P[separation completes] --> SA
+  RS[resume] --> SA
+  CP[candidate picker] --> SA
+  TC[tap confirm] --> SA
+  CP -.cancel.-> BC[BeatClient]
+  TC -.cancel.-> BC
+  P -.cancel.-> BC
+  SA --> BC
+  TC -.pendingCalibrationRef.-> SA
+  SA -.stale-closure patch.-> ST[separatedStems]
+  SA -.setTempoAnalysis before setClickCalibration.-> APP[App state]
+  SA -.-> AT[attachTempoResultToSession]
+  classDef leak stroke:#dc2626,stroke-width:2px;
+  class CP,TC,P,SA,ST leak
+              </pre>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-white p-4">
+              <p class="schematic text-slate-500 mb-2">
+                After — call-graph collapse
+              </p>
+              <div class="relative h-[300px]">
+                <div
+                  class="mx-auto w-[88%] deep text-slate-100 border-2 border-slate-900 rounded-lg px-4 py-3 h-[190px]"
+                >
+                  <p class="schematic text-slate-300">
+                    Tempo Detector flow module
+                  </p>
+                  <p class="text-sm mt-1">
+                    analyze(source, stems, hintBpm?) · confirmTap(taps) ·
+                    cancel() · snapshot · attachTo(session)
+                  </p>
+                  <div
+                    class="fade grid grid-cols-2 gap-1 mt-3 schematic text-slate-400"
+                  >
+                    <span>one-pass-at-a-time cancel</span
+                    ><span>drums merge</span>
+                    <span>pending hand-calibration</span
+                    ><span>re-anchor apply</span>
+                    <span>value-before-claim ordering</span
+                    ><span>non-fatal pass</span>
+                  </div>
+                </div>
+                <div
+                  class="absolute bottom-2 left-1/2 -translate-x-1/2 schematic text-slate-500"
+                >
+                  worker adapter in prod · in-process fake in tests — two
+                  adapters, a real seam
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="grid md:grid-cols-2 gap-6 text-sm">
+            <div>
+              <p class="schematic text-slate-500 mb-1">Problem</p>
+              <p>
+                The pure helpers are extracted (drums merge, calibrateClickGrid,
+                reanchorBeatGridToAnchor), but the bugs hide in the calling:
+                five call sites each re-run the cancel-before-re-lock rule, a
+                stale-closure patch (<span class="font-mono"
+                  >stems === undefined ? separatedStems : stems</span
+                >), a hand-calibration ref threaded between tap-confirm and
+                pass-completion, and the value-before-claim setter ordering that
+                CODING_STANDARDS §10 admits no check can guard. Understanding
+                the Tempo Detector means bouncing across App handlers, two refs,
+                and beatClient.
+              </p>
+            </div>
+            <div>
+              <p class="schematic text-slate-500 mb-1">Solution</p>
+              <p>
+                One Tempo Detector flow module owns pass scheduling, hint,
+                re-anchor, honest supersession, and session attach. App hands it
+                taps, hints, and a session; it subscribes one snapshot. The §10
+                ordering rule stops being a reviewer convention and becomes
+                code.
+              </p>
+            </div>
+          </div>
+          <ul
+            class="text-sm text-slate-700 grid md:grid-cols-2 gap-x-8 gap-y-1 list-disc pl-5"
+          >
+            <li>locality: ADR-0010/0011 rules concentrate in one module</li>
+            <li>
+              the interface is the test surface: fake worker tests the full flow
+            </li>
+            <li>five call sites shrink to five verbs</li>
+            <li>stale-closure patch deleted — stems arrive as a parameter</li>
+            <li>
+              leverage: re-lock, calibration, resume share one implementation
+            </li>
+          </ul>
+        </article>
+
+        <!-- ============ C3: Session module ============ -->
+        <article
+          id="c3"
+          class="rounded-xl border border-slate-200 bg-white p-8 space-y-6"
+        >
+          <div class="flex items-start justify-between gap-4 flex-wrap">
+            <h2 class="font-serif text-2xl">
+              3 · Deepen the Session: factory, restore, record, purge in one
+              place
+            </h2>
+            <div class="flex gap-2 shrink-0">
+              <span
+                class="text-xs font-semibold px-3 py-1 rounded-full bg-emerald-100 text-emerald-800"
+                >Strong</span
+              >
+              <span
+                class="text-xs px-3 py-1 rounded-full bg-slate-100 text-slate-600"
+                >in-process</span
+              >
+            </div>
+          </div>
+          <p class="font-mono text-sm text-slate-600">
+            src/App.tsx:584–691, 693–720, 847–883, 497–510 ·
+            src/lib/sessionStore.ts · src/lib/stemPlayerEngine.ts:200–212 ·
+            src/lib/audioContext.ts
+          </p>
+          <div class="grid md:grid-cols-2 gap-6">
+            <div class="rounded-lg border border-slate-200 bg-white p-4">
+              <p class="schematic text-slate-500 mb-2">
+                Before — Session knowledge spread across App (each band rebuilds
+                it)
+              </p>
+              <div class="space-y-1.5">
+                <div
+                  class="h-11 border-l-4 border-red-500 bg-slate-100 px-3 flex items-center text-xs"
+                >
+                  resume: rebuilds AudioBuffer inline, duplicating
+                  <span class="font-mono mx-1"
+                    >window.AudioContext || webkitAudioContext</span
+                  >
+                  — a CODING_STANDARDS §2 ban, live in App:598
+                </div>
+                <div
+                  class="h-11 border-l-4 border-red-400 bg-slate-100 px-3 flex items-center text-xs"
+                >
+                  separation: builds DemuxifySession + initial mixer literals by
+                  hand (App:847–883)
+                </div>
+                <div
+                  class="h-11 border-l-4 border-red-400 bg-slate-100 px-3 flex items-center text-xs"
+                >
+                  handleMixerChange: rebuilds the Session object + debounceSave
+                  (App:705–719)
+                </div>
+                <div
+                  class="h-11 border-l-4 border-red-400 bg-slate-100 px-3 flex items-center text-xs"
+                >
+                  attachTempoResultToSession: rebuilds the Session object again
+                  (App:503–509)
+                </div>
+                <div
+                  class="h-11 border-l-4 border-amber-400 bg-slate-100 px-3 flex items-center text-xs"
+                >
+                  "all Stems 1.0 · unmuted · unsolo" defaults exist in App,
+                  StemPlayer, and sessionStore — three places
+                </div>
+              </div>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-white p-4">
+              <p class="schematic text-slate-500 mb-2">
+                After — one thick band
+              </p>
+              <div
+                class="deep text-slate-100 rounded-lg border-2 border-slate-900 px-5 py-6 h-[210px] flex flex-col justify-center space-y-3"
+              >
+                <p class="schematic text-slate-300">Session module</p>
+                <p class="text-sm">
+                  create(sourceMix, stems, profile) · restore() → {buffer,
+                  peaks, mixer, tempo, calibration, clickTrack} · recordMixer()
+                  · recordTempo() · purge()
+                </p>
+                <div
+                  class="fade schematic text-slate-400 grid grid-cols-2 gap-1"
+                >
+                  <span
+                    >createAudioBuffer — the engine's private helper, now one
+                    helper</span
+                  >
+                  <span>getAudioContext per §2</span>
+                  <span>one mixer-defaults factory</span>
+                  <span>auto-saver cadence inside</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="grid md:grid-cols-2 gap-6 text-sm">
+            <div>
+              <p class="schematic text-slate-500 mb-1">Problem</p>
+              <p>
+                The Session shape leaks across four App sites that each rebuild
+                it, and the resume path re-implements buffer construction (the
+                engine already has the same private helper) while violating the
+                repo's own AudioContext standard. Deletion test: delete this
+                scattered logic and it reappears at every call site — it was
+                earning its keep, just in the wrong place.
+              </p>
+            </div>
+            <div>
+              <p class="schematic text-slate-500 mb-1">Solution</p>
+              <p>
+                Promote the Session module beside sessionStore: five verbs —
+                create, restore, recordMixer, recordTempo, purge. App calls
+                verbs; it stops assembling DemuxifySession literals.
+              </p>
+            </div>
+          </div>
+          <ul
+            class="text-sm text-slate-700 grid md:grid-cols-2 gap-x-8 gap-y-1 list-disc pl-5"
+          >
+            <li>
+              locality: the §2 violation disappears with its one call site
+            </li>
+            <li>one mixer-defaults factory, three copies deleted</li>
+            <li>restore tested headless — no AudioContext swapping</li>
+            <li>leverage: recovery, resume, purge share one shape</li>
+          </ul>
+        </article>
+
+        <!-- ============ C4: Export render ============ -->
+        <article
+          id="c4"
+          class="rounded-xl border border-slate-200 bg-white p-8 space-y-6"
+        >
+          <div class="flex items-start justify-between gap-4 flex-wrap">
+            <h2 class="font-serif text-2xl">
+              4 · Lift the Export render pipeline out of ExportDialog
+            </h2>
+            <div class="flex gap-2 shrink-0">
+              <span
+                class="text-xs font-semibold px-3 py-1 rounded-full bg-emerald-100 text-emerald-800"
+                >Strong</span
+              >
+              <span
+                class="text-xs px-3 py-1 rounded-full bg-slate-100 text-slate-600"
+                >in-process</span
+              >
+            </div>
+          </div>
+          <p class="font-mono text-sm text-slate-600">
+            src/components/ExportDialog.tsx:131–141, 307–~510 ·
+            src/lib/customMixdown.ts · src/lib/wavEncoder.ts ·
+            src/lib/mp3Encoder.ts · src/lib/bundleZip.ts ·
+            src/lib/signalsmithStretchAdapter.ts
+          </p>
+          <div class="grid md:grid-cols-2 gap-6">
+            <div class="rounded-lg border border-slate-200 bg-white p-4">
+              <p class="schematic text-slate-500 mb-2">
+                Before — the pipeline lives inside a UI module's render
+              </p>
+              <div class="border-2 border-red-500 rounded-lg p-3 space-y-2">
+                <p class="schematic text-red-700">
+                  ExportDialog · handleExport (~200 lines inline)
+                </p>
+                <div class="fade space-y-1.5">
+                  <div
+                    class="border border-slate-400 rounded px-3 py-1 text-xs"
+                  >
+                    renderOfflineStems (tempo · pitch · formant)
+                  </div>
+                  <div
+                    class="border border-slate-400 rounded px-3 py-1 text-xs"
+                  >
+                    mode switch: single · bundle · mixdown (anti-clipping)
+                  </div>
+                  <div
+                    class="border border-slate-400 rounded px-3 py-1 text-xs"
+                  >
+                    per-Stem encode loops + progress % arithmetic
+                  </div>
+                  <div
+                    class="border border-slate-400 rounded px-3 py-1 text-xs"
+                  >
+                    cancelExportRef checked at 4 stops
+                  </div>
+                  <div
+                    class="border border-slate-400 rounded px-3 py-1 text-xs"
+                  >
+                    filename rules + triggerDownload DOM
+                  </div>
+                </div>
+              </div>
+              <p class="text-xs text-slate-500 mt-2">
+                CODING_STANDARDS §7 records the cost: the App seam cannot await
+                the finished ZIP (jszip stalls in jsdom) — App tests spy the
+                bundler and assert arguments; only the 26 full-dialog tests see
+                a completed export.
+              </p>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-white p-4">
+              <p class="schematic text-slate-500 mb-2">
+                After — deep Export render module, thin dialog above the seam
+              </p>
+              <div class="relative h-[290px]">
+                <div
+                  class="mx-auto w-[70%] border-2 border-slate-700 bg-slate-100 rounded px-4 py-2"
+                >
+                  <p class="schematic">ExportDialog (UI)</p>
+                  <p class="text-xs text-slate-500">
+                    mode · controls · progress bar · cancel button
+                  </p>
+                </div>
+                <div class="text-center text-slate-500 text-lg leading-6">
+                  ↓ renderExport(stems, config, {onProgress, signal}) → {blob,
+                  fileName} ↑ progress events
+                </div>
+                <div
+                  class="mx-auto w-[88%] deep text-slate-100 border-2 border-slate-900 rounded px-4 py-4 h-[130px]"
+                >
+                  <p class="schematic text-slate-300">Export render module</p>
+                  <div
+                    class="fade grid grid-cols-2 gap-1 mt-2 schematic text-slate-400"
+                  >
+                    <span>offline Time-Stretch render</span
+                    ><span>WAV / MP3 encode</span>
+                    <span>Custom Mixdown + anti-clipping</span
+                    ><span>ZIP bundle</span> <span>cancel via AbortSignal</span
+                    ><span>progress mapping · filenames</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="grid md:grid-cols-2 gap-6 text-sm">
+            <div>
+              <p class="schematic text-slate-500 mb-1">Problem</p>
+              <p>
+                The deep encoding modules (customMixdown, wavEncoder,
+                mp3Encoder, bundleZip) are assembled by a UI module: the
+                choreography — render order, progress arithmetic, four cancel
+                checkpoints, filename rules — is untestable glue, and the suite
+                documents the stall with a spy workaround. The Export pipeline
+                has no interface of its own.
+              </p>
+            </div>
+            <div>
+              <p class="schematic text-slate-500 mb-1">Solution</p>
+              <p>
+                Give the pipeline a module: renderExport accepts stems + export
+                config, returns {blob, fileName}, reports progress, obeys an
+                AbortSignal. The dialog keeps the controls and subscribes;
+                download triggering stays with the DOM.
+              </p>
+            </div>
+          </div>
+          <ul
+            class="text-sm text-slate-700 grid md:grid-cols-2 gap-x-8 gap-y-1 list-disc pl-5"
+          >
+            <li>
+              the interface is the test surface: pipeline tested without jsdom
+              stalls
+            </li>
+            <li>§7 spy workaround retires</li>
+            <li>locality: cancel + progress arithmetic in one module</li>
+            <li>
+              leverage: Export Tab panel and any future surface share one render
+            </li>
+          </ul>
+          <div
+            class="rounded-md bg-amber-50 border border-amber-200 px-4 py-2 text-sm text-amber-900"
+          >
+            ADR note: ADR-0008's inline Export panel fed through the Transport
+            bridge stays exactly as recorded — the panel is the caller, the
+            pipeline moves behind its own seam.
+          </div>
+        </article>
+
+        <!-- ============ C5: Worker job bridge ============ -->
+        <article
+          id="c5"
+          class="rounded-xl border border-slate-200 bg-white p-8 space-y-6"
+        >
+          <div class="flex items-start justify-between gap-4 flex-wrap">
+            <h2 class="font-serif text-2xl">
+              5 · Share the worker bridge: three copy-pasted client↔worker
+              implementations
+            </h2>
+            <div class="flex gap-2 shrink-0">
+              <span
+                class="text-xs font-semibold px-3 py-1 rounded-full bg-amber-100 text-amber-800"
+                >Worth exploring</span
+              >
+              <span
+                class="text-xs px-3 py-1 rounded-full bg-slate-100 text-slate-600"
+                >local-substitutable</span
+              >
+            </div>
+          </div>
+          <p class="font-mono text-sm text-slate-600">
+            src/lib/inferenceClient.ts · src/lib/beatClient.ts ·
+            src/lib/mp3Encoder.ts (bridge part)
+          </p>
+          <div class="grid md:grid-cols-2 gap-6">
+            <div class="rounded-lg border border-slate-200 bg-white p-4">
+              <p class="schematic text-slate-500 mb-2">
+                Before — mass diagram: bookkeeping typed three times (interface
+                ≈ implementation)
+              </p>
+              <div
+                class="grid grid-cols-3 gap-3 h-[280px] items-end text-center"
+              >
+                <div>
+                  <div
+                    class="border-2 border-red-500 bg-red-50 h-[150px] rounded flex items-center justify-center text-xs px-1"
+                  >
+                    InferenceClient impl: resolve/reject fields, cancel,
+                    worker_log relay
+                  </div>
+                  <div
+                    class="border-2 border-slate-700 bg-slate-200 h-[100px] mt-1 rounded flex items-center justify-center text-xs px-1"
+                  >
+                    init · separate · cancel + 4 cb slots
+                  </div>
+                  <p class="schematic mt-1">shallow</p>
+                </div>
+                <div>
+                  <div
+                    class="border-2 border-red-500 bg-red-50 h-[140px] rounded flex items-center justify-center text-xs px-1"
+                  >
+                    BeatClient impl: same fields, same relay
+                  </div>
+                  <div
+                    class="border-2 border-slate-700 bg-slate-200 h-[95px] mt-1 rounded flex items-center justify-center text-xs px-1"
+                  >
+                    analyze · cancel
+                  </div>
+                  <p class="schematic mt-1">shallow</p>
+                </div>
+                <div>
+                  <div
+                    class="border-2 border-red-500 bg-red-50 h-[130px] rounded flex items-center justify-center text-xs px-1"
+                  >
+                    encodeMp3 impl: promise bridge, spawn fallback, MockWorker
+                    sniff
+                  </div>
+                  <div
+                    class="border-2 border-slate-700 bg-slate-200 h-[60px] mt-1 rounded flex items-center justify-center text-xs px-1"
+                  >
+                    encodeMp3()
+                  </div>
+                  <p class="schematic mt-1">shallow</p>
+                </div>
+              </div>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-white p-4">
+              <p class="schematic text-slate-500 mb-2">
+                After — one deep bridge, three thin adapters
+              </p>
+              <div class="relative h-[280px]">
+                <div
+                  class="mx-auto w-[88%] deep text-slate-100 border-2 border-slate-900 rounded px-4 py-4 h-[140px]"
+                >
+                  <p class="schematic text-slate-300">
+                    Worker job module — runJob(spawn, input, {onEvent, signal})
+                  </p>
+                  <div
+                    class="fade grid grid-cols-2 gap-1 mt-2 schematic text-slate-400"
+                  >
+                    <span>promise bridging once</span
+                    ><span>cancel protocol once</span>
+                    <span>worker_log → diagnostics relay once</span
+                    ><span>mock-worker handling once</span>
+                  </div>
+                </div>
+                <div
+                  class="absolute bottom-2 inset-x-0 flex justify-center gap-2 px-4"
+                >
+                  <div
+                    class="flex-1 border-2 border-slate-600 bg-slate-100 rounded px-2 py-1 text-center"
+                  >
+                    <p class="schematic">Inference adapter</p>
+                  </div>
+                  <div
+                    class="flex-1 border-2 border-slate-600 bg-slate-100 rounded px-2 py-1 text-center"
+                  >
+                    <p class="schematic">Beat adapter</p>
+                  </div>
+                  <div
+                    class="flex-1 border-2 border-slate-600 bg-slate-100 rounded px-2 py-1 text-center"
+                  >
+                    <p class="schematic">MP3 adapter</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="grid md:grid-cols-2 gap-6 text-sm">
+            <div>
+              <p class="schematic text-slate-500 mb-1">Problem</p>
+              <p>
+                beatClient.ts announces it in a comment — "mirrors the
+                established heavy-pass client↔worker pattern (see
+                inferenceClient.ts)" — and mp3Encoder.ts is the third copy:
+                resolve/reject fields, cancel bookkeeping, diagnostics relay.
+                Mock substitution exists in three dialects: a useMock flag (with
+                App sniffing NODE_ENV at the call site), a
+                <span class="font-mono">Worker.name === 'MockWorker'</span>
+                sniff, and injected-worker constructors.
+              </p>
+            </div>
+            <div>
+              <p class="schematic text-slate-500 mb-1">Solution</p>
+              <p>
+                One Worker job module crossing the worker seam once; the three
+                clients become thin typed adapters over it. Three adapters
+                already exist — the seam is demonstrably real, not hypothetical.
+              </p>
+            </div>
+          </div>
+          <ul
+            class="text-sm text-slate-700 grid md:grid-cols-2 gap-x-8 gap-y-1 list-disc pl-5"
+          >
+            <li>locality: the next worker pays the bridge once</li>
+            <li>test-env sniffing concentrates in the bridge</li>
+            <li>App stops choosing useMock — the seam absorbs it</li>
+            <li>
+              deletion test: delete a client's bookkeeping — it reappears
+              verbatim twice
+            </li>
+          </ul>
+        </article>
+
+        <!-- ============ C6: Engine interface ============ -->
+        <article
+          id="c6"
+          class="rounded-xl border border-slate-200 bg-white p-8 space-y-6"
+        >
+          <div class="flex items-start justify-between gap-4 flex-wrap">
+            <h2 class="font-serif text-2xl">
+              6 · Shrink the Stem Player engine interface: 35 methods → commands
+              + one snapshot
+            </h2>
+            <div class="flex gap-2 shrink-0">
+              <span
+                class="text-xs font-semibold px-3 py-1 rounded-full bg-slate-200 text-slate-700"
+                >Speculative</span
+              >
+              <span
+                class="text-xs px-3 py-1 rounded-full bg-slate-100 text-slate-600"
+                >in-process</span
+              >
+            </div>
+          </div>
+          <p class="font-mono text-sm text-slate-600">
+            src/lib/stemPlayerEngine.ts:563–1272 (public surface) · consumed by
+            src/components/StemPlayer.tsx · 42 tests in stemPlayerEngine.test.ts
+          </p>
+          <div class="grid md:grid-cols-2 gap-6">
+            <div class="rounded-lg border border-slate-200 bg-white p-4">
+              <p class="schematic text-slate-500 mb-2">
+                Before — mass diagram: the interface walks beside the
+                implementation
+              </p>
+              <div class="flex gap-8 h-[270px] items-end justify-center">
+                <div class="text-center">
+                  <div
+                    class="w-40 border-2 border-slate-700 bg-slate-200 h-[210px] rounded flex flex-col items-center justify-center gap-0.5 text-[10px] px-2"
+                  >
+                    <span>get·set · toggle · subscribe</span>
+                    <span class="text-slate-500"
+                      >~35 public methods: gain-node get/set pairs, mute/solo +
+                      toggle pairs, click-track triples, tempo/pitch/formant
+                      pairs, 4 subscribe channels</span
+                    >
+                  </div>
+                  <p class="schematic mt-1">interface</p>
+                </div>
+                <div class="text-center">
+                  <div
+                    class="w-40 deep border-2 border-slate-900 rounded h-[230px] flex items-end justify-center pb-2"
+                  >
+                    <span class="text-slate-300 text-xs px-2"
+                      >worklet · wsola · fallback sources · click synthesis ·
+                      level sampling</span
+                    >
+                  </div>
+                  <p class="schematic mt-1">implementation (genuinely deep)</p>
+                </div>
+              </div>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-white p-4">
+              <p class="schematic text-slate-500 mb-2">
+                After — command-shaped interface over the same implementation
+              </p>
+              <div class="flex gap-8 h-[270px] items-end justify-center">
+                <div class="text-center">
+                  <div
+                    class="w-40 border-2 border-slate-700 bg-slate-100 rounded h-[86px] flex flex-col items-center justify-center gap-0.5 text-[10px] px-2"
+                  >
+                    <span>play · pause · seek</span>
+                    <span
+                      >applyMixer(partial) · applyTimeStretch(partial) ·
+                      applyClickTrack(partial)</span
+                    >
+                    <span>snapshot() · subscribe(listener)</span>
+                  </div>
+                  <p class="schematic mt-1">interface ≈ 8</p>
+                </div>
+                <div class="text-center">
+                  <div
+                    class="w-40 deep border-2 border-slate-900 rounded h-[230px] flex items-end justify-center pb-2 fade"
+                  >
+                    <span class="text-slate-300 text-xs px-2"
+                      >unchanged implementation — setters become internal</span
+                    >
+                  </div>
+                  <p class="schematic mt-1">implementation</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="grid md:grid-cols-2 gap-6 text-sm">
+            <div>
+              <p class="schematic text-slate-500 mb-1">Problem</p>
+              <p>
+                The engine's implementation is deep (worklet, WSOLA, fallback
+                sources, click synthesis), but its interface is shallow: ~35
+                thin get/set/toggle methods and four subscribe channels.
+                StemPlayer re-mirrors nearly every fact into React state, and
+                callers must learn the full method map to touch playback at all.
+              </p>
+            </div>
+            <div>
+              <p class="schematic text-slate-500 mb-1">Solution</p>
+              <p>
+                Collapses the pairs: partial-state commands in, one snapshot
+                out, one subscription. Toggle semantics (ADR-0012's per-Stem
+                solo/mute exclusivity) move inside the module where the gain
+                matrix already enforces them.
+              </p>
+            </div>
+          </div>
+          <ul
+            class="text-sm text-slate-700 grid md:grid-cols-2 gap-x-8 gap-y-1 list-disc pl-5"
+          >
+            <li>leverage: 35-method map → 8 verbs at the seam</li>
+            <li>StemPlayer's mirror states shrink with the interface</li>
+            <li>
+              speculative: 42 tests pin the current surface — do C1 first, it
+              lowers the blast radius
+            </li>
+          </ul>
+        </article>
+
+        <!-- ============ Detritus ============ -->
+        <section
+          class="rounded-xl border border-slate-200 bg-white p-8 space-y-4"
+        >
+          <h2 class="font-serif text-xl">
+            Pass-through detritus (fold into any commit that touches these
+            files)
+          </h2>
+          <ul class="text-sm text-slate-700 list-disc pl-5 space-y-1">
+            <li>
+              <span class="font-mono">src/components/StemTrack.tsx</span> — a
+              3-line re-export of StemStrip for "backwards compatibility" with
+              zero importers. Deletion test: complexity vanishes entirely.
+              Delete it.
+            </li>
+            <li>
+              <span class="font-mono">formatTime</span> (StemPlayer.tsx:124) vs
+              <span class="font-mono">formatTransportTime</span> (App.tsx:112) —
+              one <span class="font-mono">mm:ss</span> formatter typed twice,
+              already drifting (NaN clamp in one, floor in the other). Fold into
+              one utility before the drift becomes a visible clock disagreement.
+            </li>
+          </ul>
+        </section>
+
+        <!-- ============ Top recommendation ============ -->
+        <section
+          id="top-recommendation"
+          class="rounded-xl border-2 border-emerald-500 bg-emerald-50 p-8 space-y-3"
+        >
+          <p class="schematic text-emerald-700">Top recommendation</p>
+          <h2 class="font-serif text-2xl">
+            1 · Collapse the engine→App transport mirroring into one Transport
+            snapshot
+          </h2>
+          <p class="text-sm text-slate-700 max-w-3xl">
+            It sits on the repo's hottest wiring — every stitch-skin footer
+            commit re-edits the mirror states, the mutable ref, and the footer
+            JSX — and it is the only candidate where the interface is the test
+            surface today blocked by full-App renders with AudioContext
+            swapping. The ADR-0013 machinery (one Playhead channel, bridge
+            cadence rules) survives unchanged; the deepening concentrates it. Do
+            it before candidate 6: the Transport snapshot is exactly the seam
+            the engine's interface shrinks against.
+          </p>
+          <a href="#c1" class="inline-block text-sm text-emerald-800 underline"
+            >Jump to candidate 1 →</a
+          >
+        </section>
+      </section>
+    </main>
+  </body>
+</html>

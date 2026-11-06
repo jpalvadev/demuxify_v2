@@ -93,11 +93,11 @@ describe("Mobile Lightweight Model End-to-End Integration", () => {
     expect(engine.getDuration()).toBeCloseTo(1.0);
 
     // Apply time-stretch and pitch shifting
-    engine.setTempo(1.25);
-    expect(engine.getTempo()).toBe(1.25);
+    engine.applyTimeStretch({ tempo: 1.25 });
+    expect(engine.snapshot().timeStretch.tempo).toBe(1.25);
 
-    engine.setPitch(3); // +3 semitones
-    expect(engine.getPitch()).toBe(3);
+    engine.applyTimeStretch({ pitch: 3 }); // +3 semitones
+    expect(engine.snapshot().timeStretch.pitch).toBe(3);
 
     engine.dispose();
   });

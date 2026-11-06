@@ -173,8 +173,6 @@ export interface StemPlayerEngineOptions {
 }
 
 export type PositionListener = (timeSec: number) => void;
-export type StateListener = (state: StemMixerStates) => void;
-export type TimeStretchListener = (state: TimeStretchState) => void;
 
 // Stereo Peak Meters (footer transport, 2026-11-05 user fix): post-fader L/R
 // meter levels normalized to 0..1 for the footer's peak pips. The scale floor
@@ -185,6 +183,102 @@ export interface StereoPeakLevels {
   right: number;
 }
 export type LevelsListener = (levels: StereoPeakLevels) => void;
+
+// Engine Command Surface (ADR-0016): ONE read side. Every fact the Stem Player
+// shows is one snapshot read at one instant — published only when a fact
+// actually changes, with sub-objects cloned at publish so a reader can never
+// mutate engine state through it. transportBridge.ts's snapshotEquals is the
+// model: an equal snapshot never publishes and never mints a new object, so
+// useSyncExternalStore readers never re-render on no-change. The Beat Grid is
+// deliberately absent: shared stage machinery the lane follows, not Mixer State.
+export interface StemPlayerSnapshot {
+  playing: boolean;
+  playheadSec: number; // canonical Source Mix seconds (the Playhead)
+  duration: number;
+  masterVolume: number; // 0..1, the Master bus
+  stems: StemMixerStates; // per-Stem { volume, muted, solo }
+  clickTrack: ClickTrackMixerState; // { enabled, volume } — no mute, no solo
+  timeStretch: TimeStretchState; // { tempo, pitch, formantPreservation }
+  levels: StereoPeakLevels; // post-fader L/R, engine-coalesced
+  stretchMode: "signalsmith" | "wsola" | "basic";
+}
+
+export type SnapshotListener = (snapshot: StemPlayerSnapshot) => void;
+
+// applyMixer payload (ticket 01): per-Stem volume/mute/solo plus Master volume,
+// all optional — a control press sends only the fact it moves.
+export interface MixerCommand {
+  stems?: Partial<Record<StemName, Partial<StemMixerState>>>;
+  masterVolume?: number;
+}
+
+// applyTimeStretch payload (ticket 02): the whole Time-Stretch command —
+// tempo, Pitch-Shift, Formant Preservation, all optional. Quantization
+// (tempo to the shipped 0.05 grid, pitch to whole semitones) and the range
+// clamps resolve inside the verb, not in the UI.
+export interface TimeStretchCommand {
+  tempo?: number;
+  pitch?: number;
+  formantPreservation?: boolean;
+}
+
+// applyClickTrack payload (ticket 03): the Click Track lane facts — enabled
+// and volume, all optional; omitted facts stay untouched.
+export interface ClickTrackCommand {
+  enabled?: boolean;
+  volume?: number;
+}
+
+// Stem Player graph probe (ADR-0016, ticket 04): the interface's ONE node
+// exposure — the whole bundle the observables ride (master and per-Stem
+// gains, the click gain, the level analysers and taps, the active sources,
+// the stretch adapter, the Beat Grid). The nodes are the live graph's, not
+// snapshots: tests and the shell watch gain outcomes on the real nodes.
+export interface StemPlayerGraphProbe {
+  masterGain: GainNode;
+  stemGains: Record<StemName, GainNode>;
+  clickGain: GainNode | null;
+  analyser: AnalyserNode | null;
+  levelTaps: {
+    splitter: ChannelSplitterNode | null;
+    merger: AudioNode | null;
+    left: AnalyserNode | null;
+    right: AnalyserNode | null;
+  };
+  activeSources: AudioBufferSourceNode[];
+  stretchAdapter: MultiTrackStretchNode | null;
+  beatGrid: Float64Array | null;
+}
+
+function stemMixerStatesEqual(a: StemMixerStates, b: StemMixerStates): boolean {
+  return STEM_NAMES.every(
+    (stem) =>
+      a[stem].volume === b[stem].volume &&
+      a[stem].muted === b[stem].muted &&
+      a[stem].solo === b[stem].solo
+  );
+}
+
+function stemPlayerSnapshotsEqual(
+  a: StemPlayerSnapshot,
+  b: StemPlayerSnapshot
+): boolean {
+  return (
+    a.playing === b.playing &&
+    a.playheadSec === b.playheadSec &&
+    a.duration === b.duration &&
+    a.masterVolume === b.masterVolume &&
+    stemMixerStatesEqual(a.stems, b.stems) &&
+    a.clickTrack.enabled === b.clickTrack.enabled &&
+    a.clickTrack.volume === b.clickTrack.volume &&
+    a.timeStretch.tempo === b.timeStretch.tempo &&
+    a.timeStretch.pitch === b.timeStretch.pitch &&
+    a.timeStretch.formantPreservation === b.timeStretch.formantPreservation &&
+    a.levels.left === b.levels.left &&
+    a.levels.right === b.levels.right &&
+    a.stretchMode === b.stretchMode
+  );
+}
 
 // Peak meter scale: RMS in [-60, 0] dB maps linearly onto [0, 1].
 const PEAK_METER_FLOOR_DB = -60;
@@ -228,8 +322,9 @@ export class StemPlayerEngine {
 
   private animationFrameId: number | null = null;
   private positionListeners: Set<PositionListener> = new Set();
-  private stateListeners: Set<StateListener> = new Set();
-  private timeStretchListeners: Set<TimeStretchListener> = new Set();
+  // Engine Command Surface (ADR-0016): the ONE read channel.
+  private snapshotListeners: Set<SnapshotListener> = new Set();
+  private currentSnapshot: StemPlayerSnapshot | null = null;
 
   // Peak meter lane (2026-11-05): a sidecar tap off the master bus — a
   // ChannelSplitterNode feeding one AnalyserNode per channel, sinks only.
@@ -412,6 +507,11 @@ export class StemPlayerEngine {
     } else if (!options?.disableWorklet) {
       this.workletInitPromise = this.initAudioWorklet(sampleRate);
     }
+
+    // The first snapshot is minted at construction: snapshot() is always
+    // readable, even before any listener attaches (useSyncExternalStore
+    // semantics demand a sync, reference-stable read from the first render).
+    this.currentSnapshot = this.buildSnapshot();
   }
 
   private async initAudioWorklet(sampleRate: number): Promise<void> {
@@ -438,6 +538,10 @@ export class StemPlayerEngine {
 
           this.stretchAdapter = adapter;
           this.useWorklet = true;
+          // stretchMode is a snapshot fact: the signalsmith handoff changes it.
+          this.publish();
+          // stretchMode is a snapshot fact: the signalsmith handoff flips it.
+          this.publish();
 
           if (this.playing) {
             const curTime = this.getCurrentTime();
@@ -532,6 +636,10 @@ export class StemPlayerEngine {
 
       this.workletNode = workletNode;
       this.useWorklet = true;
+      // stretchMode is a snapshot fact: the WSOLA handoff changes it.
+      this.publish();
+      // stretchMode is a snapshot fact: the WSOLA handoff flips it.
+      this.publish();
 
       // If active playback was started via fallback sources while worklet was loading,
       // seamlessly migrate active playback into the worklet without ghost sources!
@@ -557,23 +665,9 @@ export class StemPlayerEngine {
       );
       this.useWorklet = false;
       this.workletNode = null;
+      // stretchMode settles to 'basic' — the snapshot reports it.
+      this.publish();
     }
-  }
-
-  public getAudioContext(): AudioContext {
-    return this.audioContext;
-  }
-
-  public getMasterGainNode(): GainNode {
-    return this.masterGainNode;
-  }
-
-  public getStemGainNode(stem: StemName): GainNode {
-    return this.stemGainNodes[stem];
-  }
-
-  public getStemBuffer(stem: StemName): AudioBuffer {
-    return this.stemBuffers[stem];
   }
 
   public getDuration(): number {
@@ -594,11 +688,86 @@ export class StemPlayerEngine {
     return this.playing;
   }
 
-  public getStemState(stem: StemName): StemMixerState {
-    return { ...this.stemStates[stem] };
+  // --- Engine Command Surface read side (ADR-0016) ---------------------------
+  // One snapshot, one subscription, publish-on-change. transportBridge.ts's
+  // snapshotEquals discipline: an equal snapshot never publishes and never
+  // mints a new object, so useSyncExternalStore readers never re-render on
+  // no-change; sub-objects are cloned at publish (getAllStemStates/
+  // getClickTrackState/getLevels each return a fresh copy), so a reader can
+  // never mutate engine state through the snapshot.
+
+  private buildSnapshot(): StemPlayerSnapshot {
+    return {
+      playing: this.playing,
+      playheadSec: this.getCurrentTime(),
+      duration: this.duration,
+      masterVolume: this.masterVolume,
+      stems: this.getAllStemStates(),
+      clickTrack: this.getClickTrackState(),
+      timeStretch: {
+        tempo: this.tempo,
+        pitch: this.pitch,
+        formantPreservation: this.formantPreservation,
+      },
+      levels: this.getLevels(),
+      stretchMode: this.getStretchMode(),
+    };
   }
 
-  public getAllStemStates(): StemMixerStates {
+  private publish(): void {
+    const next = this.buildSnapshot();
+    const current = this.currentSnapshot;
+    if (current !== null && stemPlayerSnapshotsEqual(current, next)) {
+      return; // equal → no publish, no new object
+    }
+    this.currentSnapshot = next;
+    for (const listener of this.snapshotListeners) {
+      listener(next);
+    }
+  }
+
+  /** The sync read: the current snapshot, reference-stable between publishes. */
+  public snapshot(): StemPlayerSnapshot {
+    if (this.currentSnapshot === null) {
+      this.currentSnapshot = this.buildSnapshot();
+    }
+    return this.currentSnapshot;
+  }
+
+  /** The engine's one read channel: called on every published change. */
+  public subscribe(listener: SnapshotListener): () => void {
+    this.snapshotListeners.add(listener);
+    listener(this.snapshot());
+    return () => {
+      this.snapshotListeners.delete(listener);
+    };
+  }
+
+  /**
+   * The graph probe (ADR-0016, ticket 04): the single accessor handing out
+   * the node bundle. A fresh bundle per call; the nodes inside are the live
+   * graph's own, so gain outcomes are watched on the very nodes the sound
+   * passes through.
+   */
+  public graphProbe(): StemPlayerGraphProbe {
+    return {
+      masterGain: this.masterGainNode,
+      stemGains: { ...this.stemGainNodes },
+      clickGain: this.clickGainNode,
+      analyser: this.analyserL,
+      levelTaps: {
+        splitter: this.splitterNode,
+        merger: this.mergerNode,
+        left: this.analyserL,
+        right: this.analyserR,
+      },
+      activeSources: [...this.activeSources],
+      stretchAdapter: this.stretchAdapter,
+      beatGrid: this.beatGrid,
+    };
+  }
+
+  private getAllStemStates(): StemMixerStates {
     return {
       vocals: { ...this.stemStates.vocals },
       drums: { ...this.stemStates.drums },
@@ -607,25 +776,22 @@ export class StemPlayerEngine {
     };
   }
 
-  public getMasterVolume(): number {
-    return this.masterVolume;
-  }
-
   public setMasterVolume(volume: number): void {
     this.masterVolume = Math.max(0, Math.min(1, volume));
     this.masterGainNode.gain.setValueAtTime(
       this.masterVolume,
       this.audioContext.currentTime
     );
+    this.publish();
   }
 
-  public setStemVolume(stem: StemName, volume: number): void {
+  private setStemVolume(stem: StemName, volume: number): void {
     this.stemStates[stem].volume = Math.max(0, Math.min(1, volume));
     this.applyGainMatrix();
     this.notifyState();
   }
 
-  public setStemMute(stem: StemName, muted: boolean): void {
+  private setStemMute(stem: StemName, muted: boolean): void {
     this.stemStates[stem].muted = muted;
     // ADR-0012: solo and mute are per-Stem exclusive, last press wins —
     // pressing mute drops a held solo, so the matrix never falls to the
@@ -635,11 +801,7 @@ export class StemPlayerEngine {
     this.notifyState();
   }
 
-  public toggleStemMute(stem: StemName): void {
-    this.setStemMute(stem, !this.stemStates[stem].muted);
-  }
-
-  public setStemSolo(stem: StemName, solo: boolean): void {
+  private setStemSolo(stem: StemName, solo: boolean): void {
     this.stemStates[stem].solo = solo;
     // ADR-0012: pressing solo clears a held mute — the last press wins.
     if (solo) this.stemStates[stem].muted = false;
@@ -647,8 +809,61 @@ export class StemPlayerEngine {
     this.notifyState();
   }
 
-  public toggleStemSolo(stem: StemName): void {
-    this.setStemSolo(stem, !this.stemStates[stem].solo);
+  /**
+   * The mixer command (ADR-0016): per-Stem { volume?, muted?, solo? } plus
+   * Master volume, applied in one step with one publish. ADR-0012's per-Stem
+   * exclusivity resolves inside the command — setStemMute/setStemSolo (the
+   * enforcement names the ADR cites) clear the opposite flag, and the gain
+   * matrix the setters drive already silences the solo-shaded lanes.
+   */
+  public applyMixer(command: MixerCommand): void {
+    if (command.stems) {
+      for (const stem of STEM_NAMES) {
+        const partial = command.stems[stem];
+        if (!partial) continue;
+        if (partial.volume !== undefined)
+          this.setStemVolume(stem, partial.volume);
+        if (partial.muted !== undefined) this.setStemMute(stem, partial.muted);
+        if (partial.solo !== undefined) this.setStemSolo(stem, partial.solo);
+      }
+    }
+    if (command.masterVolume !== undefined) {
+      this.setMasterVolume(command.masterVolume);
+    }
+    this.publish();
+  }
+
+  /**
+   * The Time-Stretch command (ADR-0016): tempo, Pitch-Shift, and Formant
+   * Preservation in one step. Quantization and clamps resolve inside the
+   * verb — tempo lands on the shipped slider's 0.05 grid inside [0.5, 2.0],
+   * pitch on whole semitones inside [-12, 12]; the snapshot then reports the
+   * applied value. The shipped reset is the { tempo: 1, pitch: 0 } command:
+   * it routes to the reset fact exactly as the button performed it (adapter
+   * handoff, worklet reset beat) and never touches Formant Preservation.
+   */
+  public applyTimeStretch(command: TimeStretchCommand): void {
+    if (
+      command.tempo === 1 &&
+      command.pitch === 0 &&
+      command.formantPreservation === undefined
+    ) {
+      this.resetTimeStretch();
+      this.publish();
+      return;
+    }
+    if (command.tempo !== undefined) {
+      const clamped = Math.max(0.5, Math.min(2.0, command.tempo));
+      this.setTempo(Math.round(clamped * 20) / 20);
+    }
+    if (command.pitch !== undefined) {
+      const clamped = Math.max(-12, Math.min(12, command.pitch));
+      this.setPitch(Math.round(clamped));
+    }
+    if (command.formantPreservation !== undefined) {
+      this.setFormantPreservation(command.formantPreservation);
+    }
+    this.publish();
   }
 
   // --- Click Track lane (ADR-0010) -----------------------------------------
@@ -657,14 +872,6 @@ export class StemPlayerEngine {
 
   public getClickTrackState(): ClickTrackMixerState {
     return { ...this.clickTrackState };
-  }
-
-  public getBeatGrid(): Float64Array | null {
-    return this.beatGrid;
-  }
-
-  public getClickGainNode(): GainNode | null {
-    return this.clickGainNode;
   }
 
   public setBeatGrid(beatGridSec: Float64Array | null): void {
@@ -690,10 +897,7 @@ export class StemPlayerEngine {
     } else {
       this.stopClickSource();
     }
-  }
-
-  public toggleClickTrack(): void {
-    this.setClickTrackEnabled(!this.clickTrackState.enabled);
+    this.publish();
   }
 
   // Mix Rail Tidy-Up (ticket 03, ADR-0010 Amendment): there is no setClickTrackMuted
@@ -701,6 +905,21 @@ export class StemPlayerEngine {
   public setClickTrackVolume(volume: number): void {
     this.clickTrackState.volume = Math.max(0, Math.min(1, volume));
     this.applyClickGain();
+    this.publish();
+  }
+
+  /**
+   * The Click Track lane command (ADR-0016, ticket 03): enabled and volume in
+   * one call. Each written fact publishes through the setters' equality-gated
+   * publish — a no-change command publishes nothing, and the lane stays inert
+   * without a Beat Grid exactly as the raw setters kept it. Toggling is the
+   * UI reading its snapshot's `enabled` and sending the flip; the engine has
+   * no opinion about the current state the way a toggle verb would.
+   */
+  public applyClickTrack(command: ClickTrackCommand): void {
+    if (command.enabled !== undefined)
+      this.setClickTrackEnabled(command.enabled);
+    if (command.volume !== undefined) this.setClickTrackVolume(command.volume);
   }
 
   private applyClickGain(): void {
@@ -1013,33 +1232,7 @@ export class StemPlayerEngine {
     };
   }
 
-  public subscribeState(listener: StateListener): () => void {
-    this.stateListeners.add(listener);
-    listener(this.getAllStemStates());
-    return () => {
-      this.stateListeners.delete(listener);
-    };
-  }
-
-  public getAnalyserNode(): AnalyserNode | null {
-    return this.analyserL;
-  }
-
-  public getLevelTapNodes(): {
-    splitter: ChannelSplitterNode | null;
-    merger: AudioNode | null;
-    left: AnalyserNode | null;
-    right: AnalyserNode | null;
-  } {
-    return {
-      splitter: this.splitterNode,
-      merger: this.mergerNode,
-      left: this.analyserL,
-      right: this.analyserR,
-    };
-  }
-
-  public getLevels(): StereoPeakLevels {
+  private getLevels(): StereoPeakLevels {
     return { left: this.smoothedLevelL, right: this.smoothedLevelR };
   }
 
@@ -1071,6 +1264,7 @@ export class StemPlayerEngine {
     for (const listener of this.levelsListeners) {
       listener(levels);
     }
+    this.publish();
   }
 
   private sampleChannelAnalyser(
@@ -1145,20 +1339,16 @@ export class StemPlayerEngine {
     for (const listener of this.positionListeners) {
       listener(curTime);
     }
+    // ADR-0016: the Playhead rides the one snapshot (the player already
+    // re-renders per frame today — the cadence is not new).
+    this.publish();
   }
 
   private notifyState(): void {
-    const states = this.getAllStemStates();
-    for (const listener of this.stateListeners) {
-      listener(states);
-    }
+    this.publish();
   }
 
-  public getTempo(): number {
-    return this.tempo;
-  }
-
-  public setTempo(tempo: number): void {
+  private setTempo(tempo: number): void {
     const clamped = Math.max(0.5, Math.min(2.0, tempo));
     if (this.playing) {
       this.currentOffset = this.getCurrentTime();
@@ -1204,11 +1394,7 @@ export class StemPlayerEngine {
     this.notifyTimeStretch();
   }
 
-  public getPitch(): number {
-    return this.pitch;
-  }
-
-  public setPitch(semitones: number): void {
+  private setPitch(semitones: number): void {
     const clamped = Math.max(-12, Math.min(12, semitones));
     this.pitch = clamped;
     if (
@@ -1223,11 +1409,7 @@ export class StemPlayerEngine {
     this.notifyTimeStretch();
   }
 
-  public isFormantPreservationEnabled(): boolean {
-    return this.formantPreservation;
-  }
-
-  public setFormantPreservation(enabled: boolean): void {
+  private setFormantPreservation(enabled: boolean): void {
     this.formantPreservation = enabled;
     if (
       this.useWorklet &&
@@ -1239,7 +1421,10 @@ export class StemPlayerEngine {
     this.notifyTimeStretch();
   }
 
-  public resetTimeStretch(): void {
+  // ADR-0016 (ticket 02): the public form left the interface — the shipped
+  // reset fact now rides the engine as applyTimeStretch({ tempo: 1, pitch: 0 }),
+  // and this is its private implementation.
+  private resetTimeStretch(): void {
     this.setTempo(1.0);
     this.setPitch(0);
     if (
@@ -1254,42 +1439,17 @@ export class StemPlayerEngine {
     }
   }
 
-  public getTimeStretch(): TimeStretchState {
-    return {
-      tempo: this.tempo,
-      pitch: this.pitch,
-    };
-  }
-
-  public subscribeTimeStretch(listener: TimeStretchListener): () => void {
-    this.timeStretchListeners.add(listener);
-    listener(this.getTimeStretch());
-    return () => {
-      this.timeStretchListeners.delete(listener);
-    };
-  }
-
   private notifyTimeStretch(): void {
-    const state = this.getTimeStretch();
-    for (const listener of this.timeStretchListeners) {
-      listener(state);
-    }
-  }
-
-  public isUsingWorklet(): boolean {
-    return (
-      this.useWorklet &&
-      (this.workletNode !== null ||
-        (this.stretchAdapter !== null && !this.stretchAdapter.isFallback))
-    );
+    this.publish();
   }
 
   /**
    * Active time-stretch pipeline: 'signalsmith' (WASM formant-aware),
    * 'wsola' (in-process WSOLA worklet), or 'basic' (playbackRate last resort,
-   * where pitch control is inert).
+   * where pitch control is inert). ADR-0016 (ticket 02): rides the snapshot —
+   * the public getter left the interface.
    */
-  public getStretchMode(): "signalsmith" | "wsola" | "basic" {
+  private getStretchMode(): "signalsmith" | "wsola" | "basic" {
     if (
       this.useWorklet &&
       this.stretchAdapter &&
@@ -1303,15 +1463,13 @@ export class StemPlayerEngine {
     return "basic";
   }
 
-  public getStretchAdapter(): MultiTrackStretchNode | null {
-    return this.stretchAdapter;
-  }
-
-  public getActiveSources(): AudioBufferSourceNode[] {
-    return [...this.activeSources];
-  }
-
-  public async waitForWorkletReady(): Promise<boolean> {
+  /**
+   * ADR-0016 (ticket 02): the single async readiness verb — resolves once the
+   * stretch pipeline init has settled (wsola worklet or signalsmith adapter).
+   * The active mode rides the snapshot; the boolean readiness probe
+   * waitForWorkletReady left the interface.
+   */
+  public async waitForReady(): Promise<void> {
     if (this.workletInitPromise) {
       try {
         await this.workletInitPromise;
@@ -1319,7 +1477,6 @@ export class StemPlayerEngine {
         // Ignored
       }
     }
-    return this.isUsingWorklet();
   }
 
   public dispose(): void {
@@ -1327,9 +1484,8 @@ export class StemPlayerEngine {
     this.pause();
     this.stopPositionLoop();
     this.positionListeners.clear();
-    this.stateListeners.clear();
-    this.timeStretchListeners.clear();
     this.levelsListeners.clear();
+    this.snapshotListeners.clear();
 
     for (const tapNode of [
       this.splitterNode,
