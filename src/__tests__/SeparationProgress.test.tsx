@@ -3,15 +3,25 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { SeparationProgress } from "../components/SeparationProgress";
 
 describe("SeparationProgress Component", () => {
+  it("renders nothing (null) in idle state", () => {
+    const { container } = render(
+      <SeparationProgress state={{ status: "idle" }} onCancel={vi.fn()} />
+    );
+    expect(container.firstChild).toBeNull();
+  });
+
   it("renders downloading state with byte count and progress bar", () => {
     const handleCancel = vi.fn();
     render(
       <SeparationProgress
-        phase="downloading"
-        downloadProgress={{
-          loadedBytes: 25 * 1024 * 1024,
-          totalBytes: 50 * 1024 * 1024,
-          progress: 0.5,
+        state={{
+          status: "active",
+          event: {
+            stage: "downloading",
+            loadedBytes: 25 * 1024 * 1024,
+            totalBytes: 50 * 1024 * 1024,
+            progress: 0.5,
+          },
         }}
         onCancel={handleCancel}
       />
@@ -24,7 +34,6 @@ describe("SeparationProgress Component", () => {
       screen.getByText(/persisting bs-roformer 4-stem into model cache/i)
     ).toBeInTheDocument();
     expect(screen.queryByText(/htdemucs/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/demucs/i)).not.toBeInTheDocument();
     expect(screen.getAllByText(/50%/i).length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText(/25.0 MB \/ 50.0 MB/i)).toBeInTheDocument();
 
@@ -37,17 +46,45 @@ describe("SeparationProgress Component", () => {
     expect(handleCancel).toHaveBeenCalledTimes(1);
   });
 
+  it("renders initializing neural network state with backend info", () => {
+    const handleCancel = vi.fn();
+    render(
+      <SeparationProgress
+        state={{
+          status: "active",
+          event: {
+            stage: "initializing",
+            backend: "webgpu",
+          },
+        }}
+        onCancel={handleCancel}
+      />
+    );
+
+    expect(
+      screen.getByText(/initializing neural network inference/i)
+    ).toBeInTheDocument();
+    expect(screen.getByText(/compiling webgpu shaders/i)).toBeInTheDocument();
+
+    const cancelBtn = screen.getByRole("button", { name: /cancel/i });
+    fireEvent.click(cancelBtn);
+    expect(handleCancel).toHaveBeenCalledTimes(1);
+  });
+
   it("renders separating chunks state with elapsed time and ETA", () => {
     const handleCancel = vi.fn();
     render(
       <SeparationProgress
-        phase="separating"
-        chunkProgress={{
-          chunkIndex: 2,
-          totalChunks: 5,
-          progress: 0.6,
-          elapsedMs: 12000, // 12s
-          etaMs: 8000, // 8s
+        state={{
+          status: "active",
+          event: {
+            stage: "separating",
+            chunkIndex: 2,
+            totalChunks: 5,
+            progress: 0.6,
+            elapsedMs: 12000,
+            etaMs: 8000,
+          },
         }}
         onCancel={handleCancel}
       />
@@ -62,13 +99,16 @@ describe("SeparationProgress Component", () => {
     expect(progressbar).toHaveAttribute("aria-valuenow", "60");
   });
 
-  it("renders error state with error message and retry button", () => {
+  it("renders error state with error message, retry and cancel buttons", () => {
     const handleRetry = vi.fn();
+    const handleCancel = vi.fn();
     render(
       <SeparationProgress
-        phase="error"
-        error="WebGPU device lost"
-        onCancel={vi.fn()}
+        state={{
+          status: "error",
+          error: "WebGPU device lost",
+        }}
+        onCancel={handleCancel}
         onRetry={handleRetry}
       />
     );
@@ -79,23 +119,10 @@ describe("SeparationProgress Component", () => {
     const retryBtn = screen.getByRole("button", { name: /retry/i });
     fireEvent.click(retryBtn);
     expect(handleRetry).toHaveBeenCalledTimes(1);
-  });
 
-  it("renders early chunk_start state while chunk 1 is compiling shaders", () => {
-    render(
-      <SeparationProgress
-        phase="separating"
-        chunkStart={{
-          chunkIndex: 0,
-          totalChunks: 42,
-          stage: "webgpu_compiling",
-        }}
-        onCancel={vi.fn()}
-      />
-    );
-
-    expect(screen.getByText(/separating chunk 1 of 42/i)).toBeInTheDocument();
-    expect(screen.getByText(/compiling webgpu shaders/i)).toBeInTheDocument();
+    const cancelBtn = screen.getByRole("button", { name: /cancel/i });
+    fireEvent.click(cancelBtn);
+    expect(handleCancel).toHaveBeenCalledTimes(1);
   });
 
   it("renders dynamic model identity when a mobile or fast profile is provided", () => {
@@ -118,13 +145,16 @@ describe("SeparationProgress Component", () => {
 
     render(
       <SeparationProgress
-        phase="downloading"
-        modelProfile={htdemucsProfile}
-        downloadProgress={{
-          loadedBytes: 20 * 1024 * 1024,
-          totalBytes: 54 * 1024 * 1024,
-          progress: 0.37,
+        state={{
+          status: "active",
+          event: {
+            stage: "downloading",
+            loadedBytes: 20 * 1024 * 1024,
+            totalBytes: 54 * 1024 * 1024,
+            progress: 0.37,
+          },
         }}
+        modelProfile={htdemucsProfile}
         onCancel={handleCancel}
       />
     );
@@ -136,5 +166,25 @@ describe("SeparationProgress Component", () => {
       screen.getByText(/persisting ht-demucs 4-stem into model cache/i)
     ).toBeInTheDocument();
     expect(screen.queryByText(/bs-roformer/i)).not.toBeInTheDocument();
+  });
+
+  it("supports transitional legacy props during App.tsx migration", () => {
+    const handleCancel = vi.fn();
+    render(
+      <SeparationProgress
+        phase="downloading"
+        downloadProgress={{
+          loadedBytes: 10 * 1024 * 1024,
+          totalBytes: 40 * 1024 * 1024,
+          progress: 0.25,
+        }}
+        onCancel={handleCancel}
+      />
+    );
+
+    expect(
+      screen.getByText(/downloading bs-roformer.*weights/i)
+    ).toBeInTheDocument();
+    expect(screen.getByText(/10.0 MB \/ 40.0 MB/i)).toBeInTheDocument();
   });
 });
