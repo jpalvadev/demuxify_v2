@@ -278,10 +278,9 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
   const pitch = snapshot.timeStretch.pitch;
   const formantPreservation =
     snapshot.timeStretch.formantPreservation !== false;
-  // Click Track lane state lives here (not in the mixer states): domain-separate.
-  const [clickTrack, setClickTrack] = useState<ClickTrackMixerState>(
-    initialClickTrack ?? CLICK_TRACK_DEFAULT
-  );
+  // ADR-0016 (ticket 03): the Click Track lane rides the snapshot too — the
+  // lane's facts are engine-owned, domain-separate from the Stem mixer faces.
+  const clickTrack = snapshot.clickTrack;
 
   // Initialize engine
   useEffect(() => {
@@ -316,7 +315,7 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
     if (initialCurrentTime !== undefined) {
       setCurrentTime(initialCurrentTime);
     }
-    setClickTrack(engine.getClickTrackState());
+    // The rail reports its starting state out on attach (Session persistence).
     onClickTrackState?.(engine.getClickTrackState());
 
     const unsubPos = engine.subscribePosition((time) => {
@@ -349,13 +348,12 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
   }, [stems, sampleRate, providedDuration, audioContext]);
 
   // Beat Grid (ADR-0010): swapping the grid replaces the clicks' positions; a
-  // lane with no grid has no clicks.
+  // lane with no grid has no clicks. No lane facts change on a grid swap, so
+  // there is nothing to report out (ADR-0016: reports ride fact changes).
   useEffect(() => {
     const engine = engineRef.current;
     if (!engine) return;
     engine.setBeatGrid(beatGrid ?? null);
-    setClickTrack(engine.getClickTrackState());
-    onClickTrackState?.(engine.getClickTrackState());
   }, [beatGrid]);
 
   // Spacebar Hotkey listener for Play/Pause
@@ -596,9 +594,10 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
   const handleToggleClickTrack = useCallback(() => {
     const engine = engineRef.current;
     if (!engine) return;
-    engine.toggleClickTrack();
-    setClickTrack(engine.getClickTrackState());
-    onClickTrackState?.(engine.getClickTrackState());
+    // ADR-0016 (ticket 03): the flip is a command — read the lane's current
+    // enabled fact, send the opposite, echo the post-command snapshot out.
+    engine.applyClickTrack({ enabled: !engine.snapshot().clickTrack.enabled });
+    onClickTrackState?.(engine.snapshot().clickTrack);
   }, [onClickTrackState]);
 
   // Mix Rail Tidy-Up (ticket 03): no handleToggleClickTrackMute — the rail
@@ -608,9 +607,8 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
     (volume: number) => {
       const engine = engineRef.current;
       if (!engine) return;
-      engine.setClickTrackVolume(volume);
-      setClickTrack(engine.getClickTrackState());
-      onClickTrackState?.(engine.getClickTrackState());
+      engine.applyClickTrack({ volume });
+      onClickTrackState?.(engine.snapshot().clickTrack);
     },
     [onClickTrackState]
   );

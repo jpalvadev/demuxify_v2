@@ -13,26 +13,44 @@ preservation).
 
 **Blocked by:** 01 (snapshot + subscribe), 02 (verb list settled before lane plumbing lands).
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] `applyClickTrack(partial)` on the verb list; lane contract facts (inert-without-grid, uniform taps,
+- [x] `applyClickTrack(partial)` on the verb list; lane contract facts (inert-without-grid, uniform taps,
       0 = silence) verified unchanged in the engine suite
-- [ ] `setBeatGrid(grid)` verb replaces the current grid-replacement path; re-lock keeps mixer + Playhead
+- [x] `setBeatGrid(grid)` verb replaces the current grid-replacement path; re-lock keeps mixer + Playhead
       untouched (pinned behavior); `getBeatGrid` leaves the interface at ticket 04's purge
-- [ ] `StemPlayer`: clickTrack mirror state deleted; lane faces read `snapshot.clickTrack`;
+- [x] `StemPlayer`: clickTrack mirror state deleted; lane faces read `snapshot.clickTrack`;
       `onClickTrackState` payload byte-identical, initial emit survives
-- [ ] Grid-swap echo rule: the effect that restates an unchanged lane state is deleted; pinned-echo
+- [x] Grid-swap echo rule: the effect that restates an unchanged lane state is deleted; pinned-echo
       exceptions named on this ticket if any test demands them
-- [ ] Retarget roster touched here: engine suite's lane tests onto command+snapshot (the `mobileLightweightEndToEnd`
+- [x] Retarget roster touched here: engine suite's lane tests onto command+snapshot (the `mobileLightweightEndToEnd`
       suite is already retargeted on 02; re-verify)
-- [ ] Parity guards green untouched: `StemPlayer.test.tsx` (21 — the lane pins at 576–650 are the guard),
+- [x] Parity guards green untouched: `StemPlayer.test.tsx` (21 — the lane pins at 576–650 are the guard),
       `App.test.tsx` (60), `sessionStore.test.ts`
-- [ ] Beat-grid replays NOT required (spec: snap tolerance and ADR-0011 numbers untouched; this is a
+- [x] Beat-grid replays NOT required (spec: snap tolerance and ADR-0011 numbers untouched; this is a
       plumbing move — green parity guards are the proof)
-- [ ] Gates green (full chain, dist rebuilt); zero new ids; no view designed — record: "no new look
+- [x] Gates green (full chain, dist rebuilt); zero new ids; no view designed — record: "no new look
       rendered; skin byte-untouched"
 
 ## Comments
 
 - (agent, at authoring): Q16 settled the echo rules for this slice. The lane has no mute/solo facts —
   `ClickTrackMixerState` is `{ enabled, volume }` and stays that shape.
+- (agent, 2026-11-06, delivered): Engine gains `ClickTrackCommand { enabled?, volume? }` +
+  `applyClickTrack` — each written fact publishes through the setters' equality-gated publish, a
+  no-change command publishes nothing, and the lane stays inert without a grid exactly as the raw
+  setters kept it. `setBeatGrid(grid)` was already the swap verb and stands untouched. The toggle is
+  now the UI reading `snapshot().clickTrack.enabled` and sending the flip; the raw setters,
+  `toggleClickTrack`, and `getClickTrackState` stay public until ticket 04's purge.
+  `StemPlayer`: the lane `useState` mirror died — faces read `snapshot.clickTrack`; the mount effect
+  keeps its initial `onClickTrackState` emit (pinned at `StemPlayer.test.tsx:612`) and drops its
+  mirror seed; the `[beatGrid]` effect's echo (`setClickTrack` + `onClickTrackState`) is DELETED —
+  no pinned test consumes a grid-swap echo (the lane pins assert only `reported[0]` and the
+  last-report after a toggle), so the echo-rule exception list is empty. Handler echoes stay
+  byte-identical: `{ enabled, volume }` read post-command from `engine.snapshot().clickTrack`.
+  Engine suite retarget: all 13 lane calls (8 enable, 2 toggle flips, 5 volume) ride
+  `applyClickTrack`; contract pins (node/channel counts, live-playhead re-anchor, 0 = silence,
+  clamp, uniform bursts, rate lockstep) unchanged. One new verb-contract pin: equality-gated
+  publishes (one fact one publish, no-change = zero, clamp lands in the snapshot). Suite:
+  391/391 (390 + 1). Parity guards green with zero retargets; mobileE2E re-verified green.
+  Record: "no new look rendered; skin byte-untouched".

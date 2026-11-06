@@ -224,6 +224,13 @@ export interface TimeStretchCommand {
   formantPreservation?: boolean;
 }
 
+// applyClickTrack payload (ticket 03): the Click Track lane facts — enabled
+// and volume, all optional; omitted facts stay untouched.
+export interface ClickTrackCommand {
+  enabled?: boolean;
+  volume?: number;
+}
+
 function stemMixerStatesEqual(a: StemMixerStates, b: StemMixerStates): boolean {
   return STEM_NAMES.every(
     (stem) =>
@@ -902,6 +909,20 @@ export class StemPlayerEngine {
     this.clickTrackState.volume = Math.max(0, Math.min(1, volume));
     this.applyClickGain();
     this.publish();
+  }
+
+  /**
+   * The Click Track lane command (ADR-0016, ticket 03): enabled and volume in
+   * one call. Each written fact publishes through the setters' equality-gated
+   * publish — a no-change command publishes nothing, and the lane stays inert
+   * without a Beat Grid exactly as the raw setters kept it. Toggling is the
+   * UI reading its snapshot's `enabled` and sending the flip; the engine has
+   * no opinion about the current state the way a toggle verb would.
+   */
+  public applyClickTrack(command: ClickTrackCommand): void {
+    if (command.enabled !== undefined)
+      this.setClickTrackEnabled(command.enabled);
+    if (command.volume !== undefined) this.setClickTrackVolume(command.volume);
   }
 
   private applyClickGain(): void {

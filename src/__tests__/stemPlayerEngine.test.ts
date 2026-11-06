@@ -3,6 +3,7 @@ import {
   StemPlayerEngine,
   ClickTrackMixerState,
   StemMixerState,
+  StemPlayerSnapshot,
   TimeStretchState,
   CalibratedClickGrid,
   ClickCalibrationRejection,
@@ -1074,7 +1075,7 @@ describe("StemPlayerEngine", () => {
       });
       engine.setStemVolume("drums", 0.5);
 
-      engine.toggleClickTrack();
+      engine.applyClickTrack({ enabled: true });
       // One gain node added (4 Stems + master + click), one channel synthesized.
       expect(mockCtx.createGain).toHaveBeenCalledTimes(6);
       expect(mockCtx.createBuffer).toHaveBeenCalledTimes(5);
@@ -1090,7 +1091,7 @@ describe("StemPlayerEngine", () => {
       expect(engine.getActiveSources()).toHaveLength(5);
       expect(engine.getStemGainNode("drums").gain.value).toBe(0.5);
 
-      engine.toggleClickTrack();
+      engine.applyClickTrack({ enabled: false });
       // Only the click lane source is stopped: the Stems keep playing.
       const clickSource = mockCtx.createdSources[4];
       expect(clickSource.stop).toHaveBeenCalledTimes(1);
@@ -1107,7 +1108,7 @@ describe("StemPlayerEngine", () => {
         sampleRate,
         beatGrid: beatGridSec,
       });
-      engine.setClickTrackEnabled(true);
+      engine.applyClickTrack({ enabled: true });
       await engine.play();
       // play() anchors the lane at (10.0, 0): 0s into the song at t=10.
       expect(mockCtx.createdSources).toHaveLength(5);
@@ -1115,9 +1116,9 @@ describe("StemPlayerEngine", () => {
 
       // Four seconds in, the user flips the rail off and back on.
       mockCtx.currentTime = 14;
-      engine.toggleClickTrack();
+      engine.applyClickTrack({ enabled: false });
       mockCtx.currentTime = 16;
-      engine.toggleClickTrack();
+      engine.applyClickTrack({ enabled: true });
       // The resumed lane must anchor at the live playhead (6s at t=16),
       // never where play() started, or the clicks shift off the drums.
       const resumed = mockCtx.createdSources[5];
@@ -1131,7 +1132,7 @@ describe("StemPlayerEngine", () => {
         sampleRate,
         beatGrid: beatGridSec,
       });
-      engine.setClickTrackEnabled(true);
+      engine.applyClickTrack({ enabled: true });
       await engine.play();
       expect(mockCtx.createdSources[4].start).toHaveBeenCalledWith(10, 0);
 
@@ -1148,16 +1149,16 @@ describe("StemPlayerEngine", () => {
         sampleRate,
         beatGrid: beatGridSec,
       });
-      engine.setClickTrackEnabled(true);
+      engine.applyClickTrack({ enabled: true });
       const clickGain = engine.getClickGainNode();
       if (!clickGain) return;
       expect(clickGain.gain.value).toBe(1.0);
 
-      engine.setClickTrackVolume(0.4);
+      engine.applyClickTrack({ volume: 0.4 });
       expect(clickGain.gain.value).toBeCloseTo(0.4, 6);
-      engine.setClickTrackVolume(0);
+      engine.applyClickTrack({ volume: 0 });
       expect(clickGain.gain.value).toBe(0);
-      engine.setClickTrackVolume(1.5); // clamped like a Stem lane
+      engine.applyClickTrack({ volume: 1.5 }); // clamped like a Stem lane
       expect(clickGain.gain.value).toBe(1.0);
     });
 
@@ -1167,12 +1168,12 @@ describe("StemPlayerEngine", () => {
         sampleRate,
         beatGrid: beatGridSec,
       });
-      engine.setClickTrackEnabled(true);
+      engine.applyClickTrack({ enabled: true });
       await engine.play();
       expect(mockCtx.createBuffer).toHaveBeenCalledTimes(5);
 
       // Volume and a transport seek never rebuild the channel.
-      engine.setClickTrackVolume(0.7);
+      engine.applyClickTrack({ volume: 0.7 });
       expect(mockCtx.createBuffer).toHaveBeenCalledTimes(5);
     });
 
@@ -1182,7 +1183,7 @@ describe("StemPlayerEngine", () => {
         sampleRate,
         beatGrid: beatGridSec,
       });
-      engine.setClickTrackEnabled(true);
+      engine.applyClickTrack({ enabled: true });
       await engine.play();
 
       const clickSource = mockCtx.createdSources[4];
@@ -1243,8 +1244,8 @@ describe("StemPlayerEngine", () => {
         sampleRate,
         beatGrid: beatGridSec,
       });
-      engine.setClickTrackEnabled(true);
-      engine.setClickTrackVolume(0.7);
+      engine.applyClickTrack({ enabled: true });
+      engine.applyClickTrack({ volume: 0.7 });
       await engine.play();
       expect(mockCtx.createBuffer).toHaveBeenCalledTimes(5);
       expect(mockCtx.createdSources).toHaveLength(5);
@@ -1344,7 +1345,7 @@ describe("StemPlayerEngine", () => {
         sampleRate,
         beatGrid: detectorGrid,
       });
-      engine.setClickTrackEnabled(true);
+      engine.applyClickTrack({ enabled: true });
       mockCtx.currentTime = 10;
       await engine.play();
       expect(mockCtx.createdSources[4].start).toHaveBeenCalledWith(10, 0);
@@ -1381,6 +1382,41 @@ describe("StemPlayerEngine", () => {
         );
         expect(Math.abs(onsets[k] - (k * 0.5 + 0.03))).toBeGreaterThan(0.01);
       }
+    });
+
+    it("the lane verb is equality-gated: the snapshot follows each fact, a no-change command publishes nothing", () => {
+      const engine = new StemPlayerEngine(dummyStems, {
+        audioContext: mockCtx as any,
+        sampleRate,
+        beatGrid: beatGridSec,
+      });
+      const reports: StemPlayerSnapshot[] = [];
+      const unsubscribe = engine.subscribe((snap) => reports.push(snap));
+      const laneOff: ClickTrackMixerState = { enabled: false, volume: 1.0 };
+      expect(engine.snapshot().clickTrack).toEqual(laneOff);
+      const baseline = reports.length;
+
+      // One fact, one publish: the flip lands in the snapshot.
+      engine.applyClickTrack({ enabled: true });
+      const laneOn: ClickTrackMixerState = { enabled: true, volume: 1.0 };
+      expect(engine.snapshot().clickTrack).toEqual(laneOn);
+      expect(reports.length).toBe(baseline + 1);
+
+      // A no-change command publishes nothing: an equal snapshot never notifies.
+      engine.applyClickTrack({ enabled: true, volume: 1.0 });
+      expect(reports.length).toBe(baseline + 1);
+      expect(engine.snapshot().clickTrack).toEqual(laneOn);
+
+      // Volume lands as its own equality-gated publish, clamped like a Stem lane.
+      engine.applyClickTrack({ volume: 0.4 });
+      const laneQuiet: ClickTrackMixerState = { enabled: true, volume: 0.4 };
+      expect(engine.snapshot().clickTrack).toEqual(laneQuiet);
+      expect(reports.length).toBe(baseline + 2);
+      engine.applyClickTrack({ volume: 1.5 });
+      expect(engine.snapshot().clickTrack).toEqual(laneOn);
+      expect(reports.length).toBe(baseline + 3);
+
+      unsubscribe();
     });
   });
 });
