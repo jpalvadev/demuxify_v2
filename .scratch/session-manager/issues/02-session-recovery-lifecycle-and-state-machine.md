@@ -4,11 +4,15 @@
 
 **Blocked by:** 01: The Headless Session Manager Core & Reactive Seam.
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] `checkPrevious` queries storage for existing sessions; if found, transitions status to `detected` and populates `snapshot.detectedMetadata` with lightweight metadata without loading heavy audio buffers.
-- [ ] If no previous session exists or storage is empty, `checkPrevious` leaves status at `idle` with `detectedMetadata: null`.
-- [ ] `resume` loads and deserializes full audio channel arrays from storage, sets status to `active`, populates `snapshot.session`, and resolves with the hydrated `DemuxifySession`.
-- [ ] Corrupted, truncated, or incomplete storage records during `checkPrevious` or `resume` are handled gracefully, resetting state or emitting an informative error snapshot without throwing unhandled exceptions.
-- [ ] `purge` cancels any pending debounced timers, wipes active in-memory session state, deletes database and OPFS entries via storage adapter, and transitions status to `idle`.
-- [ ] Headless unit tests in `src/__tests__/sessionManager.test.ts` verify full recovery state transitions (`idle` -> `detected` -> `resuming` -> `active`), purge wipe guarantees, and resilience against corrupted storage records.
+- [x] `checkPrevious` queries storage for existing sessions; if found, transitions status to `detected` and populates `snapshot.detectedMetadata` with lightweight metadata without loading heavy audio buffers.
+- [x] If no previous session exists or storage is empty, `checkPrevious` leaves status at `idle` with `detectedMetadata: null`.
+- [x] `resume` loads and deserializes full audio channel arrays from storage, sets status to `active`, populates `snapshot.session`, and resolves with the hydrated `DemuxifySession`.
+- [x] Corrupted, truncated, or incomplete storage records during `checkPrevious` or `resume` are handled gracefully, resetting state or emitting an informative error snapshot without throwing unhandled exceptions.
+- [x] `purge` cancels any pending debounced timers, wipes active in-memory session state, deletes database and OPFS entries via storage adapter, and transitions status to `idle`.
+- [x] Headless unit tests in `src/__tests__/sessionManager.test.ts` verify full recovery state transitions (`idle` -> `detected` -> `resuming` -> `active`), purge wipe guarantees, and resilience against corrupted storage records.
+
+## Answer
+
+Implemented full recovery lifecycle state machine (`idle` -> `detected` -> `resuming` -> `active`, plus `error`) inside `SessionManager`. Added `loadActiveSessionMetadata` to `sessionStore.ts` for buffer-free metadata detection during startup. Verified with unit tests in `sessionManager.test.ts` and `sessionStore.test.ts`.

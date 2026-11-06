@@ -267,6 +267,37 @@ function isValidMetadata(meta: any): meta is SessionMetadata {
   );
 }
 
+export async function loadActiveSessionMetadata(): Promise<SessionMetadata | null> {
+  try {
+    const db = await openDatabase();
+    return new Promise((resolve) => {
+      try {
+        const tx = db.transaction(SESSIONS_STORE, "readonly");
+        const store = tx.objectStore(SESSIONS_STORE);
+        const req = store.get(ACTIVE_SESSION_KEY);
+        req.onsuccess = () => {
+          db.close();
+          const record = req.result as StoredSessionRecord | undefined;
+          if (record && isValidMetadata(record.metadata)) {
+            resolve(record.metadata);
+          } else {
+            resolve(null);
+          }
+        };
+        req.onerror = () => {
+          db.close();
+          resolve(null);
+        };
+      } catch {
+        db.close();
+        resolve(null);
+      }
+    });
+  } catch {
+    return null;
+  }
+}
+
 function isValidMixer(mixer: any): mixer is SessionMixerState {
   if (
     !mixer ||

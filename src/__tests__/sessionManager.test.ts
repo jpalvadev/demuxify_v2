@@ -276,3 +276,211 @@ describe("SessionManager - Core & Reactive Seam (Ticket 01)", () => {
     expect(snap.session?.metadata.title).toBe("Audioslave - Stone");
   });
 });
+
+describe("SessionManager - Recovery Lifecycle & State Machine (Ticket 02)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it("checkPrevious leaves status at idle when storage is empty", async () => {
+    const storageAdapter = {
+      saveActiveSession: vi.fn(),
+      loadActiveSession: vi.fn().mockResolvedValue(null),
+      loadActiveSessionMetadata: vi.fn().mockResolvedValue(null),
+      hasActiveSession: vi.fn().mockResolvedValue(false),
+      clearActiveSession: vi.fn(),
+    };
+
+    const manager = createSessionManager({
+      persistence: "storage",
+      storageAdapter,
+    });
+
+    const meta = await manager.checkPrevious();
+    expect(meta).toBeNull();
+    const snap = manager.snapshot();
+    expect(snap.status).toBe("idle");
+    expect(snap.detectedMetadata).toBeNull();
+    expect(snap.session).toBeNull();
+  });
+
+  it("checkPrevious transitions status to detected with metadata without loading audio buffers", async () => {
+    const mockMeta = {
+      id: "session-prev-1",
+      createdAt: 1000,
+      updatedAt: 2000,
+      title: "Audioslave - Stone",
+      filename: "stone.mp3",
+      duration: 180,
+      sampleRate: 44100,
+    };
+
+    const loadActiveSession = vi.fn();
+    const loadActiveSessionMetadata = vi.fn().mockResolvedValue(mockMeta);
+
+    const storageAdapter = {
+      saveActiveSession: vi.fn(),
+      loadActiveSession,
+      loadActiveSessionMetadata,
+      hasActiveSession: vi.fn().mockResolvedValue(true),
+      clearActiveSession: vi.fn(),
+    };
+
+    const manager = createSessionManager({
+      persistence: "storage",
+      storageAdapter,
+    });
+
+    const result = await manager.checkPrevious();
+    expect(result).toEqual(mockMeta);
+    expect(loadActiveSessionMetadata).toHaveBeenCalled();
+    expect(loadActiveSession).not.toHaveBeenCalled();
+
+    const snap = manager.snapshot();
+    expect(snap.status).toBe("detected");
+    expect(snap.detectedMetadata).toEqual(mockMeta);
+    expect(snap.session).toBeNull();
+  });
+
+  it("resume transitions through resuming to active and populates snapshot.session", async () => {
+    const mockMeta = {
+      id: "session-prev-1",
+      createdAt: 1000,
+      updatedAt: 2000,
+      title: "Audioslave - Stone",
+      filename: "stone.mp3",
+      duration: 180,
+      sampleRate: 44100,
+    };
+
+    const hydratedSession = {
+      metadata: mockMeta,
+      sourceMix: { channels: [new Float32Array(10)] },
+      stems: {
+        vocals: [new Float32Array(10)],
+        drums: [new Float32Array(10)],
+        bass: [new Float32Array(10)],
+        other: [new Float32Array(10)],
+      },
+      mixer: {
+        stems: {
+          vocals: { volume: 0.8, muted: false, solo: false },
+          drums: { volume: 1.0, muted: false, solo: false },
+          bass: { volume: 1.0, muted: false, solo: false },
+          other: { volume: 1.0, muted: false, solo: false },
+        },
+        masterVolume: 0.9,
+        currentTime: 42,
+      },
+    };
+
+    const storageAdapter = {
+      saveActiveSession: vi.fn(),
+      loadActiveSession: vi.fn().mockResolvedValue(hydratedSession),
+      loadActiveSessionMetadata: vi.fn().mockResolvedValue(mockMeta),
+      hasActiveSession: vi.fn().mockResolvedValue(true),
+      clearActiveSession: vi.fn(),
+    };
+
+    const manager = createSessionManager({
+      persistence: "storage",
+      storageAdapter,
+    });
+
+    await manager.checkPrevious();
+    expect(manager.snapshot().status).toBe("detected");
+
+    const statuses: string[] = [];
+    manager.subscribe((s) => {
+      statuses.push(s.status);
+    });
+
+    const resumed = await manager.resume();
+    expect(resumed).toEqual(hydratedSession);
+    expect(statuses).toContain("resuming");
+    expect(statuses).toContain("active");
+
+    const snap = manager.snapshot();
+    expect(snap.status).toBe("active");
+    expect(snap.session).toEqual(hydratedSession);
+    expect(snap.detectedMetadata).toBeNull();
+  });
+
+  it("resume transitions to error gracefully if loading session fails or returns null", async () => {
+    const storageAdapter = {
+      saveActiveSession: vi.fn(),
+      loadActiveSession: vi
+        .fn()
+        .mockRejectedValue(new Error("Corrupted OPFS buffer")),
+      loadActiveSessionMetadata: vi.fn().mockResolvedValue({
+        id: "corrupted",
+        createdAt: 1000,
+        updatedAt: 2000,
+        title: "Corrupted",
+        filename: "corrupted.wav",
+        duration: 10,
+        sampleRate: 44100,
+      }),
+      hasActiveSession: vi.fn().mockResolvedValue(true),
+      clearActiveSession: vi.fn(),
+    };
+
+    const manager = createSessionManager({
+      persistence: "storage",
+      storageAdapter,
+    });
+
+    await manager.checkPrevious();
+    expect(manager.snapshot().status).toBe("detected");
+
+    const resumed = await manager.resume();
+    expect(resumed).toBeNull();
+
+    const snap = manager.snapshot();
+    expect(snap.status).toBe("error");
+    expect(snap.lastSaveError).not.toBeNull();
+    expect(snap.session).toBeNull();
+  });
+
+  it("purge cancels debouncer, wipes memory state, calls clearActiveSession, and transitions to idle", async () => {
+    const clearActiveSession = vi.fn().mockResolvedValue(undefined);
+    const mockSave = vi.fn().mockResolvedValue(undefined);
+
+    const storageAdapter = {
+      saveActiveSession: mockSave,
+      loadActiveSession: vi.fn().mockResolvedValue(null),
+      loadActiveSessionMetadata: vi.fn().mockResolvedValue(null),
+      hasActiveSession: vi.fn().mockResolvedValue(false),
+      clearActiveSession,
+    };
+
+    const manager = createSessionManager({
+      persistence: "storage",
+      storageAdapter,
+    });
+
+    await manager.createSession(createMockSessionParams());
+    expect(manager.snapshot().status).toBe("active");
+
+    // Trigger update to start debouncer
+    manager.updateMixer({ masterVolume: 0.2 });
+
+    await manager.purge();
+
+    // Advance time to verify debounced save was cancelled
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(mockSave).not.toHaveBeenCalled();
+    expect(clearActiveSession).toHaveBeenCalledTimes(1);
+
+    const snap = manager.snapshot();
+    expect(snap.status).toBe("idle");
+    expect(snap.session).toBeNull();
+    expect(snap.detectedMetadata).toBeNull();
+    expect(snap.lastSaveError).toBeNull();
+  });
+});

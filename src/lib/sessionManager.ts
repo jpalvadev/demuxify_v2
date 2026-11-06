@@ -4,6 +4,7 @@ import type { ClickTrackMixerState } from "./stemPlayerEngine";
 import {
   saveActiveSession,
   loadActiveSession,
+  loadActiveSessionMetadata,
   hasActiveSession,
   clearActiveSession,
   DemuxifySession,
@@ -58,6 +59,7 @@ export interface CreateSessionParams {
 export interface StorageAdapter {
   saveActiveSession: (session: DemuxifySession) => Promise<void>;
   loadActiveSession: () => Promise<DemuxifySession | null>;
+  loadActiveSessionMetadata?: () => Promise<SessionMetadata | null>;
   hasActiveSession: () => Promise<boolean>;
   clearActiveSession: () => Promise<void>;
 }
@@ -84,9 +86,9 @@ export interface SessionManager {
   ) => void;
   flush: () => Promise<void>;
   dispose: () => void;
-  checkPrevious?: () => Promise<SessionMetadata | null>;
-  resume?: () => Promise<DemuxifySession>;
-  purge?: () => Promise<void>;
+  checkPrevious: () => Promise<SessionMetadata | null>;
+  resume: () => Promise<DemuxifySession | null>;
+  purge: () => Promise<void>;
 }
 
 const DEFAULT_DEBOUNCE_MS = 600;
@@ -130,6 +132,7 @@ export function createSessionManager(
   const adapter: StorageAdapter = options.storageAdapter ?? {
     saveActiveSession,
     loadActiveSession,
+    loadActiveSessionMetadata,
     hasActiveSession,
     clearActiveSession,
   };
@@ -345,6 +348,119 @@ export function createSessionManager(
     scheduleDebouncedSave();
   };
 
+  const checkPrevious = async (): Promise<SessionMetadata | null> => {
+    if (persistence === "memory-only") {
+      return null;
+    }
+
+    try {
+      let meta: SessionMetadata | null = null;
+      if (adapter.loadActiveSessionMetadata) {
+        meta = await adapter.loadActiveSessionMetadata();
+      } else {
+        const has = await adapter.hasActiveSession();
+        if (has) {
+          const loaded = await adapter.loadActiveSession();
+          meta = loaded?.metadata ?? null;
+        }
+      }
+
+      if (meta) {
+        publish({
+          ...snapshot,
+          status: "detected",
+          detectedMetadata: meta,
+        });
+        return meta;
+      } else {
+        publish({
+          ...snapshot,
+          status: "idle",
+          detectedMetadata: null,
+        });
+        return null;
+      }
+    } catch {
+      publish({
+        ...snapshot,
+        status: "idle",
+        detectedMetadata: null,
+      });
+      return null;
+    }
+  };
+
+  const resume = async (): Promise<DemuxifySession | null> => {
+    if (persistence === "memory-only") {
+      return null;
+    }
+
+    publish({
+      ...snapshot,
+      status: "resuming",
+    });
+
+    try {
+      const session = await adapter.loadActiveSession();
+      if (!session) {
+        const error = new Error(
+          "Failed to resume session from storage: session not found or corrupted."
+        );
+        publish({
+          ...snapshot,
+          status: "error",
+          session: null,
+          detectedMetadata: null,
+          lastSaveError: error,
+        });
+        return null;
+      }
+
+      publish({
+        ...snapshot,
+        status: "active",
+        session,
+        detectedMetadata: null,
+        lastSaveError: null,
+      });
+      return session;
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error(String(err));
+      publish({
+        ...snapshot,
+        status: "error",
+        session: null,
+        detectedMetadata: null,
+        lastSaveError: error,
+      });
+      return null;
+    }
+  };
+
+  const purge = async (): Promise<void> => {
+    if (debounceTimer) {
+      clearTimeout(debounceTimer);
+      debounceTimer = null;
+    }
+
+    if (persistence === "storage") {
+      try {
+        await adapter.clearActiveSession();
+      } catch {
+        // Silently ignore storage clear error
+      }
+    }
+
+    publish({
+      ...snapshot,
+      status: "idle",
+      session: null,
+      detectedMetadata: null,
+      isSaving: false,
+      lastSaveError: null,
+    });
+  };
+
   const dispose = (): void => {
     if (debounceTimer) {
       clearTimeout(debounceTimer);
@@ -367,6 +483,9 @@ export function createSessionManager(
     attachTempo,
     flush,
     dispose,
+    checkPrevious,
+    resume,
+    purge,
   };
 
   return manager;
