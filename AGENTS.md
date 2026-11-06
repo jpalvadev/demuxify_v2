@@ -66,9 +66,9 @@ Any commit touching `src/` rebuilds `dist/` first (`npm run build`, or direct `t
 
 When the suite fails, do NOT re-read raw vitest output (thousands of tokens of DOM dumps). Run `npm run test:report` (`scripts/vitest-summary.mjs`) and work from its compact failure list — the hook's last gate is that same command, so `git commit` itself already prints the compact list (and aborts on red) instead of flooding ~40 k lines of raw vitest into the commit result.
 
-### Git layout
+### Git workflow
 
-This repo has **no remote**. All branches and commits are local only; there is no such thing as "unpushed" work here. Do not attempt `git push`, force-pushes, or PR workflows.
+Remote `origin` is connected to GitHub (`https://github.com/jpalvadev/demuxify_v2.git`). Push feature/integration branches and `main` to `origin` when requested, keeping commits clean and passing all pre-commit gates. Avoid destructive force-pushes on `main`.
 
 ### Stitch Skin — screenshot-driven fidelity
 
