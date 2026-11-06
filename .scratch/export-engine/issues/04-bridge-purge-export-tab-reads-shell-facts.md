@@ -4,10 +4,10 @@
 
 **Blocked by:** 03: ExportTab UI Conversion & Modal Affordance Purge.
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] `ExportDialogState` interface, `onExportDialogState` prop, and `emitExportDialogState()` method are removed from `src/components/StemPlayer.tsx`.
-- [ ] `exportDialogState` state variable and `handleExportDialogStateChange` handler are removed from `src/App.tsx`.
-- [ ] `App.tsx` renders `<ExportTab />` directly with facts derived from the active player snapshot, session, and tempo analysis.
-- [ ] Switching between Tabs preserves user export preferences (format, bitrate, mode) without leaking state across unrelated views.
-- [ ] All App-seam tests (`src/__tests__/App.test.tsx`) pass cleanly with the bridge state removed.
+- [x] `ExportDialogState` interface, `onExportDialogState` prop, and `emitExportDialogState()` method are removed from `src/components/StemPlayer.tsx`.
+- [x] `exportDialogState` state variable and `handleExportDialogStateChange` handler are removed from `src/App.tsx`.
+- [x] `App.tsx` renders `<ExportTab />` directly with facts derived from the active player snapshot, session, and tempo analysis.
+- [x] Switching between Tabs preserves user export preferences (format, bitrate, mode) without leaking state across unrelated views.
+- [x] All App-seam tests (`src/__tests__/App.test.tsx`) pass cleanly with the bridge state removed.

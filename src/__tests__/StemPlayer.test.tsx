@@ -419,8 +419,8 @@ describe("StemPlayer UI Component", () => {
     ).toBe(true);
   });
 
-  it("keeps the hosted form action-free while the bridge still re-emits", async () => {
-    const emittedStates: any[] = [];
+  it("keeps the hosted form action-free while the player snapshot still emits", async () => {
+    const emittedSnapshots: any[] = [];
     render(
       <StemPlayer
         stems={dummyStems}
@@ -428,8 +428,8 @@ describe("StemPlayer UI Component", () => {
         audioContext={mockCtx}
         sourceMixTitle="audioslave_stone.mp3"
         exportDialogHosted
-        onExportDialogState={(state) => {
-          emittedStates.push(state);
+        onSnapshot={(snap) => {
+          emittedSnapshots.push(snap);
         }}
       />
     );
@@ -442,7 +442,7 @@ describe("StemPlayer UI Component", () => {
     ).toBeNull();
 
     // Mixer and Time-Stretch/Pitch-Shift/Formant tweaks still reach the
-    // Transport bridge (the master fader died with the erased strip).
+    // player snapshot.
     fireEvent.change(screen.getByRole("slider", { name: /drums volume/i }), {
       target: { value: "0.4" },
     });
@@ -455,14 +455,14 @@ describe("StemPlayer UI Component", () => {
     );
 
     await waitFor(() => {
-      expect(emittedStates.length).toBeGreaterThanOrEqual(4);
+      expect(emittedSnapshots.length).toBeGreaterThanOrEqual(4);
     });
-    const lastState = emittedStates[emittedStates.length - 1];
-    expect(lastState.mixerStates.drums.volume).toBeCloseTo(0.4);
-    expect(lastState.masterVolume).toBeCloseTo(1);
-    expect(lastState.timeStretch.tempo).toBeCloseTo(1.1);
-    expect(lastState.timeStretch.pitch).toBe(1);
-    expect(lastState.timeStretch.formantPreservation).toBe(false);
+    const lastSnap = emittedSnapshots[emittedSnapshots.length - 1];
+    expect(lastSnap.stems.drums.volume).toBeCloseTo(0.4);
+    expect(lastSnap.masterVolume).toBeCloseTo(1);
+    expect(lastSnap.timeStretch.tempo).toBeCloseTo(1.1);
+    expect(lastSnap.timeStretch.pitch).toBe(1);
+    expect(lastSnap.timeStretch.formantPreservation).toBe(false);
   });
 
   it("synchronizes solo states into Custom Mixdown export dialog", async () => {

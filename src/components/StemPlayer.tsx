@@ -25,7 +25,6 @@ import {
   StemPlayerEngine,
   StemMixerStates,
   StemPlayerSnapshot,
-  TimeStretchState,
   ClickTrackMixerState,
   CalibratedClickGrid,
   StereoPeakLevels,
@@ -47,15 +46,6 @@ import type { TempoCandidate } from "../workers/beatDetection.worker";
 
 // Tab Shell (ADR-0007/0008): live mixer + time-stretch state bridge so the
 // Export panel can be mounted at the app level instead of inside the player.
-// App hosts the panel inline in the Export Tab and flags exportDialogHosted;
-// without that flag the component keeps its legacy internal Export panel
-// (per-component seam).
-export interface ExportDialogState {
-  mixerStates: StemMixerStates;
-  masterVolume: number;
-  timeStretch: TimeStretchState;
-}
-
 // Tab Shell bridge (ADR-0008): transport actions stay available to the app —
 // the Mix Tab's single Play/Pause toggle calls play or pause by state, and
 // spine scrubbing keeps using seek. 2026-11-05 footer fix: the shell's Master
@@ -93,7 +83,7 @@ export interface StemPlayerProps {
   // Tab, so the Mix Tab carries no Export Stems action and the player renders
   // no fallback panel of its own.
   exportDialogHosted?: boolean;
-  onExportDialogState?: (state: ExportDialogState) => void;
+  onSnapshot?: (snapshot: StemPlayerSnapshot) => void;
   onTransportControls?: (controls: TransportControls) => void;
   // Mix Tab cohesion (ADR-0013): one outbound Playhead channel — the app wires
   // the shared Master Waveform spine to it, fed by the engine's existing
@@ -213,7 +203,7 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
   initialCurrentTime,
   onMixerChange,
   exportDialogHosted,
-  onExportDialogState,
+  onSnapshot,
   onTransportControls,
   onPlayheadChange,
   onPlayStateChange,
@@ -273,6 +263,10 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
     readSnapshot,
     readSnapshot
   );
+
+  useEffect(() => {
+    onSnapshot?.(snapshot);
+  }, [snapshot, onSnapshot]);
   const mixerStates = snapshot.stems;
   const masterVolume = snapshot.masterVolume;
   // ADR-0016 (ticket 04): the engine's getStemBuffer wall is gone — each Stem
@@ -470,23 +464,6 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
     [onMixerChange]
   );
 
-  // Re-export the live state for an app-level Export panel (Tab Shell).
-  const emitExportDialogState = () => {
-    if (!onExportDialogState) return;
-    const engine = engineRef.current;
-    if (!engine) return;
-    const snap = engine.snapshot();
-    onExportDialogState({
-      mixerStates: snap.stems,
-      masterVolume: snap.masterVolume,
-      timeStretch: {
-        tempo: snap.timeStretch.tempo,
-        pitch: snap.timeStretch.pitch,
-        formantPreservation: snap.timeStretch.formantPreservation !== false,
-      },
-    });
-  };
-
   const handleReset = useCallback(() => {
     handleSeek(0);
   }, [handleSeek]);
@@ -504,7 +481,6 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
         masterVolume: snap.masterVolume,
         currentTime: snap.playheadSec,
       });
-      emitExportDialogState();
     },
     [onMixerChange]
   );
@@ -523,7 +499,6 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
         masterVolume: snap.masterVolume,
         currentTime: snap.playheadSec,
       });
-      emitExportDialogState();
     },
     [onMixerChange]
   );
@@ -540,7 +515,6 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
         masterVolume: snap.masterVolume,
         currentTime: snap.playheadSec,
       });
-      emitExportDialogState();
     },
     [onMixerChange]
   );
@@ -558,7 +532,6 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
         masterVolume: snap.masterVolume,
         currentTime: snap.playheadSec,
       });
-      emitExportDialogState();
     },
     [onMixerChange]
   );
@@ -570,7 +543,6 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
   // faces read the applied values back out of the snapshot.
   const handleTempoChange = useCallback((newTempo: number) => {
     engineRef.current?.applyTimeStretch({ tempo: newTempo });
-    emitExportDialogState();
   }, []);
 
   const handleIncrementTempo = useCallback(() => {
@@ -578,7 +550,6 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
     if (!engine) return;
     const current = engine.snapshot().timeStretch.tempo;
     engine.applyTimeStretch({ tempo: current + 0.05 });
-    emitExportDialogState();
   }, []);
 
   const handleDecrementTempo = useCallback(() => {
@@ -586,12 +557,10 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
     if (!engine) return;
     const current = engine.snapshot().timeStretch.tempo;
     engine.applyTimeStretch({ tempo: current - 0.05 });
-    emitExportDialogState();
   }, []);
 
   const handlePitchChange = useCallback((newPitch: number) => {
     engineRef.current?.applyTimeStretch({ pitch: newPitch });
-    emitExportDialogState();
   }, []);
 
   const handleIncrementPitch = useCallback(() => {
@@ -599,7 +568,6 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
     if (!engine) return;
     const current = engine.snapshot().timeStretch.pitch;
     engine.applyTimeStretch({ pitch: current + 1 });
-    emitExportDialogState();
   }, []);
 
   const handleDecrementPitch = useCallback(() => {
@@ -607,7 +575,6 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
     if (!engine) return;
     const current = engine.snapshot().timeStretch.pitch;
     engine.applyTimeStretch({ pitch: current - 1 });
-    emitExportDialogState();
   }, []);
 
   const handleToggleFormant = useCallback(() => {
@@ -615,14 +582,12 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
     if (!engine) return;
     const next = engine.snapshot().timeStretch.formantPreservation === false;
     engine.applyTimeStretch({ formantPreservation: next });
-    emitExportDialogState();
   }, []);
 
   // The shipped reset fact as a command (ticket 02): tempo -> 1.0, pitch -> 0,
   // Formant Preservation untouched.
   const handleResetTimeStretch = useCallback(() => {
     engineRef.current?.applyTimeStretch({ tempo: 1, pitch: 0 });
-    emitExportDialogState();
   }, []);
 
   // --- Click Track rail handlers (ADR-0010, ticket 04) ---------------------
