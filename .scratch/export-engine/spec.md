@@ -1,6 +1,6 @@
 # Spec: Export Engine — Deepen the Export Engine and Collapse the Export Tab Monolith
 
-Status: ready-for-agent (2026-11-06)
+Status: resolved-in-full (2026-11-06)
 
 Recorded on the tracker 2026-11-06. This is the architectural deepening increment for Candidate 1 of the 2026-11-06 architecture review: a deepening of the export pipeline and elimination of the monolithic component structure in the Export Tab. The shipped Export Tab visual layout, user affordances, and byte-exact audio outputs are the invariant promise. Glossary terms used throughout: **Export Engine**, **Export Bundle**, **Custom Mixdown**, **Stems**, **Source Mix**, **Session**, **Tab Shell**, **Tab**, **Rail**, **Click Track**, **Beat Grid**, **Time-Stretch**, **Pitch-Shift**, **Formant Preservation**, **Player Engine**, **Mixer State**, **Playhead**.
 
