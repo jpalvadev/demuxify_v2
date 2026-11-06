@@ -56,6 +56,7 @@ Always use canonical domain terms defined in `GLOSSARY.md`.
 
 - Shared test doubles and readers — e.g. the WAV-bytes -> click onsets decoder (`decodeWavOnsets`, `src/__tests__/wavOnsetsHelper.ts`) — live in one module under `src/__tests__/` and every seam that needs one imports it, instead of each test file keeping its own copy of the shape.
 - Expectation fixtures must be TYPED constants, not multi-line object literals passed straight to `toEqual`/`toMatch`: hoist them (`const expectedLane: ClickTrackMixerState = { ... }`) so `typecheck` sees drift and vitest failures stay readable. Verified by `npm run check:test-fixtures`.
+- Chrome fed by an external store (the Transport snapshot through `useSyncExternalStore`) re-renders after the push lands: at the App seam, assert DOM facts with `await waitFor(…)` — a scripted push is followed by React's concurrent re-render, so a synchronous read right after the push races it.
 
 ## 9. Affordance Retirement Turns DOM Assertions into Absence Assertions, Surviving Readouts Stay Pinned
 
