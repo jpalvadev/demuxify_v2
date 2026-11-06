@@ -601,52 +601,70 @@ describe("StemPlayerEngine", () => {
       expect(engine.getTimeStretch()).toEqual({ tempo: 1.0, pitch: 0 });
     });
 
-    it("clamps tempo to range [0.5, 2.0]", () => {
+    it("clamps tempo to [0.5, 2.0] and quantizes to the 0.05 grid inside applyTimeStretch", () => {
       const engine = new StemPlayerEngine(dummyStems, {
         audioContext: mockCtx as any,
         sampleRate,
       });
 
-      engine.setTempo(1.5);
-      expect(engine.getTempo()).toBe(1.5);
+      engine.applyTimeStretch({ tempo: 1.5 });
+      expect(engine.snapshot().timeStretch.tempo).toBe(1.5);
 
-      engine.setTempo(0.2);
-      expect(engine.getTempo()).toBe(0.5);
+      engine.applyTimeStretch({ tempo: 0.2 });
+      expect(engine.snapshot().timeStretch.tempo).toBe(0.5);
 
-      engine.setTempo(3.0);
-      expect(engine.getTempo()).toBe(2.0);
+      engine.applyTimeStretch({ tempo: 3.0 });
+      expect(engine.snapshot().timeStretch.tempo).toBe(2.0);
+
+      // The shipped slider's 0.05x quantization resolves inside the verb,
+      // so every face lands on exact grid values (no float drift).
+      engine.applyTimeStretch({ tempo: 1.33 });
+      expect(engine.snapshot().timeStretch.tempo).toBe(1.35);
     });
 
-    it("clamps pitch to range [-12, +12]", () => {
+    it("clamps pitch to [-12, +12] and quantizes to whole semitones inside applyTimeStretch", () => {
       const engine = new StemPlayerEngine(dummyStems, {
         audioContext: mockCtx as any,
         sampleRate,
       });
 
-      engine.setPitch(3);
-      expect(engine.getPitch()).toBe(3);
+      engine.applyTimeStretch({ pitch: 3 });
+      expect(engine.snapshot().timeStretch.pitch).toBe(3);
 
-      engine.setPitch(-15);
-      expect(engine.getPitch()).toBe(-12);
+      engine.applyTimeStretch({ pitch: -15 });
+      expect(engine.snapshot().timeStretch.pitch).toBe(-12);
 
-      engine.setPitch(14);
-      expect(engine.getPitch()).toBe(12);
+      engine.applyTimeStretch({ pitch: 14 });
+      expect(engine.snapshot().timeStretch.pitch).toBe(12);
+
+      // Whole-semitone rule inside the verb:
+      engine.applyTimeStretch({ pitch: 2.7 });
+      expect(engine.snapshot().timeStretch.pitch).toBe(3);
     });
 
-    it("resets tempo to 1.0 and pitch to 0 via resetTimeStretch()", () => {
+    it("resets tempo to 1.0 and pitch to 0 via applyTimeStretch({ tempo: 1, pitch: 0 })", () => {
       const engine = new StemPlayerEngine(dummyStems, {
         audioContext: mockCtx as any,
         sampleRate,
       });
 
-      engine.setTempo(1.75);
-      engine.setPitch(-4);
-      expect(engine.getTimeStretch()).toEqual({ tempo: 1.75, pitch: -4 });
+      engine.applyTimeStretch({ tempo: 1.75, pitch: -4 });
+      const applied: TimeStretchState = {
+        tempo: 1.75,
+        pitch: -4,
+        formantPreservation: true,
+      };
+      expect(engine.snapshot().timeStretch).toEqual(applied);
 
-      engine.resetTimeStretch();
-      expect(engine.getTempo()).toBe(1.0);
-      expect(engine.getPitch()).toBe(0);
-      expect(engine.getTimeStretch()).toEqual({ tempo: 1.0, pitch: 0 });
+      engine.applyTimeStretch({ tempo: 1, pitch: 0 });
+      expect(engine.snapshot().timeStretch.tempo).toBe(1.0);
+      expect(engine.snapshot().timeStretch.pitch).toBe(0);
+
+      // The shipped reset touches only tempo and pitch — Formant
+      // Preservation survives it untouched (today's behavior, pinned).
+      engine.applyTimeStretch({ formantPreservation: false });
+      engine.applyTimeStretch({ tempo: 1, pitch: 0 });
+      expect(engine.snapshot().timeStretch.formantPreservation).toBe(false);
     });
 
     it("notifies subscribers via subscribeTimeStretch", () => {
@@ -677,7 +695,7 @@ describe("StemPlayerEngine", () => {
         sampleRate,
       });
 
-      engine.setTempo(2.0);
+      engine.applyTimeStretch({ tempo: 2.0 });
       await engine.play();
 
       // In 1 second of audioContext time at 2.0x tempo, 2.0 seconds of audio elapsed
@@ -685,7 +703,7 @@ describe("StemPlayerEngine", () => {
       expect(engine.getCurrentTime()).toBeCloseTo(2.0, 2);
 
       // Now set tempo to 0.5x while playing
-      engine.setTempo(0.5);
+      engine.applyTimeStretch({ tempo: 0.5 });
       // Offset should be locked at 2.0, and 1 more second of real time adds 0.5s of audio
       mockCtx.currentTime = 12.0; // +1.0 sec further
       expect(engine.getCurrentTime()).toBeCloseTo(2.5, 2);
@@ -702,9 +720,9 @@ describe("StemPlayerEngine", () => {
 
       // Should not throw and methods work seamlessly
       expect(() => {
-        engine.setTempo(1.2);
-        engine.setPitch(-2);
-        engine.resetTimeStretch();
+        engine.applyTimeStretch({ tempo: 1.2 });
+        engine.applyTimeStretch({ pitch: -2 });
+        engine.applyTimeStretch({ tempo: 1, pitch: 0 });
       }).not.toThrow();
     });
   });
@@ -756,9 +774,9 @@ describe("StemPlayerEngine", () => {
         sampleRate,
       });
 
-      const isReady = await engine.waitForWorkletReady();
-      expect(isReady).toBe(true);
+      await engine.waitForReady();
       expect(engine.isUsingWorklet()).toBe(true);
+      expect(engine.snapshot().stretchMode).not.toBe("basic");
       expect(createdWorkletNodes).toHaveLength(1);
 
       const workletNode = createdWorkletNodes[0];
@@ -778,7 +796,7 @@ describe("StemPlayerEngine", () => {
         sampleRate,
       });
 
-      await engine.waitForWorkletReady();
+      await engine.waitForReady();
       mockWorkletCtx.currentTime = 10.0;
       await engine.play();
 
@@ -816,7 +834,7 @@ describe("StemPlayerEngine", () => {
         sampleRate,
       });
 
-      await engine.waitForWorkletReady();
+      await engine.waitForReady();
       mockWorkletCtx.currentTime = 10.0;
       await engine.play();
 
@@ -842,7 +860,7 @@ describe("StemPlayerEngine", () => {
         sampleRate,
       });
 
-      await engine.waitForWorkletReady();
+      await engine.waitForReady();
       mockWorkletCtx.currentTime = 10.0;
       await engine.play();
 
@@ -853,7 +871,7 @@ describe("StemPlayerEngine", () => {
       expect(engine.getCurrentTime()).toBeCloseTo(2.0, 2);
 
       // Change tempo to 1.5x while playing
-      engine.setTempo(1.5);
+      engine.applyTimeStretch({ tempo: 1.5 });
       expect(workletNode.port.postMessage).toHaveBeenCalledWith({
         type: "setTempo",
         tempo: 1.5,
@@ -876,25 +894,25 @@ describe("StemPlayerEngine", () => {
         sampleRate,
       });
 
-      await engine.waitForWorkletReady();
+      await engine.waitForReady();
       mockWorkletCtx.currentTime = 10.0;
       await engine.play();
 
       const workletNode = createdWorkletNodes[0];
 
-      engine.setPitch(4);
+      engine.applyTimeStretch({ pitch: 4 });
       expect(workletNode.port.postMessage).toHaveBeenCalledWith({
         type: "setPitch",
         pitch: 4,
       });
-      expect(engine.getPitch()).toBe(4);
+      expect(engine.snapshot().timeStretch.pitch).toBe(4);
 
-      engine.setPitch(-5);
+      engine.applyTimeStretch({ pitch: -5 });
       expect(workletNode.port.postMessage).toHaveBeenCalledWith({
         type: "setPitch",
         pitch: -5,
       });
-      expect(engine.getPitch()).toBe(-5);
+      expect(engine.snapshot().timeStretch.pitch).toBe(-5);
 
       // All 4 outputs remain connected
       expect(workletNode.connect).toHaveBeenCalledTimes(4);
@@ -928,7 +946,7 @@ describe("StemPlayerEngine", () => {
 
       // Now resolve the AudioWorklet loading
       resolveAddModule();
-      await engine.waitForWorkletReady();
+      await engine.waitForReady();
 
       expect(engine.isUsingWorklet()).toBe(true);
 
@@ -955,7 +973,7 @@ describe("StemPlayerEngine", () => {
         sampleRate,
       });
 
-      await engine.waitForWorkletReady();
+      await engine.waitForReady();
       await engine.play();
 
       expect(engine.isPlaying()).toBe(true);
@@ -1170,7 +1188,7 @@ describe("StemPlayerEngine", () => {
       const clickSource = mockCtx.createdSources[4];
       expect(clickSource.playbackRate.value).toBe(1.0);
 
-      engine.setTempo(1.5);
+      engine.applyTimeStretch({ tempo: 1.5 });
       // Stems and Click Track alike sit at the shared factor: the lane follows
       // Time-Stretch in lockstep, it is not rated on its own.
       for (const source of mockCtx.createdSources) {

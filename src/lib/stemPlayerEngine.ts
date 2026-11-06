@@ -214,6 +214,16 @@ export interface MixerCommand {
   masterVolume?: number;
 }
 
+// applyTimeStretch payload (ticket 02): the whole Time-Stretch command —
+// tempo, Pitch-Shift, Formant Preservation, all optional. Quantization
+// (tempo to the shipped 0.05 grid, pitch to whole semitones) and the range
+// clamps resolve inside the verb, not in the UI.
+export interface TimeStretchCommand {
+  tempo?: number;
+  pitch?: number;
+  formantPreservation?: boolean;
+}
+
 function stemMixerStatesEqual(a: StemMixerStates, b: StemMixerStates): boolean {
   return STEM_NAMES.every(
     (stem) =>
@@ -803,6 +813,39 @@ export class StemPlayerEngine {
     }
     if (command.masterVolume !== undefined) {
       this.setMasterVolume(command.masterVolume);
+    }
+    this.publish();
+  }
+
+  /**
+   * The Time-Stretch command (ADR-0016): tempo, Pitch-Shift, and Formant
+   * Preservation in one step. Quantization and clamps resolve inside the
+   * verb — tempo lands on the shipped slider's 0.05 grid inside [0.5, 2.0],
+   * pitch on whole semitones inside [-12, 12]; the snapshot then reports the
+   * applied value. The shipped reset is the { tempo: 1, pitch: 0 } command:
+   * it routes to the reset fact exactly as the button performed it (adapter
+   * handoff, worklet reset beat) and never touches Formant Preservation.
+   */
+  public applyTimeStretch(command: TimeStretchCommand): void {
+    if (
+      command.tempo === 1 &&
+      command.pitch === 0 &&
+      command.formantPreservation === undefined
+    ) {
+      this.resetTimeStretch();
+      this.publish();
+      return;
+    }
+    if (command.tempo !== undefined) {
+      const clamped = Math.max(0.5, Math.min(2.0, command.tempo));
+      this.setTempo(Math.round(clamped * 20) / 20);
+    }
+    if (command.pitch !== undefined) {
+      const clamped = Math.max(-12, Math.min(12, command.pitch));
+      this.setPitch(Math.round(clamped));
+    }
+    if (command.formantPreservation !== undefined) {
+      this.setFormantPreservation(command.formantPreservation);
     }
     this.publish();
   }
@@ -1402,7 +1445,10 @@ export class StemPlayerEngine {
     this.notifyTimeStretch();
   }
 
-  public resetTimeStretch(): void {
+  // ADR-0016 (ticket 02): the public form left the interface — the shipped
+  // reset fact now rides the engine as applyTimeStretch({ tempo: 1, pitch: 0 }),
+  // and this is its private implementation.
+  private resetTimeStretch(): void {
     this.setTempo(1.0);
     this.setPitch(0);
     if (
@@ -1451,9 +1497,10 @@ export class StemPlayerEngine {
   /**
    * Active time-stretch pipeline: 'signalsmith' (WASM formant-aware),
    * 'wsola' (in-process WSOLA worklet), or 'basic' (playbackRate last resort,
-   * where pitch control is inert).
+   * where pitch control is inert). ADR-0016 (ticket 02): rides the snapshot —
+   * the public getter left the interface.
    */
-  public getStretchMode(): "signalsmith" | "wsola" | "basic" {
+  private getStretchMode(): "signalsmith" | "wsola" | "basic" {
     if (
       this.useWorklet &&
       this.stretchAdapter &&
@@ -1475,7 +1522,13 @@ export class StemPlayerEngine {
     return [...this.activeSources];
   }
 
-  public async waitForWorkletReady(): Promise<boolean> {
+  /**
+   * ADR-0016 (ticket 02): the single async readiness verb — resolves once the
+   * stretch pipeline init has settled (wsola worklet or signalsmith adapter).
+   * The active mode rides the snapshot; the boolean readiness probe
+   * waitForWorkletReady left the interface.
+   */
+  public async waitForReady(): Promise<void> {
     if (this.workletInitPromise) {
       try {
         await this.workletInitPromise;
@@ -1483,7 +1536,6 @@ export class StemPlayerEngine {
         // Ignored
       }
     }
-    return this.isUsingWorklet();
   }
 
   public dispose(): void {

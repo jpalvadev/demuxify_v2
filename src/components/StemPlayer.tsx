@@ -272,9 +272,12 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
   const mixerStates = snapshot.stems;
   const masterVolume = snapshot.masterVolume;
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
-  const [tempo, setTempo] = useState(1.0);
-  const [pitch, setPitch] = useState(0);
-  const [formantPreservation, setFormantPreservation] = useState(true);
+  // ADR-0016 (ticket 02): tempo, pitch, and Formant Preservation ride the
+  // snapshot — the strip's stretch faces read the applied (quantized) values.
+  const tempo = snapshot.timeStretch.tempo;
+  const pitch = snapshot.timeStretch.pitch;
+  const formantPreservation =
+    snapshot.timeStretch.formantPreservation !== false;
   // Click Track lane state lives here (not in the mixer states): domain-separate.
   const [clickTrack, setClickTrack] = useState<ClickTrackMixerState>(
     initialClickTrack ?? CLICK_TRACK_DEFAULT
@@ -313,9 +316,6 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
     if (initialCurrentTime !== undefined) {
       setCurrentTime(initialCurrentTime);
     }
-    setTempo(engine.getTempo());
-    setPitch(engine.getPitch());
-    setFormantPreservation(engine.isFormantPreservationEnabled());
     setClickTrack(engine.getClickTrackState());
     onClickTrackState?.(engine.getClickTrackState());
 
@@ -329,13 +329,9 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
       onPlayheadChange?.(time);
     });
 
-    const unsubTimeStretch = engine.subscribeTimeStretch((ts) => {
-      setTempo(ts.tempo);
-      setPitch(ts.pitch);
-      if (ts.formantPreservation !== undefined) {
-        setFormantPreservation(ts.formantPreservation);
-      }
-    });
+    // ADR-0016 (ticket 02): the stretch faces read the snapshot; the
+    // subscribeTimeStretch mirror channel has no reader left in this component
+    // (the channel itself retires with ticket 04's getter purge).
 
     // Peak meters (2026-11-05): the engine samples the master bus in its own
     // play loop; the player only forwards the coalesced L/R levels out.
@@ -345,7 +341,6 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
 
     return () => {
       unsubPos();
-      unsubTimeStretch();
       unsubLevels();
       engine.dispose();
       engineRef.current = null;
@@ -445,13 +440,14 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
     if (!onExportDialogState) return;
     const engine = engineRef.current;
     if (!engine) return;
+    const snap = engine.snapshot();
     onExportDialogState({
-      mixerStates: engine.getAllStemStates(),
-      masterVolume: engine.getMasterVolume(),
+      mixerStates: snap.stems,
+      masterVolume: snap.masterVolume,
       timeStretch: {
-        tempo: engine.getTempo(),
-        pitch: engine.getPitch(),
-        formantPreservation: engine.isFormantPreservationEnabled(),
+        tempo: snap.timeStretch.tempo,
+        pitch: snap.timeStretch.pitch,
+        formantPreservation: snap.timeStretch.formantPreservation !== false,
       },
     });
   };
@@ -532,77 +528,65 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
     [onMixerChange]
   );
 
+  // ADR-0016 (ticket 02): each stretch face sends one command; the tempo
+  // 0.05x quantization (slider, +/- buttons, presets all land on exact grid
+  // values, no 1.3500000000000001-style drift) and the whole-semitone pitch
+  // rule with their range clamps resolve inside applyTimeStretch, and the
+  // faces read the applied values back out of the snapshot.
   const handleTempoChange = useCallback((newTempo: number) => {
-    // 0.05x quantization so the slider, +/- buttons and presets all land on
-    // exact grid values (avoids 1.3500000000000001-style float drift).
-    const quantized = Math.max(
-      0.5,
-      Math.min(2.0, Math.round(newTempo * 20) / 20)
-    );
-    engineRef.current?.setTempo(quantized);
-    setTempo(quantized);
+    engineRef.current?.applyTimeStretch({ tempo: newTempo });
     emitExportDialogState();
   }, []);
 
   const handleIncrementTempo = useCallback(() => {
-    // Engine-first: the fork defers state-updater callbacks, so side effects
-    // must run synchronously here (see handleTempoChange).
     const engine = engineRef.current;
-    const current = engine ? engine.getTempo() : tempo;
-    const next = Math.min(2.0, Math.round((current + 0.05) * 20) / 20);
-    engine?.setTempo(next);
-    setTempo(next);
+    if (!engine) return;
+    const current = engine.snapshot().timeStretch.tempo;
+    engine.applyTimeStretch({ tempo: current + 0.05 });
     emitExportDialogState();
   }, []);
 
   const handleDecrementTempo = useCallback(() => {
     const engine = engineRef.current;
-    const current = engine ? engine.getTempo() : tempo;
-    const next = Math.max(0.5, Math.round((current - 0.05) * 20) / 20);
-    engine?.setTempo(next);
-    setTempo(next);
+    if (!engine) return;
+    const current = engine.snapshot().timeStretch.tempo;
+    engine.applyTimeStretch({ tempo: current - 0.05 });
     emitExportDialogState();
   }, []);
 
   const handlePitchChange = useCallback((newPitch: number) => {
-    const quantized = Math.max(-12, Math.min(12, Math.round(newPitch)));
-    engineRef.current?.setPitch(quantized);
-    setPitch(quantized);
+    engineRef.current?.applyTimeStretch({ pitch: newPitch });
     emitExportDialogState();
   }, []);
 
   const handleIncrementPitch = useCallback(() => {
     const engine = engineRef.current;
-    const current = engine ? engine.getPitch() : pitch;
-    const next = Math.min(12, current + 1);
-    engine?.setPitch(next);
-    setPitch(next);
+    if (!engine) return;
+    const current = engine.snapshot().timeStretch.pitch;
+    engine.applyTimeStretch({ pitch: current + 1 });
     emitExportDialogState();
   }, []);
 
   const handleDecrementPitch = useCallback(() => {
     const engine = engineRef.current;
-    const current = engine ? engine.getPitch() : pitch;
-    const next = Math.max(-12, current - 1);
-    engine?.setPitch(next);
-    setPitch(next);
+    if (!engine) return;
+    const current = engine.snapshot().timeStretch.pitch;
+    engine.applyTimeStretch({ pitch: current - 1 });
     emitExportDialogState();
   }, []);
 
   const handleToggleFormant = useCallback(() => {
     const engine = engineRef.current;
-    const next = !(engine
-      ? engine.isFormantPreservationEnabled()
-      : formantPreservation);
-    engine?.setFormantPreservation(next);
-    setFormantPreservation(next);
+    if (!engine) return;
+    const next = engine.snapshot().timeStretch.formantPreservation === false;
+    engine.applyTimeStretch({ formantPreservation: next });
     emitExportDialogState();
   }, []);
 
+  // The shipped reset fact as a command (ticket 02): tempo -> 1.0, pitch -> 0,
+  // Formant Preservation untouched.
   const handleResetTimeStretch = useCallback(() => {
-    engineRef.current?.resetTimeStretch();
-    setTempo(1.0);
-    setPitch(0);
+    engineRef.current?.applyTimeStretch({ tempo: 1, pitch: 0 });
     emitExportDialogState();
   }, []);
 
