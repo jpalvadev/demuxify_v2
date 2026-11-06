@@ -67,6 +67,7 @@ import {
   LiveTransportBridge,
   TransportBridge,
 } from "./lib/transportBridge";
+import { formatTransportClock } from "./lib/transportClockFormat";
 import { DISPLAY_FONT_STACK, MONO_FONT_STACK } from "./lib/typography";
 
 // Bold pairing (ticket 10): the bundled display face paints the focal Tab banners and
@@ -114,16 +115,8 @@ const TAB_GATING_REASON = "no Stems yet";
 // Footer transport readouts (2026-11-05 user fix): the bar's clock, peak pips
 // and master fader are LIVE chrome fed by the engine — a frozen mockup frame
 // (the literal 00:51 / 03:35, static pips, pinned 100% fader) is a bug, not
-// the design truth.
-function formatTransportTime(totalSeconds: number): string {
-  const safe =
-    isNaN(totalSeconds) || totalSeconds < 0 ? 0 : Math.floor(totalSeconds);
-  const minutes = Math.floor(safe / 60);
-  const seconds = safe % 60;
-  return `${minutes.toString().padStart(2, "0")}:${seconds
-    .toString()
-    .padStart(2, "0")}`;
-}
+// the design truth. The clock's `mm:ss` rule is the shared formatter in
+// lib/transportClockFormat (ticket 03 consolidation) — no App-local twin.
 
 // Peak pip ladder: PEAK_METER_SEGMENTS segments per channel, painted top →
 // bottom. A segment lights when the normalized level reaches its rank from
@@ -205,9 +198,9 @@ export const App: React.FC<AppProps> = ({ transport }) => {
   const [waveformPeaks, setWaveformPeaks] = useState<WaveformPeaks | null>(
     debugSession?.waveformPeaks ?? null
   );
-  const [currentTime, setCurrentTime] = useState(
-    debugSession?.currentTime ?? 0
-  );
+  // transport-snapshot ticket 03: the Playhead mirror state is gone — the
+  // spine, the clock chip and every Playhead face read the snapshot's
+  // playheadSec through the one bridge subscription.
   const [isDecoding, setIsDecoding] = useState(false);
   const [decodeError, setDecodeError] = useState<string | null>(null);
 
@@ -529,7 +522,7 @@ export const App: React.FC<AppProps> = ({ transport }) => {
     setSelectedFile(file);
     setIsDecoding(true);
     setDecodeError(null);
-    setCurrentTime(0);
+    liveTransportRef.current?.setPlayheadSec(0);
     setSeparationPhase("idle");
     setSeparatedStems(null);
     setTempoAnalysis(null);
@@ -579,7 +572,7 @@ export const App: React.FC<AppProps> = ({ transport }) => {
     setSelectedFile(null);
     setDecodedSourceMix(null);
     setWaveformPeaks(null);
-    setCurrentTime(0);
+    liveTransportRef.current?.setPlayheadSec(0);
     setDecodeError(null);
     setSeparationPhase("idle");
     setSeparatedStems(null);
@@ -673,10 +666,13 @@ export const App: React.FC<AppProps> = ({ transport }) => {
       } else if (session.metadata.modelProfileId) {
         setSelectedModelId(session.metadata.modelProfileId);
       }
-      setCurrentTime(session.mixer.currentTime ?? 0);
-      liveTransportRef.current?.restateMasterVolume(
-        session.mixer.masterVolume ?? 1.0
-      );
+      // transport-snapshot ticket 03/04: the recovered Session seeds the
+      // snapshot's Master volume and Playhead before the player mounts, so
+      // the footer and the spine never flash defaults.
+      liveTransportRef.current?.seed({
+        masterVolume: session.mixer.masterVolume ?? 1.0,
+        playheadSec: session.mixer.currentTime ?? 0,
+      });
       setSeparationPhase("completed");
       setDetectedSession(null);
       // ADR-0008: resuming lands on the Mix Tab, where playback lives
@@ -1232,7 +1228,7 @@ export const App: React.FC<AppProps> = ({ transport }) => {
                   peaks={waveformPeaks}
                   audioBuffer={decodedSourceMix.buffer}
                   duration={decodedSourceMix.metadata.duration}
-                  currentTime={currentTime}
+                  currentTime={snapshot.playheadSec}
                   onSeek={handleSeek}
                   height={96}
                   metaRight={
@@ -1255,7 +1251,9 @@ export const App: React.FC<AppProps> = ({ transport }) => {
                   // Mix Tab cohesion (ADR-0013): the spine's clock is fed by
                   // the engine's one position subscription, not by the mixer
                   // bridge — press play with no mixer event and it walks.
-                  onPlayheadChange={(timeSec) => setCurrentTime(timeSec)}
+                  onPlayheadChange={(timeSec) =>
+                    liveTransportRef.current?.setPlayheadSec(timeSec)
+                  }
                   // Stitch skin 08d: the same engine also reports play/pause
                   // truth, which the live adapter lands on the snapshot — the
                   // disc's icon, aria-pressed and click dispatch read it.
@@ -1445,14 +1443,14 @@ export const App: React.FC<AppProps> = ({ transport }) => {
               data-testid="footer-time-current"
               className="text-white text-sm sm:text-base font-bold tracking-wider"
             >
-              {formatTransportTime(currentTime)}
+              {formatTransportClock(snapshot.playheadSec)}
             </span>
             <span className="text-zinc-500 text-xs">/</span>
             <span
               data-testid="footer-time-total"
               className="text-zinc-400 text-xs"
             >
-              {formatTransportTime(decodedSourceMix?.metadata.duration ?? 0)}
+              {formatTransportClock(decodedSourceMix?.metadata.duration ?? 0)}
             </span>
           </div>
           <div className="hidden sm:flex flex-col">

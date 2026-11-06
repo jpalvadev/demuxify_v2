@@ -28,6 +28,7 @@ import { ExportDialog } from "./ExportDialog";
 import { WaveformPeaks } from "../lib/waveformPeaks";
 import { cn } from "../lib/utils";
 import { DISPLAY_FONT_STACK, MONO_FONT_STACK } from "../lib/typography";
+import { formatTransportClock } from "../lib/transportClockFormat";
 // Readout only: the Tempo Detector's ranked candidate shape (ticket 06). Type-
 // only import, so the player never pulls the beat-detection worker at runtime.
 import type { TempoCandidate } from "../workers/beatDetection.worker";
@@ -119,13 +120,6 @@ export interface StemPlayerProps {
   // Beat Grid was re-anchored by hand instead of the Detector. The rail says
   // "calibrated by hand" — it never calls a by-hand decision an auto reading.
   clickCalibration?: CalibratedClickGrid | null;
-}
-
-function formatTime(totalSeconds: number): string {
-  if (isNaN(totalSeconds) || totalSeconds < 0) return "00:00";
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = Math.floor(totalSeconds % 60);
-  return `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
 }
 
 // Click Track rail (ADR-0010, ticket 04): the lane's neutral default — off, so
@@ -1043,11 +1037,11 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
             style={{ fontFamily: MONO_FONT_STACK }}
           >
             <span className="text-white font-bold tracking-wider">
-              {formatTime(currentTime)}
+              {formatTransportClock(currentTime)}
             </span>
             <span className="text-zinc-500 text-xs">/</span>
             <span className="text-zinc-400 text-xs">
-              {formatTime(duration)}
+              {formatTransportClock(duration)}
             </span>
           </div>
 

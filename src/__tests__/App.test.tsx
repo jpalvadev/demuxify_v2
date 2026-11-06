@@ -2405,6 +2405,39 @@ describe("App UI Shell", () => {
     });
   });
 
+  // Transport snapshot (ticket 03): the spine and the footer clock chip are
+  // one Playhead's two faces — a pushed playheadSec moves both in lockstep,
+  // no disc, no engine, no mixer traffic. The shared mm:ss rule paints the
+  // chip (01:03); the spine's own m:ss accessible face stays one digit wider.
+  it("reads the spine and the clock chip from the snapshot's playheadSec", async () => {
+    vi.spyOn(webgpuModule, "detectWebGPUCapability").mockResolvedValue({
+      supported: true,
+      isFallback: false,
+    });
+    completeSeparationMocks();
+
+    const scripted = createScriptedTransport();
+    render(<App transport={scripted.bridge} />);
+    await loadAndSeparate();
+
+    const mixTab = screen.getByRole("region", { name: /mix tab/i });
+    const spine = within(mixTab).getByRole("slider", {
+      name: /master waveform timeline/i,
+    });
+    expect(screen.getByTestId("footer-time-current")).toHaveTextContent(
+      "00:00"
+    );
+
+    scripted.push({ playheadSec: 63 });
+    await waitFor(() => {
+      expect(screen.getByTestId("footer-time-current")).toHaveTextContent(
+        "01:03"
+      );
+    });
+    expect(spine).toHaveAttribute("aria-valuenow", "63");
+    expect(spine).toHaveAttribute("aria-valuetext", "1:03");
+  });
+
   // Transport snapshot (ticket 01): the footer disc runs on the module's
   // snapshot through the scripted adapter — commands in, snapshots out, zero
   // audio machinery. This retargets the disc semantics the AudioContext
