@@ -284,7 +284,7 @@ export const StemStrip: React.FC<StemStripProps> = ({
           w-32 tinted badge column with hairline seam. */}
       <div
         className={cn(
-          "order-1 flex flex-1 items-center gap-2 px-3 py-1.5 sm:h-full sm:flex-none sm:w-32 sm:justify-between sm:border-e sm:border-st-hairline sm:py-0",
+          "order-1 flex flex-1 items-center gap-2 px-3 py-2 sm:h-full sm:flex-none sm:w-32 sm:justify-between sm:border-e sm:border-st-hairline sm:py-0",
           config.badgeBgClass
         )}
       >
@@ -308,7 +308,7 @@ export const StemStrip: React.FC<StemStripProps> = ({
           rack's M/S block welded to the rack hairline. Single instance; order
           classes do the moving. Compact mono M/S caps. Behavior, aria, and
           handlers untouched. */}
-      <div className="order-2 ml-auto flex shrink-0 items-center gap-1 pr-1 sm:order-3 sm:h-full sm:ml-0 sm:border-s sm:border-st-hairline sm:bg-st-surface-light sm:pl-3 sm:pr-0">
+      <div className="order-2 ml-auto flex shrink-0 items-center gap-1 py-2 pr-1 sm:order-3 sm:h-full sm:py-0 sm:ml-0 sm:border-s sm:border-st-hairline sm:bg-st-surface-light sm:pl-3 sm:pr-0">
         <button
           type="button"
           aria-label={`Mute ${config.label}`}
