@@ -91,7 +91,7 @@ export interface SessionManager {
   purge: () => Promise<void>;
 }
 
-const DEFAULT_DEBOUNCE_MS = 600;
+export const DEFAULT_DEBOUNCE_MS = 600;
 
 function clamp(val: number, min: number, max: number): number {
   if (isNaN(val)) return min;
