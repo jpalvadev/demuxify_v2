@@ -36,3 +36,18 @@ If your output contradicts an existing ADR, surface it explicitly rather than si
 
 > _Contradicts ADR-0002 (audioworklet multi track pitch tempo), but worth reopening because…_
 
+## Historical Citations in ADRs
+
+When an ADR cites retired, removed, or refactored symbols that no longer exist in `src/`, `npm run check:doc-anchors` verifies that the citation is explicitly marked with historical context on that line or section. Use recognized keywords:
+
+- `retired` / `retire`
+- `deleted`
+- `removed`
+- `history` / `historical`
+- `no longer`
+- `renamed` / `renaming`
+- `prior`
+- `previously`
+- `superseded`
+
+This allows ADRs to faithfully record past architectural states without triggering dead-anchor errors during pre-commit checks.
