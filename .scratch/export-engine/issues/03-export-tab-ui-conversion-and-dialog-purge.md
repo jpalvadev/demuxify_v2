@@ -4,11 +4,11 @@
 
 **Blocked by:** 02: Custom Mixdown & Preset Resolution in the Export Engine.
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] `src/components/ExportDialog.tsx` is renamed to `src/components/ExportTab.tsx` and exports `ExportTab`.
-- [ ] Modal-specific props (`isOpen`, `onClose`) and container wrappers (`role="dialog"`, overlay backdrops) are removed; container renders as a clean Tab panel.
-- [ ] Export execution delegates to `exportAudio` in `src/lib/exportEngine.ts`, and successful exports invoke `triggerDownload` via an isolated DOM helper.
-- [ ] Export cancellation uses an internal `AbortController` linked to the UI "Cancel" button, cleanly resetting state without throwing unhandled rejections.
-- [ ] Visual fidelity, Tailwind class tokens, and responsive layout at 1440×900 and 390×844 match `view_target/stitch.html` exactly.
-- [ ] `src/__tests__/ExportDialog.test.tsx` is retargeted to `src/__tests__/ExportTab.test.tsx`, testing mode selection, preset buttons, format dropdowns, and download invocation.
+- [x] `src/components/ExportDialog.tsx` is renamed to `src/components/ExportTab.tsx` and exports `ExportTab`.
+- [x] Modal-specific props (`isOpen`, `onClose`) and container wrappers (`role="dialog"`, overlay backdrops) are removed; container renders as a clean Tab panel.
+- [x] Export execution delegates to `exportAudio` in `src/lib/exportEngine.ts`, and successful exports invoke `triggerDownload` via an isolated DOM helper.
+- [x] Export cancellation uses an internal `AbortController` linked to the UI "Cancel" button, cleanly resetting state without throwing unhandled rejections.
+- [x] Visual fidelity, Tailwind class tokens, and responsive layout at 1440×900 and 390×844 match `view_target/stitch.html` exactly.
+- [x] `src/__tests__/ExportDialog.test.tsx` is retargeted to `src/__tests__/ExportTab.test.tsx`, testing mode selection, preset buttons, format dropdowns, and download invocation.

@@ -32,7 +32,7 @@ import {
 } from "../lib/stemPlayerEngine";
 import { StemStrip } from "./StemStrip";
 import { MasterWaveform } from "./MasterWaveform";
-import { ExportDialog } from "./ExportDialog";
+import { ExportTab as ExportDialog } from "./ExportTab";
 import {
   WaveformPeaks,
   computeWaveformPeaks,

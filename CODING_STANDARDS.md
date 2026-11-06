@@ -50,7 +50,7 @@ Always use canonical domain terms defined in `GLOSSARY.md`.
 
 - App-level jsdom tests must not await a completed export/ZIP: jszip's `generateAsync` scheduling never resolves inside the full-App test env (it stalls at "Packaging ZIP bundle..."). This is an environment fact, not a product bug — the same call completes at the component seams.
 - At the App seam, spy the bundler (`createStemBundleZip`) and assert its call arguments (format, Click Track bytes): what would be exported, byte-for-byte.
-- Assert a finished export only in `ExportDialog.test.tsx` / `bundleZip.test.ts`, where the call demonstrably resolves.
+- Assert a finished export only in `ExportTab.test.tsx` / `bundleZip.test.ts`, where the call demonstrably resolves.
 
 ## 8. Shared Test Readers
 

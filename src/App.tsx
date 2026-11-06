@@ -13,7 +13,7 @@ import { SourceMixCard } from "./components/SourceMixCard";
 import { MasterWaveform } from "./components/MasterWaveform";
 import { BeatGridTapCalibration } from "./components/BeatGridTapCalibration";
 import { StemPlayer, ExportDialogState } from "./components/StemPlayer";
-import { ExportDialog } from "./components/ExportDialog";
+import { ExportTab } from "./components/ExportTab";
 import { SessionRecovery } from "./components/SessionRecovery";
 import { WebGPUStatusBadge } from "./components/WebGPUStatusBadge";
 import {
@@ -1347,8 +1347,7 @@ export const App: React.FC<AppProps> = ({ transport }) => {
                   </div>
                 </div>
                 <div className="pt-1">
-                  <ExportDialog
-                    isOpen
+                  <ExportTab
                     stems={separatedStems}
                     sampleRate={decodedSourceMix.metadata.sampleRate}
                     sourceMixTitle={decodedSourceMix.metadata.fileName}

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, act } from "@testing-library/react";
 import { toast, toastManager } from "../lib/toast";
-import { ExportDialog } from "../components/ExportDialog";
+import { ExportTab } from "../components/ExportTab";
 
 // ADR-0009: the toast DOM surface (src/components/Toast.tsx + <ToastContainer />)
 // is dead — notices render inline in their owning Tab. This seam covers the
@@ -59,7 +59,7 @@ describe("Toast manager behind the dead toast surface", () => {
       other: [new Float32Array(100), new Float32Array(100)],
     };
 
-    render(<ExportDialog isOpen stems={dummyStems} sourceMixTitle="MySong" />);
+    render(<ExportTab stems={dummyStems} sourceMixTitle="MySong" />);
 
     const exportBtn = screen.getByRole("button", {
       name: /export & download/i,
