@@ -1,6 +1,6 @@
 # Spec: Session Manager — Deepen Session Management behind an In-Memory Session Core
 
-Status: ready-for-agent
+Status: complete
 
 Recorded on the tracker 2026-11-06. This is the architectural deepening increment for Candidate 2 of the 2026-11-06 architecture review: consolidating active in-memory session state, persistence coordination, auto-save debouncing, and recovery lifecycle management into a deep **Session Manager** module. The user affordances, storage schemas, recovery prompts, and persistence guarantees remain invariant. Glossary terms used throughout: **Session**, **Session Manager**, **Source Mix**, **Stems**, **Stem Player**, **Player Engine**, **Export Engine**, **Tab Shell**, **Tab**, **Rail**, **Click Track**, **Beat Grid**, **Time-Stretch**, **Pitch-Shift**, **Formant Preservation**, **Playhead**.
 

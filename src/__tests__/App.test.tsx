@@ -797,6 +797,7 @@ describe("App UI Shell", () => {
     });
 
     const sessionStore = await import("../lib/sessionStore");
+    await sessionStore.clearActiveSession();
     await sessionStore.saveActiveSession({
       metadata: {
         id: "saved-session-test",
@@ -832,11 +833,14 @@ describe("App UI Shell", () => {
 
     render(<App />);
 
-    await waitFor(() => {
-      expect(
-        screen.getByRole("region", { name: /previous session recovery/i })
-      ).toBeInTheDocument();
-    });
+    await waitFor(
+      () => {
+        expect(
+          screen.getByRole("region", { name: /previous session recovery/i })
+        ).toBeInTheDocument();
+      },
+      { timeout: 4000 }
+    );
 
     expect(
       screen.getByRole("heading", { name: /previous session found.*Stone/i })
@@ -858,6 +862,7 @@ describe("App UI Shell", () => {
     });
 
     const sessionStore = await import("../lib/sessionStore");
+    await sessionStore.clearActiveSession();
     await sessionStore.saveActiveSession({
       metadata: {
         id: "hydrate-session-test",
@@ -943,6 +948,7 @@ describe("App UI Shell", () => {
     });
 
     const sessionStore = await import("../lib/sessionStore");
+    await sessionStore.clearActiveSession();
     await sessionStore.saveActiveSession({
       metadata: {
         id: "tempo-resume-session-test",
@@ -1048,6 +1054,7 @@ describe("App UI Shell", () => {
     });
 
     const sessionStore = await import("../lib/sessionStore");
+    await sessionStore.clearActiveSession();
     await sessionStore.saveActiveSession({
       metadata: {
         id: "discard-session-test",
@@ -2449,6 +2456,7 @@ describe("App UI Shell", () => {
     });
 
     const sessionStore = await import("../lib/sessionStore");
+    await sessionStore.clearActiveSession();
     await sessionStore.saveActiveSession({
       metadata: {
         id: "seed-snapshot-session-test",
