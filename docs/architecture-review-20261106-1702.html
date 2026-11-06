@@ -1,0 +1,1008 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Architecture Review — demuxify_v2</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="module">
+      import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+      mermaid.initialize({
+        startOnLoad: true,
+        theme: "neutral",
+        securityLevel: "loose",
+      });
+    </script>
+    <style>
+      .seam {
+        stroke-dasharray: 4 4;
+      }
+      .leak {
+        stroke: #dc2626;
+        stroke-width: 2px;
+      }
+      .deep-card {
+        background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+      }
+    </style>
+  </head>
+  <body class="bg-stone-50 text-slate-900 font-sans antialiased">
+    <main class="max-w-5xl mx-auto px-6 py-12 space-y-12">
+      <!-- Header & Legend -->
+      <header
+        class="border-b border-stone-200 pb-8 flex flex-col md:flex-row md:items-end justify-between gap-4"
+      >
+        <div>
+          <span
+            class="text-xs font-semibold tracking-wider uppercase text-emerald-600"
+            >Architectural Deepening</span
+          >
+          <h1 class="text-3xl font-serif font-bold text-slate-900 mt-1">
+            demuxify_v2 Codebase Review
+          </h1>
+          <p class="text-sm text-slate-500 mt-1">
+            November 6, 2026 · Evaluated against domain model (GLOSSARY.md) and
+            ADR-0001 through ADR-0016
+          </p>
+        </div>
+        <div
+          class="flex items-center gap-3 text-xs bg-white border border-stone-200 rounded-lg p-2.5 shadow-sm"
+        >
+          <div class="flex items-center gap-1.5">
+            <span class="w-3 h-3 rounded-sm bg-slate-800 inline-block"></span
+            ><span class="text-slate-600">Deep module</span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <span
+              class="w-3 h-3 rounded-sm border border-slate-400 bg-slate-100 inline-block"
+            ></span
+            ><span class="text-slate-600">Module</span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <span
+              class="w-4 h-0 border-t-2 border-dashed border-slate-500 inline-block"
+            ></span
+            ><span class="text-slate-600">Seam</span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <span class="w-4 h-0 border-t-2 border-red-500 inline-block"></span
+            ><span class="text-red-600 font-medium">Leakage</span>
+          </div>
+        </div>
+      </header>
+
+      <!-- Candidates Section -->
+      <section id="candidates" class="space-y-12">
+        <!-- Candidate 1 -->
+        <article
+          id="candidate-1"
+          class="bg-white border border-stone-200 rounded-xl p-8 shadow-sm space-y-6 scroll-mt-8"
+        >
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <h2 class="text-2xl font-serif font-bold text-slate-900">
+              1. Deepen the Export Engine & Collapse the Export Monolith
+            </h2>
+            <div class="flex items-center gap-2">
+              <span
+                class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800"
+                >Strong</span
+              >
+              <span
+                class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-700"
+                >in-process</span
+              >
+            </div>
+          </div>
+
+          <div
+            class="font-mono text-xs text-slate-500 bg-stone-50 border border-stone-200 p-2.5 rounded-md"
+          >
+            src/components/ExportDialog.tsx · src/lib/customMixdown.ts ·
+            src/lib/bundleZip.ts · src/lib/wavEncoder.ts · src/lib/mp3Encoder.ts
+            · src/App.tsx
+          </div>
+
+          <!-- Problem & Solution -->
+          <div class="grid md:grid-cols-2 gap-4 text-sm">
+            <div class="p-3 bg-red-50/60 border border-red-100 rounded-lg">
+              <span
+                class="font-semibold text-red-900 block text-xs uppercase tracking-wider mb-1"
+                >Problem</span
+              >
+              <p class="text-slate-700">
+                Export orchestration—offline time-stretching, anti-clipping gain
+                calculation, click-track synthesis, multi-track WAV/MP3
+                encoding, and ZIP bundle creation—is tangled inside an 1137-line
+                UI component, forcing tests to drive the DOM to verify audio
+                algorithms.
+              </p>
+            </div>
+            <div
+              class="p-3 bg-emerald-50/60 border border-emerald-100 rounded-lg"
+            >
+              <span
+                class="font-semibold text-emerald-900 block text-xs uppercase tracking-wider mb-1"
+                >Solution</span
+              >
+              <p class="text-slate-700">
+                Extract a deep Export Engine module that coordinates offline
+                rendering, encoding, and packaging behind a single command
+                interface, shrinking the view into a thin ExportTab.
+              </p>
+            </div>
+          </div>
+
+          <!-- Wins -->
+          <div>
+            <span
+              class="text-xs font-semibold uppercase tracking-wider text-slate-500 block mb-2"
+              >Architectural Wins</span
+            >
+            <ul
+              class="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs text-slate-700"
+            >
+              <li
+                class="bg-stone-50 border border-stone-200 rounded px-2.5 py-1.5 flex items-center gap-1.5"
+              >
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span
+                >Locality: all encoding logic lives together
+              </li>
+              <li
+                class="bg-stone-50 border border-stone-200 rounded px-2.5 py-1.5 flex items-center gap-1.5"
+              >
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span
+                >Tests hit engine without DOM
+              </li>
+              <li
+                class="bg-stone-50 border border-stone-200 rounded px-2.5 py-1.5 flex items-center gap-1.5"
+              >
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span
+                >Leverage: one interface handles all formats
+              </li>
+              <li
+                class="bg-stone-50 border border-stone-200 rounded px-2.5 py-1.5 flex items-center gap-1.5"
+              >
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span
+                >Export Tab becomes pure view
+              </li>
+              <li
+                class="bg-stone-50 border border-stone-200 rounded px-2.5 py-1.5 flex items-center gap-1.5"
+              >
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span
+                >Retires historical "Dialog" name debt
+              </li>
+              <li
+                class="bg-stone-50 border border-stone-200 rounded px-2.5 py-1.5 flex items-center gap-1.5"
+              >
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span
+                >Eliminates exportDialogState bridge in App
+              </li>
+            </ul>
+          </div>
+
+          <!-- ADR Callout -->
+          <div
+            class="bg-amber-50/70 border border-amber-200 rounded-lg p-3 text-xs text-amber-900"
+          >
+            <strong>ADR Alignment:</strong> Honors ADR-0004 (anti-clipping
+            protection) and ADR-0007 / ADR-0014 (Tab Shell UI), formally
+            retiring the historical "Dialog" naming in GLOSSARY.md for an inline
+            Export Tab.
+          </div>
+
+          <!-- Before / After Visual -->
+          <div class="grid md:grid-cols-2 gap-6 pt-2">
+            <!-- Before -->
+            <div
+              class="border border-stone-200 rounded-lg p-4 bg-stone-50 flex flex-col justify-between"
+            >
+              <div
+                class="text-xs uppercase tracking-wider font-semibold text-slate-500 mb-3"
+              >
+                Before: Tangled UI Component Monolith
+              </div>
+              <pre class="mermaid">
+                flowchart TD
+                  App[App.tsx] -.bridge state.-> ED[ExportDialog.tsx 1137L]
+                  subgraph Monolith[ExportDialog UI Monolith]
+                    ED --> Offline[renderOfflineStems]
+                    ED --> AntiClip[Anti-Clipping Math]
+                    ED --> ClickSynth[Click Track Synthesis]
+                    ED --> WAV[WAV Encoder]
+                    ED --> MP3[MP3 Worker Encoder]
+                    ED --> ZIP[bundleZip.ts]
+                    ED --> DOM[Hidden &lt;a&gt; Trigger]
+                  end
+                  classDef leak stroke:#dc2626,stroke-width:2px;
+                  class App,ED leak;
+              </pre>
+              <div class="text-xs text-slate-500 mt-2">
+                1,007 lines of UI tests simulate DOM clicks to verify
+                mathematical encoding logic.
+              </div>
+            </div>
+
+            <!-- After -->
+            <div
+              class="border border-emerald-200 rounded-lg p-4 bg-emerald-50/30 flex flex-col justify-between"
+            >
+              <div
+                class="text-xs uppercase tracking-wider font-semibold text-emerald-800 mb-3"
+              >
+                After: Deep Export Engine Behind Clean Seam
+              </div>
+              <pre class="mermaid">
+                flowchart TD
+                  Snapshot[StemPlayerSnapshot] --> View[ExportTab UI View]
+                  View -.-> Seam((( Seam: exportAudio )))
+                  subgraph DeepEngine[Deep Module: ExportEngine]
+                    direction TB
+                    Plan[Render Plan & Time-Stretch]
+                    Mix[Custom Mixdown & Headroom]
+                    Enc[Parallel Stem Audio Encoders]
+                    Pack[Click Track & ZIP Packaging]
+                    Plan --> Mix --> Enc --> Pack
+                  end
+                  Seam --> DeepEngine
+                  DeepEngine --> BlobOut[ExportPayload Blob]
+                  classDef deep fill:#0f172a,stroke:#38bdf8,stroke-width:2px,color:#fff;
+                  class DeepEngine deep;
+              </pre>
+              <div class="text-xs text-slate-500 mt-2">
+                Pure headless tests exercise mixdown, time-stretch render, and
+                packaging without DOM.
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <!-- Candidate 2 -->
+        <article
+          id="candidate-2"
+          class="bg-white border border-stone-200 rounded-xl p-8 shadow-sm space-y-6 scroll-mt-8"
+        >
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <h2 class="text-2xl font-serif font-bold text-slate-900">
+              2. Deepen Session Management behind an In-Memory Session Core
+            </h2>
+            <div class="flex items-center gap-2">
+              <span
+                class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800"
+                >Strong</span
+              >
+              <span
+                class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-700"
+                >local-substitutable</span
+              >
+            </div>
+          </div>
+
+          <div
+            class="font-mono text-xs text-slate-500 bg-stone-50 border border-stone-200 p-2.5 rounded-md"
+          >
+            src/App.tsx · src/lib/sessionStore.ts ·
+            src/components/SessionRecovery.tsx
+          </div>
+
+          <!-- Problem & Solution -->
+          <div class="grid md:grid-cols-2 gap-4 text-sm">
+            <div class="p-3 bg-red-50/60 border border-red-100 rounded-lg">
+              <span
+                class="font-semibold text-red-900 block text-xs uppercase tracking-wider mb-1"
+                >Problem</span
+              >
+              <p class="text-slate-700">
+                sessionStore.ts is a shallow CRUD layer, forcing App.tsx to
+                manually manage active in-memory session state, debounced
+                auto-save triggers, and multi-field object cloning across six
+                separate event handlers.
+              </p>
+            </div>
+            <div
+              class="p-3 bg-emerald-50/60 border border-emerald-100 rounded-lg"
+            >
+              <span
+                class="font-semibold text-emerald-900 block text-xs uppercase tracking-wider mb-1"
+                >Solution</span
+              >
+              <p class="text-slate-700">
+                Consolidate active session state, persistence coordination, and
+                auto-save scheduling inside a deep Session Manager module with a
+                command interface and snapshot subscription.
+              </p>
+            </div>
+          </div>
+
+          <!-- Wins -->
+          <div>
+            <span
+              class="text-xs font-semibold uppercase tracking-wider text-slate-500 block mb-2"
+              >Architectural Wins</span
+            >
+            <ul
+              class="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs text-slate-700"
+            >
+              <li
+                class="bg-stone-50 border border-stone-200 rounded px-2.5 py-1.5 flex items-center gap-1.5"
+              >
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span
+                >Locality: session mutation logic unified
+              </li>
+              <li
+                class="bg-stone-50 border border-stone-200 rounded px-2.5 py-1.5 flex items-center gap-1.5"
+              >
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span
+                >App.tsx sheds ~300 lines of refs
+              </li>
+              <li
+                class="bg-stone-50 border border-stone-200 rounded px-2.5 py-1.5 flex items-center gap-1.5"
+              >
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span
+                >Eliminates mutable cachedSessionRef races
+              </li>
+              <li
+                class="bg-stone-50 border border-stone-200 rounded px-2.5 py-1.5 flex items-center gap-1.5"
+              >
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span
+                >Auto-save verified without UI rendering
+              </li>
+              <li
+                class="bg-stone-50 border border-stone-200 rounded px-2.5 py-1.5 flex items-center gap-1.5"
+              >
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span
+                >Single enforcement point for invariants
+              </li>
+              <li
+                class="bg-stone-50 border border-stone-200 rounded px-2.5 py-1.5 flex items-center gap-1.5"
+              >
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span
+                >Seeding and purge logic consolidated
+              </li>
+            </ul>
+          </div>
+
+          <!-- ADR Callout -->
+          <div
+            class="bg-amber-50/70 border border-amber-200 rounded-lg p-3 text-xs text-amber-900"
+          >
+            <strong>ADR Alignment:</strong> Extends ADR-0003 storage contracts
+            and matches the snapshot/command architecture established in
+            ADR-0013 and ADR-0016.
+          </div>
+
+          <!-- Before / After Visual -->
+          <div class="grid md:grid-cols-2 gap-6 pt-2">
+            <!-- Before -->
+            <div
+              class="border border-stone-200 rounded-lg p-4 bg-stone-50 flex flex-col justify-between"
+            >
+              <div
+                class="text-xs uppercase tracking-wider font-semibold text-slate-500 mb-3"
+              >
+                Before: Shallow CRUD with Leaky App Orchestration
+              </div>
+              <pre class="mermaid">
+                flowchart TD
+                  subgraph App[App.tsx]
+                    Ref1[cachedSessionRef]
+                    Ref2[autoSaverRef]
+                    H1[handleMixerChange]
+                    H2[attachTempoResultToSession]
+                    H3[handleResumeSession]
+                    H4[handlePurgeSession]
+                    H1 --> Ref1
+                    H2 --> Ref1
+                    Ref1 --> Ref2
+                  end
+                  Ref2 -.raw records.-> Store[sessionStore.ts CRUD]
+                  Store --> IDB[(IndexedDB)]
+                  Store --> OPFS[(OPFS)]
+                  classDef leak stroke:#dc2626,stroke-width:2px;
+                  class App,Ref1,Ref2 leak;
+              </pre>
+              <div class="text-xs text-slate-500 mt-2">
+                Every new feature touches multiple clone-and-save sites inside
+                App.tsx.
+              </div>
+            </div>
+
+            <!-- After -->
+            <div
+              class="border border-emerald-200 rounded-lg p-4 bg-emerald-50/30 flex flex-col justify-between"
+            >
+              <div
+                class="text-xs uppercase tracking-wider font-semibold text-emerald-800 mb-3"
+              >
+                After: Deep Session Manager Behind Verbs Seam
+              </div>
+              <pre class="mermaid">
+                flowchart TD
+                  App[App.tsx] -.-> Seam((( Seam: SessionManager )))
+                  subgraph DeepManager[Deep Module: SessionManager]
+                    direction TB
+                    State[Active Session State]
+                    Debounce[Internal Cadence Debouncer]
+                    Adapter[Storage Adapter: IDB / OPFS]
+                    State --> Debounce --> Adapter
+                  end
+                  Seam --> DeepManager
+                  DeepManager -.snapshot.-> App
+                  classDef deep fill:#0f172a,stroke:#38bdf8,stroke-width:2px,color:#fff;
+                  class DeepManager deep;
+              </pre>
+              <div class="text-xs text-slate-500 mt-2">
+                Commands in (updateMixer, updateTempo, resume, purge),
+                SessionSnapshot out.
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <!-- Candidate 3 -->
+        <article
+          id="candidate-3"
+          class="bg-white border border-stone-200 rounded-xl p-8 shadow-sm space-y-6 scroll-mt-8"
+        >
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <h2 class="text-2xl font-serif font-bold text-slate-900">
+              3. Deepen the Audio Separation Pipeline (Inference Orchestrator)
+            </h2>
+            <div class="flex items-center gap-2">
+              <span
+                class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800"
+                >Worth exploring</span
+              >
+              <span
+                class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-700"
+                >in-process</span
+              >
+            </div>
+          </div>
+
+          <div
+            class="font-mono text-xs text-slate-500 bg-stone-50 border border-stone-200 p-2.5 rounded-md"
+          >
+            src/App.tsx · src/lib/inferenceClient.ts ·
+            src/workers/inference.worker.ts · src/lib/chunkOverlapAdd.ts ·
+            src/components/SeparationProgress.tsx
+          </div>
+
+          <!-- Problem & Solution -->
+          <div class="grid md:grid-cols-2 gap-4 text-sm">
+            <div class="p-3 bg-red-50/60 border border-red-100 rounded-lg">
+              <span
+                class="font-semibold text-red-900 block text-xs uppercase tracking-wider mb-1"
+                >Problem</span
+              >
+              <p class="text-slate-700">
+                InferenceClient is a shallow message-passing wrapper around a
+                Web Worker, pushing model profile selection, buffer slicing,
+                chunk progress math, and worker lifecycle management up into
+                App.tsx.
+              </p>
+            </div>
+            <div
+              class="p-3 bg-emerald-50/60 border border-emerald-100 rounded-lg"
+            >
+              <span
+                class="font-semibold text-emerald-900 block text-xs uppercase tracking-wider mb-1"
+                >Solution</span
+              >
+              <p class="text-slate-700">
+                Deepen InferenceClient into an autonomous Separation Pipeline
+                module that accepts an audio source and profile ID,
+                orchestrating download, inference chunking, and worker lifecycle
+                behind a single promise-based execution seam.
+              </p>
+            </div>
+          </div>
+
+          <!-- Wins -->
+          <div>
+            <span
+              class="text-xs font-semibold uppercase tracking-wider text-slate-500 block mb-2"
+              >Architectural Wins</span
+            >
+            <ul
+              class="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs text-slate-700"
+            >
+              <li
+                class="bg-stone-50 border border-stone-200 rounded px-2.5 py-1.5 flex items-center gap-1.5"
+              >
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span
+                >Leverage: one clean separation interface
+              </li>
+              <li
+                class="bg-stone-50 border border-stone-200 rounded px-2.5 py-1.5 flex items-center gap-1.5"
+              >
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span
+                >Eliminates manual buffer slicing in UI
+              </li>
+              <li
+                class="bg-stone-50 border border-stone-200 rounded px-2.5 py-1.5 flex items-center gap-1.5"
+              >
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span
+                >Worker lifecycle contained in module
+              </li>
+              <li
+                class="bg-stone-50 border border-stone-200 rounded px-2.5 py-1.5 flex items-center gap-1.5"
+              >
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span
+                >App.tsx separates UI from inference
+              </li>
+              <li
+                class="bg-stone-50 border border-stone-200 rounded px-2.5 py-1.5 flex items-center gap-1.5"
+              >
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span
+                >Simple mock seam for testing
+              </li>
+            </ul>
+          </div>
+
+          <!-- ADR Callout -->
+          <div
+            class="bg-amber-50/70 border border-amber-200 rounded-lg p-3 text-xs text-amber-900"
+          >
+            <strong>ADR Alignment:</strong> Preserves ADR-0001 client-side
+            WebGPU execution and ADR-0005 model profiles while insulating the UI
+            shell from worker coordination.
+          </div>
+
+          <!-- Before / After Visual -->
+          <div class="grid md:grid-cols-2 gap-6 pt-2">
+            <!-- Before -->
+            <div
+              class="border border-stone-200 rounded-lg p-4 bg-stone-50 flex flex-col justify-between"
+            >
+              <div
+                class="text-xs uppercase tracking-wider font-semibold text-slate-500 mb-3"
+              >
+                Before: Shallow Worker Wrapper with UI Glue
+              </div>
+              <pre class="mermaid">
+                flowchart TD
+                  App[App.tsx handleStartSeparation] --> Prof[getModelProfile]
+                  App --> Init[client.init options]
+                  App --> Slice[Buffer Channel Extraction]
+                  App --> Sep[client.separate options]
+                  App --> Chunk[Chunk Event Handler]
+                  subgraph Client[InferenceClient: Shallow]
+                    Init --> Worker[Inference Worker]
+                    Sep --> Worker
+                  end
+                  classDef leak stroke:#dc2626,stroke-width:2px;
+                  class App,Slice,Chunk leak;
+              </pre>
+              <div class="text-xs text-slate-500 mt-2">
+                App.tsx orchestrates worker initialization, channel loop, and
+                chunk timing.
+              </div>
+            </div>
+
+            <!-- After -->
+            <div
+              class="border border-emerald-200 rounded-lg p-4 bg-emerald-50/30 flex flex-col justify-between"
+            >
+              <div
+                class="text-xs uppercase tracking-wider font-semibold text-emerald-800 mb-3"
+              >
+                After: Deep Separation Pipeline Module
+              </div>
+              <pre class="mermaid">
+                flowchart TD
+                  App[App.tsx] -.-> Seam((( Seam: runSeparation )))
+                  subgraph Pipeline[Deep Module: SeparationPipeline]
+                    direction TB
+                    Profile[Profile & Backend Resolver]
+                    Cache[Model Cache Manager]
+                    WorkerMgr[Worker Pool & Lifecycle]
+                    Overlap[Chunk Overlap-Add Reconstructor]
+                    Profile --> Cache --> WorkerMgr --> Overlap
+                  end
+                  Seam --> Pipeline
+                  Pipeline -.progress & stems.-> App
+                  classDef deep fill:#0f172a,stroke:#38bdf8,stroke-width:2px,color:#fff;
+                  class Pipeline deep;
+              </pre>
+              <div class="text-xs text-slate-500 mt-2">
+                One function call accepts AudioBuffer and profile; yields
+                unified progress and Stems.
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <!-- Candidate 4 -->
+        <article
+          id="candidate-4"
+          class="bg-white border border-stone-200 rounded-xl p-8 shadow-sm space-y-6 scroll-mt-8"
+        >
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <h2 class="text-2xl font-serif font-bold text-slate-900">
+              4. Unify the Canvas Waveform Rendering Engine
+            </h2>
+            <div class="flex items-center gap-2">
+              <span
+                class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800"
+                >Worth exploring</span
+              >
+              <span
+                class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-700"
+                >in-process</span
+              >
+            </div>
+          </div>
+
+          <div
+            class="font-mono text-xs text-slate-500 bg-stone-50 border border-stone-200 p-2.5 rounded-md"
+          >
+            src/components/MasterWaveform.tsx · src/components/StemStrip.tsx ·
+            src/lib/waveformPeaks.ts
+          </div>
+
+          <!-- Problem & Solution -->
+          <div class="grid md:grid-cols-2 gap-4 text-sm">
+            <div class="p-3 bg-red-50/60 border border-red-100 rounded-lg">
+              <span
+                class="font-semibold text-red-900 block text-xs uppercase tracking-wider mb-1"
+                >Problem</span
+              >
+              <p class="text-slate-700">
+                MasterWaveform and StemStrip duplicate low-level canvas
+                rendering logic—retina pixel ratio scaling, ResizeObserver
+                management, peak bucket normalization, and playhead
+                interpolation—across their separate implementations.
+              </p>
+            </div>
+            <div
+              class="p-3 bg-emerald-50/60 border border-emerald-100 rounded-lg"
+            >
+              <span
+                class="font-semibold text-emerald-900 block text-xs uppercase tracking-wider mb-1"
+                >Solution</span
+              >
+              <p class="text-slate-700">
+                Extract a dedicated headless Waveform Renderer module that
+                manages canvas lifecycle, peak drawing, and playhead animation,
+                reducing both components to thin view containers.
+              </p>
+            </div>
+          </div>
+
+          <!-- Wins -->
+          <div>
+            <span
+              class="text-xs font-semibold uppercase tracking-wider text-slate-500 block mb-2"
+              >Architectural Wins</span
+            >
+            <ul
+              class="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs text-slate-700"
+            >
+              <li
+                class="bg-stone-50 border border-stone-200 rounded px-2.5 py-1.5 flex items-center gap-1.5"
+              >
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span
+                >Locality: rendering math in one module
+              </li>
+              <li
+                class="bg-stone-50 border border-stone-200 rounded px-2.5 py-1.5 flex items-center gap-1.5"
+              >
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span
+                >Eliminates duplicate DPI scaling loops
+              </li>
+              <li
+                class="bg-stone-50 border border-stone-200 rounded px-2.5 py-1.5 flex items-center gap-1.5"
+              >
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span
+                >Waveform drawing testable without DOM
+              </li>
+              <li
+                class="bg-stone-50 border border-stone-200 rounded px-2.5 py-1.5 flex items-center gap-1.5"
+              >
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span
+                >StemStrip and MasterWaveform shrink
+              </li>
+              <li
+                class="bg-stone-50 border border-stone-200 rounded px-2.5 py-1.5 flex items-center gap-1.5"
+              >
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span
+                >Guarantees visual consistency across tabs
+              </li>
+            </ul>
+          </div>
+
+          <!-- ADR Callout -->
+          <div
+            class="bg-amber-50/70 border border-amber-200 rounded-lg p-3 text-xs text-amber-900"
+          >
+            <strong>ADR Alignment:</strong> Strengthens ADR-0013 Playhead
+            cohesion visually while keeping the 66 ms repaint ceiling invariant
+            intact.
+          </div>
+
+          <!-- Before / After Visual -->
+          <div class="grid md:grid-cols-2 gap-6 pt-2">
+            <!-- Before -->
+            <div
+              class="border border-stone-200 rounded-lg p-4 bg-stone-50 flex flex-col justify-between"
+            >
+              <div
+                class="text-xs uppercase tracking-wider font-semibold text-slate-500 mb-3"
+              >
+                Before: Duplicate Canvas Rendering Loops
+              </div>
+              <div class="space-y-3 py-4 text-xs font-mono">
+                <div class="border border-red-200 bg-red-50 p-2.5 rounded">
+                  <div class="font-bold text-red-900">
+                    MasterWaveform.tsx (345L)
+                  </div>
+                  <div class="text-slate-600 mt-1">
+                    DPI Scaling · ResizeObserver · Playhead Loop · Peak
+                    Normalization
+                  </div>
+                </div>
+                <div class="border border-red-200 bg-red-50 p-2.5 rounded">
+                  <div class="font-bold text-red-900">StemStrip.tsx (400L)</div>
+                  <div class="text-slate-600 mt-1">
+                    DPI Scaling · ResizeObserver · Playhead Loop · Peak
+                    Normalization
+                  </div>
+                </div>
+              </div>
+              <div class="text-xs text-slate-500 mt-2">
+                Any fix to canvas blurriness or playhead jitter must be
+                implemented twice.
+              </div>
+            </div>
+
+            <!-- After -->
+            <div
+              class="border border-emerald-200 rounded-lg p-4 bg-emerald-50/30 flex flex-col justify-between"
+            >
+              <div
+                class="text-xs uppercase tracking-wider font-semibold text-emerald-800 mb-3"
+              >
+                After: Consolidated Waveform Renderer
+              </div>
+              <div class="space-y-3 py-2 text-xs font-mono">
+                <div
+                  class="border border-emerald-300 bg-slate-900 text-slate-100 p-3 rounded shadow"
+                >
+                  <div class="font-bold text-sky-400">
+                    Deep Module: WaveformRenderer
+                  </div>
+                  <div class="text-slate-300 mt-1">
+                    Single DPI Scaling Engine · Peak Bucket Interpolation ·
+                    Playhead Needle Animator
+                  </div>
+                </div>
+                <div class="grid grid-cols-2 gap-2 text-center">
+                  <div class="border border-slate-200 bg-white p-2 rounded">
+                    MasterWaveform View
+                  </div>
+                  <div class="border border-slate-200 bg-white p-2 rounded">
+                    StemStrip View
+                  </div>
+                </div>
+              </div>
+              <div class="text-xs text-slate-500 mt-2">
+                Components pass canvas ref + peaks + playheadSec; renderer
+                handles the hardware canvas.
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <!-- Candidate 5 -->
+        <article
+          id="candidate-5"
+          class="bg-white border border-stone-200 rounded-xl p-8 shadow-sm space-y-6 scroll-mt-8"
+        >
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <h2 class="text-2xl font-serif font-bold text-slate-900">
+              5. Deepen the Tempo Detector & Click Calibration Subsystem
+            </h2>
+            <div class="flex items-center gap-2">
+              <span
+                class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800"
+                >Worth exploring</span
+              >
+              <span
+                class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-700"
+                >local-substitutable</span
+              >
+            </div>
+          </div>
+
+          <div
+            class="font-mono text-xs text-slate-500 bg-stone-50 border border-stone-200 p-2.5 rounded-md"
+          >
+            src/App.tsx · src/lib/beatClient.ts · src/lib/beatGridRepair.ts ·
+            src/components/BeatGridTapCalibration.tsx
+          </div>
+
+          <!-- Problem & Solution -->
+          <div class="grid md:grid-cols-2 gap-4 text-sm">
+            <div class="p-3 bg-red-50/60 border border-red-100 rounded-lg">
+              <span
+                class="font-semibold text-red-900 block text-xs uppercase tracking-wider mb-1"
+                >Problem</span
+              >
+              <p class="text-slate-700">
+                Tempo analysis logic—groove channel selection, worker dispatch,
+                candidate re-locking with BPM hints, and by-hand tap calibration
+                with grid rigid-body shifting—is fragmented across four files
+                with leaky state handoffs in App.tsx.
+              </p>
+            </div>
+            <div
+              class="p-3 bg-emerald-50/60 border border-emerald-100 rounded-lg"
+            >
+              <span
+                class="font-semibold text-emerald-900 block text-xs uppercase tracking-wider mb-1"
+                >Solution</span
+              >
+              <p class="text-slate-700">
+                Consolidate tempo detection, candidate re-locking, and tap
+                calibration into a deep Tempo Tracker module that accepts audio
+                or tap events and returns the consolidated TempoAnalysisResult
+                and BeatGrid.
+              </p>
+            </div>
+          </div>
+
+          <!-- Wins -->
+          <div>
+            <span
+              class="text-xs font-semibold uppercase tracking-wider text-slate-500 block mb-2"
+              >Architectural Wins</span
+            >
+            <ul
+              class="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs text-slate-700"
+            >
+              <li
+                class="bg-stone-50 border border-stone-200 rounded px-2.5 py-1.5 flex items-center gap-1.5"
+              >
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span
+                >Locality: beat grid rules in one module
+              </li>
+              <li
+                class="bg-stone-50 border border-stone-200 rounded px-2.5 py-1.5 flex items-center gap-1.5"
+              >
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span
+                >Eliminates handoff refs in App.tsx
+              </li>
+              <li
+                class="bg-stone-50 border border-stone-200 rounded px-2.5 py-1.5 flex items-center gap-1.5"
+              >
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span
+                >Drums vs mix fallback hidden inside
+              </li>
+              <li
+                class="bg-stone-50 border border-stone-200 rounded px-2.5 py-1.5 flex items-center gap-1.5"
+              >
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Tap
+                calibration tested without UI
+              </li>
+              <li
+                class="bg-stone-50 border border-stone-200 rounded px-2.5 py-1.5 flex items-center gap-1.5"
+              >
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span
+                >Direct alignment with GLOSSARY concepts
+              </li>
+            </ul>
+          </div>
+
+          <!-- ADR Callout -->
+          <div
+            class="bg-amber-50/70 border border-amber-200 rounded-lg p-3 text-xs text-amber-900"
+          >
+            <strong>ADR Alignment:</strong> Unifies ADR-0010 (tempo detection)
+            and ADR-0011 (beat grid downbeat/repair derivations) behind one
+            seam.
+          </div>
+
+          <!-- Before / After Visual -->
+          <div class="grid md:grid-cols-2 gap-6 pt-2">
+            <!-- Before -->
+            <div
+              class="border border-stone-200 rounded-lg p-4 bg-stone-50 flex flex-col justify-between"
+            >
+              <div
+                class="text-xs uppercase tracking-wider font-semibold text-slate-500 mb-3"
+              >
+                Before: Fragmented Tempo & Calibration Handoffs
+              </div>
+              <pre class="mermaid">
+                flowchart TD
+                  App[App.tsx] --> ChSelect[channelForTempoAnalysis]
+                  ChSelect --> Client[beatClient.ts]
+                  Client --> Worker[beatDetection.worker]
+                  App --> CalibUI[BeatGridTapCalibration.tsx]
+                  CalibUI --> Repair[beatGridRepair.ts]
+                  Repair -.reanchor.-> App
+                  classDef leak stroke:#dc2626,stroke-width:2px;
+                  class App,ChSelect leak;
+              </pre>
+              <div class="text-xs text-slate-500 mt-2">
+                Channel selection, candidate hint re-locking, and tap
+                calibration leak into App.tsx.
+              </div>
+            </div>
+
+            <!-- After -->
+            <div
+              class="border border-emerald-200 rounded-lg p-4 bg-emerald-50/30 flex flex-col justify-between"
+            >
+              <div
+                class="text-xs uppercase tracking-wider font-semibold text-emerald-800 mb-3"
+              >
+                After: Deep Tempo Tracker Module
+              </div>
+              <pre class="mermaid">
+                flowchart TD
+                  Audio[AudioBuffer or Stems] -.-> Seam((( Seam: TempoTracker )))
+                  Taps[Raw User Taps] -.-> Seam
+                  subgraph DeepTracker[Deep Module: TempoTracker]
+                    direction TB
+                    WorkerBridge[Worker Execution & Hinting]
+                    GridEng[Beat Grid Analysis & Snap]
+                    HandCalib[Hand Calibration Rigid Shift]
+                    WorkerBridge --> GridEng --> HandCalib
+                  end
+                  Seam --> DeepTracker
+                  DeepTracker -.TempoAnalysisResult & BeatGrid.-> App[App.tsx / Session]
+                  classDef deep fill:#0f172a,stroke:#38bdf8,stroke-width:2px,color:#fff;
+                  class DeepTracker deep;
+              </pre>
+              <div class="text-xs text-slate-500 mt-2">
+                Single interface for automatic analysis, candidate re-locking,
+                and manual tap calibration.
+              </div>
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <!-- Top Recommendation Section -->
+      <section id="top-recommendation" class="border-t border-stone-200 pt-8">
+        <div
+          class="bg-gradient-to-br from-slate-900 to-slate-800 text-white rounded-xl p-8 shadow-md flex flex-col md:flex-row md:items-center justify-between gap-6"
+        >
+          <div class="space-y-2 max-w-2xl">
+            <div class="flex items-center gap-2">
+              <span
+                class="px-2 py-0.5 rounded text-xs font-semibold bg-emerald-500 text-slate-950 uppercase tracking-wider"
+                >Top Recommendation</span
+              >
+              <span class="text-xs text-slate-400"
+                >Immediate Impact & High Leverage</span
+              >
+            </div>
+            <h3 class="text-2xl font-serif font-bold text-white">
+              Candidate 1: Deepen the Export Engine & Collapse the Export
+              Monolith
+            </h3>
+            <p class="text-sm text-slate-300 leading-relaxed">
+              Following the successful deepening of Transport Bridge (ADR-0013)
+              and Player Engine (ADR-0016), ExportDialog is now the largest and
+              most tangled monolithic component remaining in the codebase (1,137
+              lines). Extracting a deep Export Engine isolates high-value audio
+              encoding arithmetic behind a pure test seam, retires historical
+              "Dialog" naming debt in line with ADR-0007 / GLOSSARY, and
+              eliminates the exportDialogState bridge in App.tsx.
+            </p>
+          </div>
+          <div class="flex-shrink-0">
+            <a
+              href="#candidate-1"
+              class="inline-flex items-center justify-center px-5 py-2.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold text-sm transition-colors shadow"
+            >
+              Review Candidate 1 &rarr;
+            </a>
+          </div>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

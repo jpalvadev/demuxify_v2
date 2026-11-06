@@ -32,7 +32,7 @@ The export subsystem collapses into a deep headless **Export Engine** module and
    - `exportAudio` produces pure data; the UI view invokes `triggerDownload` upon completion.
 
 4. **Clean Export Tab View (`src/components/ExportTab.tsx`):**
-   - Renamed from historical `ExportDialog.tsx` to `ExportTab.tsx`, exporting `ExportTab`.
+   - Renamed from `ExportDialog.tsx` to `ExportTab.tsx`, exporting `ExportTab`.
    - Dead modal affordances (`isOpen`, `onClose`, modal overlay backdrop, Escape key listener) are deleted; container renders as a clean Tab panel (`role="region"`).
    - In-panel Cancel button triggers an internal `AbortController` linked to the active export, cleanly resetting state without throwing unhandled errors.
 

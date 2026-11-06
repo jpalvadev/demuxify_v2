@@ -25,7 +25,7 @@ const identifierToken =
   /^[A-Za-z_$][A-Za-z0-9_$]*(\.[A-Za-z_$][A-Za-z0-9_$]*)*$/;
 const codeishToken = /[A-Z0-9_$]/; // camelCase/PascalCase or symbol-ish
 const historicalText =
-  /(retire|deleted|removed?|history|historical|no longer)/i;
+  /(retire|deleted|removed?|history|historical|no longer|renam(ed|ing)?|prior\b|previously|superseded)/i;
 const packageSpan = /^@[\w/@-]+$/;
 const pathSpan = /^[^\s`]+\/[^\s`]*$/; // path-shaped, no whitespace
 const fileExtSpan = /^[^\s`]+\.(ts|tsx|mjs|md)$/i;
