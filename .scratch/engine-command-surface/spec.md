@@ -1,6 +1,6 @@
 # Spec: Engine Command Surface — The Player Engine Speaks Commands and Reports One Mixer State
 
-Status: ready-for-agent
+Status: resolved-in-full (2026-11-06)
 
 Recorded on the tracker 2026-11-06. This is the architecture-review increment (candidate 6 of the 2026-11-05 architecture report, the one the report marked _Speculative_ and deliberately sequenced after candidate 1): a deepening of the **Player Engine**'s interface, not a feature — the shipped Mix **Tab** behavior is the promise, byte-for-byte, exactly as the `transport-snapshot` increment promised it. Candidate 1 landed first precisely so this shrink would have a seam to shrink against (ADR-0013 amendment, 2026-11-06), and the report's own note is honored: the **Transport** snapshot is the seam this interface shrinks against. An **ADR-0016** is authored at porting start, with **ADR-0012** and **ADR-0013** amendments. Glossary terms used throughout: **Player Engine**, **Mixer State**, **Stem Player**, **Transport**, **Playhead**, **Peak Pips**, **Master Waveform**, **Stem Strip**, **Stems**, **Source Mix**, **Session**, **Tab Shell**, **Tab**, **Rail**, **Click Track**, **Beat Grid**, **Time-Stretch**, **Pitch-Shift**, **Formant Preservation**, **Hand Calibration**, **Tempo Detector**.
 
