@@ -2438,6 +2438,151 @@ describe("App UI Shell", () => {
     expect(spine).toHaveAttribute("aria-valuetext", "1:03");
   });
 
+  // Transport snapshot (ticket 04): a restored Session seeds the snapshot's
+  // Master volume and Playhead on resume — the very first frame with the
+  // player mounted shows the Session's own truth, no default-flash on the
+  // footer, and the spine resumes at the restored spot.
+  it("seeds the snapshot from the restored Session before the player mounts", async () => {
+    vi.spyOn(webgpuModule, "detectWebGPUCapability").mockResolvedValue({
+      supported: true,
+      isFallback: false,
+    });
+
+    const sessionStore = await import("../lib/sessionStore");
+    await sessionStore.saveActiveSession({
+      metadata: {
+        id: "seed-snapshot-session-test",
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        title: "Seedstone",
+        filename: "seedstone.mp3",
+        duration: 284,
+        sampleRate: 44100,
+      },
+      sourceMix: {
+        channels: [new Float32Array(500), new Float32Array(500)],
+      },
+      stems: {
+        vocals: [new Float32Array(500), new Float32Array(500)],
+        drums: [new Float32Array(500), new Float32Array(500)],
+        bass: [new Float32Array(500), new Float32Array(500)],
+        other: [new Float32Array(500), new Float32Array(500)],
+      },
+      mixer: {
+        stems: {
+          vocals: { volume: 1.0, muted: false, solo: false },
+          drums: { volume: 1.0, muted: false, solo: false },
+          bass: { volume: 1.0, muted: false, solo: false },
+          other: { volume: 1.0, muted: false, solo: false },
+        },
+        masterVolume: 0.9,
+        currentTime: 42,
+        pitchSemitones: 0,
+        tempoRatio: 1.0,
+      },
+    });
+
+    render(<App />);
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: /resume session/i })
+      ).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByRole("button", { name: /resume session/i }));
+    await waitFor(() => {
+      expect(
+        screen.getByRole("region", { name: /stem player/i })
+      ).toBeInTheDocument();
+    });
+
+    // The footer's first painted frame is already the Session's truth:
+    // 90% Master and a 00:42 Playhead.
+    expect(screen.getByTestId("footer-master-percent")).toHaveTextContent(
+      "90%"
+    );
+    expect(
+      screen.getByRole("slider", { name: /^master volume$/i })
+    ).toHaveValue("90");
+    expect(screen.getByTestId("footer-time-current")).toHaveTextContent(
+      "00:42"
+    );
+    const mixTab = screen.getByRole("region", { name: /mix tab/i });
+    expect(
+      within(mixTab).getByRole("slider", { name: /master waveform timeline/i })
+    ).toHaveAttribute("aria-valuenow", "42");
+
+    await sessionStore.clearActiveSession();
+  });
+
+  // Transport snapshot (ticket 04): with no player wired — the Separate Tab
+  // at boot — the snapshot reads idle and every command is an inert no-op:
+  // the disc never plays a phantom, the fader's restatement paints its %
+  // readout, and nothing crashes without an engine.
+  it("keeps the footer disc and fader idle-safe with no player wired", async () => {
+    vi.spyOn(webgpuModule, "detectWebGPUCapability").mockResolvedValue({
+      supported: true,
+      isFallback: false,
+    });
+    const sessionStore = await import("../lib/sessionStore");
+    await sessionStore.clearActiveSession();
+
+    render(<App />);
+
+    const disc = await screen.findByRole("button", {
+      name: /^play\/pause$/i,
+    });
+    expect(disc).toHaveAttribute("aria-pressed", "false");
+
+    // The play command crosses an unwired adapter: inert, no phantom state.
+    fireEvent.click(disc);
+    expect(disc).toHaveAttribute("aria-pressed", "false");
+
+    // The fader's restatement paints the snapshot — 40% — with no engine
+    // behind it and no crash.
+    const fader = screen.getByRole("slider", { name: /^master volume$/i });
+    fireEvent.change(fader, { target: { value: "40" } });
+    await waitFor(() => {
+      expect(screen.getByTestId("footer-master-percent")).toHaveTextContent(
+        "40%"
+      );
+    });
+  });
+
+  // Transport snapshot (ticket 04): completing a separation resets the
+  // snapshot to fresh defaults — a fader parked at 40% before the separation
+  // comes back 100%, the Playhead reads 00:00, and the disc sits idle.
+  it("resets the snapshot to fresh defaults when a separation completes", async () => {
+    vi.spyOn(webgpuModule, "detectWebGPUCapability").mockResolvedValue({
+      supported: true,
+      isFallback: false,
+    });
+    completeSeparationMocks();
+
+    render(<App />);
+
+    // Park the fader mid-drag on the Separate Tab (restatement, no player).
+    const fader = await screen.findByRole("slider", {
+      name: /^master volume$/i,
+    });
+    fireEvent.change(fader, { target: { value: "40" } });
+    await waitFor(() => {
+      expect(screen.getByTestId("footer-master-percent")).toHaveTextContent(
+        "40%"
+      );
+    });
+
+    await loadAndSeparate();
+
+    expect(screen.getByTestId("footer-master-percent")).toHaveTextContent(
+      "100%"
+    );
+    expect(screen.getByTestId("footer-time-current")).toHaveTextContent(
+      "00:00"
+    );
+    const disc = screen.getByRole("button", { name: /^play\/pause$/i });
+    expect(disc).toHaveAttribute("aria-pressed", "false");
+  });
+
   // Transport snapshot (ticket 01): the footer disc runs on the module's
   // snapshot through the scripted adapter — commands in, snapshots out, zero
   // audio machinery. This retargets the disc semantics the AudioContext

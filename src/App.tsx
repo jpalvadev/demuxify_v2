@@ -522,7 +522,10 @@ export const App: React.FC<AppProps> = ({ transport }) => {
     setSelectedFile(file);
     setIsDecoding(true);
     setDecodeError(null);
-    liveTransportRef.current?.setPlayheadSec(0);
+    // transport-snapshot ticket 04: a new Source Mix wipes the transport —
+    // the player unmounts (commands go inert) and the snapshot reads idle.
+    liveTransportRef.current?.release();
+    liveTransportRef.current?.reset();
     setSeparationPhase("idle");
     setSeparatedStems(null);
     setTempoAnalysis(null);
@@ -572,7 +575,10 @@ export const App: React.FC<AppProps> = ({ transport }) => {
     setSelectedFile(null);
     setDecodedSourceMix(null);
     setWaveformPeaks(null);
-    liveTransportRef.current?.setPlayheadSec(0);
+    // transport-snapshot ticket 04: the purge wipe releases the player and
+    // returns the snapshot to idle fresh defaults.
+    liveTransportRef.current?.release();
+    liveTransportRef.current?.reset();
     setDecodeError(null);
     setSeparationPhase("idle");
     setSeparatedStems(null);
@@ -796,6 +802,12 @@ export const App: React.FC<AppProps> = ({ transport }) => {
     try {
       setSeparationPhase("downloading");
       setSeparationError(null);
+      // transport-snapshot ticket 04: a fresh separation starts from idle —
+      // any mounted player is about to unmount (commands go inert), and the
+      // snapshot resets to fresh defaults (not playing, Playhead 0, 1.0,
+      // silent) alongside the fresh mixer state below.
+      liveTransportRef.current?.release();
+      liveTransportRef.current?.reset();
       setSeparatedStems(null);
 
       if (!inferenceClientRef.current) {
@@ -839,6 +851,11 @@ export const App: React.FC<AppProps> = ({ transport }) => {
         }
       );
 
+      // transport-snapshot ticket 04: separation completion lands fresh
+      // defaults on the snapshot as the player mounts — not playing,
+      // Playhead 0, volume 1.0, silent levels (the engine's own mixer mirror
+      // lands the same values, an equal restatement, a no-op publish).
+      liveTransportRef.current?.reset();
       setSeparatedStems(result.stems);
       setSeparationPhase("completed");
       // Ticket 07 (ADR-0010 Amendment): the Beat Grid gets re-read where the

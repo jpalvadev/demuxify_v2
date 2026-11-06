@@ -175,4 +175,23 @@ describe("Transport bridge — live adapter (the shell's own wiring)", () => {
     live.setPlaying(false);
     expect(live.bridge.getSnapshot().playing).toBe(false);
   });
+
+  it("seeding lands the restored Session's values; reset returns fresh defaults", () => {
+    const live = createLiveTransportBridge();
+    const seeded: TransportSnapshot = {
+      playing: false,
+      playheadSec: 42,
+      masterVolume: 0.9,
+      levels: { left: 0, right: 0 },
+    };
+    live.seed({ masterVolume: 0.9, playheadSec: 42 });
+    expect(live.bridge.getSnapshot()).toEqual(seeded);
+
+    // Live traffic on top of the seed, then the wipe: fresh defaults.
+    live.setPlaying(true);
+    live.setLevels({ left: 0.4, right: 0.4 });
+    live.setPlayheadSec(99);
+    live.reset();
+    expect(live.bridge.getSnapshot()).toEqual(IDLE_TRANSPORT_SNAPSHOT);
+  });
 });
