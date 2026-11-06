@@ -20,6 +20,10 @@ _Avoid_: Mixer, audio controls, music player
 The client-side execution runtime running the ONNX neural network model (Studio / BS-RoFormer on desktop, Balanced / HT-Demucs, or Ultra Fast / Open-Unmix on mobile devices) via WebGPU or WebAssembly.
 _Avoid_: RoFormer runner, backend, separator
 
+**Separation Engine**:
+The headless coordinator that transforms a **Source Mix** into isolated **Stems** — it resolves **Model Profiles**, manages neural network weight caching, and drives the **Inference Engine** worker behind a promise-based execution seam. The application drives it; it never renders UI or touches WebAudio playback nodes directly.
+_Avoid_: Separation pipeline, inference orchestrator, model runner, separator
+
 **Player Engine**:
 The WebAudio playback core the **Stem Player** drives — it owns the sound of a mix: the Stems, the Master bus, the Click Track, and Time-Stretch. Separation fills it; it never separates, so it is never the Inference Engine.
 _Avoid_: Audio engine, mixer engine, playback backend, bare "engine" when separation is in scope

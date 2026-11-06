@@ -27,7 +27,7 @@ function runVitest() {
     {
       // stdout: pure JSON report (captured); stderr: vitest's own diagnostics
       // pass through to the terminal so a broken run is still visible.
-      stdio: ["inherit", "pipe", "inherit"],
+      stdio: ["ignore", "pipe", "inherit"],
       encoding: "utf-8",
       maxBuffer: 64 * 1024 * 1024,
     }

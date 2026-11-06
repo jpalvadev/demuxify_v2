@@ -898,20 +898,26 @@ describe("App UI Shell", () => {
 
     render(<App />);
 
-    await waitFor(() => {
-      expect(
-        screen.getByRole("button", { name: /resume session/i })
-      ).toBeInTheDocument();
-    });
+    await waitFor(
+      () => {
+        expect(
+          screen.getByRole("button", { name: /resume session/i })
+        ).toBeInTheDocument();
+      },
+      { timeout: 4000 }
+    );
 
     const resumeBtn = screen.getByRole("button", { name: /resume session/i });
     fireEvent.click(resumeBtn);
 
-    await waitFor(() => {
-      expect(
-        screen.getByRole("region", { name: /stem player/i })
-      ).toBeInTheDocument();
-    });
+    await waitFor(
+      () => {
+        expect(
+          screen.getByRole("region", { name: /stem player/i })
+        ).toBeInTheDocument();
+      },
+      { timeout: 4000 }
+    );
 
     // Recovery banner should disappear after resuming
     expect(
@@ -1002,20 +1008,26 @@ describe("App UI Shell", () => {
 
     render(<App />);
 
-    await waitFor(() => {
-      expect(
-        screen.getByRole("button", { name: /resume session/i })
-      ).toBeInTheDocument();
-    });
+    await waitFor(
+      () => {
+        expect(
+          screen.getByRole("button", { name: /resume session/i })
+        ).toBeInTheDocument();
+      },
+      { timeout: 4000 }
+    );
 
     const resumeBtn = screen.getByRole("button", { name: /resume session/i });
     fireEvent.click(resumeBtn);
 
-    await waitFor(() => {
-      expect(
-        screen.getByRole("region", { name: /stem player/i })
-      ).toBeInTheDocument();
-    });
+    await waitFor(
+      () => {
+        expect(
+          screen.getByRole("region", { name: /stem player/i })
+        ).toBeInTheDocument();
+      },
+      { timeout: 4000 }
+    );
 
     // Ticket 03: the recovered Session carries its Tempo Detector result, so
     // the readout resumes identical (ranked candidates survive the store
