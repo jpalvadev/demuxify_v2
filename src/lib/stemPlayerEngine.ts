@@ -186,6 +186,64 @@ export interface StereoPeakLevels {
 }
 export type LevelsListener = (levels: StereoPeakLevels) => void;
 
+// Engine Command Surface (ADR-0016): ONE read side. Every fact the Stem Player
+// shows is one snapshot read at one instant — published only when a fact
+// actually changes, with sub-objects cloned at publish so a reader can never
+// mutate engine state through it. transportBridge.ts's snapshotEquals is the
+// model: an equal snapshot never publishes and never mints a new object, so
+// useSyncExternalStore readers never re-render on no-change. The Beat Grid is
+// deliberately absent: shared stage machinery the lane follows, not Mixer State.
+export interface StemPlayerSnapshot {
+  playing: boolean;
+  playheadSec: number; // canonical Source Mix seconds (the Playhead)
+  duration: number;
+  masterVolume: number; // 0..1, the Master bus
+  stems: StemMixerStates; // per-Stem { volume, muted, solo }
+  clickTrack: ClickTrackMixerState; // { enabled, volume } — no mute, no solo
+  timeStretch: TimeStretchState; // { tempo, pitch, formantPreservation }
+  levels: StereoPeakLevels; // post-fader L/R, engine-coalesced
+  stretchMode: "signalsmith" | "wsola" | "basic";
+}
+
+export type SnapshotListener = (snapshot: StemPlayerSnapshot) => void;
+
+// applyMixer payload (ticket 01): per-Stem volume/mute/solo plus Master volume,
+// all optional — a control press sends only the fact it moves.
+export interface MixerCommand {
+  stems?: Partial<Record<StemName, Partial<StemMixerState>>>;
+  masterVolume?: number;
+}
+
+function stemMixerStatesEqual(a: StemMixerStates, b: StemMixerStates): boolean {
+  return STEM_NAMES.every(
+    (stem) =>
+      a[stem].volume === b[stem].volume &&
+      a[stem].muted === b[stem].muted &&
+      a[stem].solo === b[stem].solo
+  );
+}
+
+function stemPlayerSnapshotsEqual(
+  a: StemPlayerSnapshot,
+  b: StemPlayerSnapshot
+): boolean {
+  return (
+    a.playing === b.playing &&
+    a.playheadSec === b.playheadSec &&
+    a.duration === b.duration &&
+    a.masterVolume === b.masterVolume &&
+    stemMixerStatesEqual(a.stems, b.stems) &&
+    a.clickTrack.enabled === b.clickTrack.enabled &&
+    a.clickTrack.volume === b.clickTrack.volume &&
+    a.timeStretch.tempo === b.timeStretch.tempo &&
+    a.timeStretch.pitch === b.timeStretch.pitch &&
+    a.timeStretch.formantPreservation === b.timeStretch.formantPreservation &&
+    a.levels.left === b.levels.left &&
+    a.levels.right === b.levels.right &&
+    a.stretchMode === b.stretchMode
+  );
+}
+
 // Peak meter scale: RMS in [-60, 0] dB maps linearly onto [0, 1].
 const PEAK_METER_FLOOR_DB = -60;
 // The pips are painted, not sampled per audio frame: coalesce emissions to
@@ -230,6 +288,9 @@ export class StemPlayerEngine {
   private positionListeners: Set<PositionListener> = new Set();
   private stateListeners: Set<StateListener> = new Set();
   private timeStretchListeners: Set<TimeStretchListener> = new Set();
+  // Engine Command Surface (ADR-0016): the ONE read channel.
+  private snapshotListeners: Set<SnapshotListener> = new Set();
+  private currentSnapshot: StemPlayerSnapshot | null = null;
 
   // Peak meter lane (2026-11-05): a sidecar tap off the master bus — a
   // ChannelSplitterNode feeding one AnalyserNode per channel, sinks only.
@@ -412,6 +473,11 @@ export class StemPlayerEngine {
     } else if (!options?.disableWorklet) {
       this.workletInitPromise = this.initAudioWorklet(sampleRate);
     }
+
+    // The first snapshot is minted at construction: snapshot() is always
+    // readable, even before any listener attaches (useSyncExternalStore
+    // semantics demand a sync, reference-stable read from the first render).
+    this.currentSnapshot = this.buildSnapshot();
   }
 
   private async initAudioWorklet(sampleRate: number): Promise<void> {
@@ -438,6 +504,10 @@ export class StemPlayerEngine {
 
           this.stretchAdapter = adapter;
           this.useWorklet = true;
+          // stretchMode is a snapshot fact: the signalsmith handoff changes it.
+          this.publish();
+          // stretchMode is a snapshot fact: the signalsmith handoff flips it.
+          this.publish();
 
           if (this.playing) {
             const curTime = this.getCurrentTime();
@@ -532,6 +602,10 @@ export class StemPlayerEngine {
 
       this.workletNode = workletNode;
       this.useWorklet = true;
+      // stretchMode is a snapshot fact: the WSOLA handoff changes it.
+      this.publish();
+      // stretchMode is a snapshot fact: the WSOLA handoff flips it.
+      this.publish();
 
       // If active playback was started via fallback sources while worklet was loading,
       // seamlessly migrate active playback into the worklet without ghost sources!
@@ -557,6 +631,8 @@ export class StemPlayerEngine {
       );
       this.useWorklet = false;
       this.workletNode = null;
+      // stretchMode settles to 'basic' — the snapshot reports it.
+      this.publish();
     }
   }
 
@@ -594,6 +670,61 @@ export class StemPlayerEngine {
     return this.playing;
   }
 
+  // --- Engine Command Surface read side (ADR-0016) ---------------------------
+  // One snapshot, one subscription, publish-on-change. transportBridge.ts's
+  // snapshotEquals discipline: an equal snapshot never publishes and never
+  // mints a new object, so useSyncExternalStore readers never re-render on
+  // no-change; sub-objects are cloned at publish (getAllStemStates/
+  // getClickTrackState/getLevels each return a fresh copy), so a reader can
+  // never mutate engine state through the snapshot.
+
+  private buildSnapshot(): StemPlayerSnapshot {
+    return {
+      playing: this.playing,
+      playheadSec: this.getCurrentTime(),
+      duration: this.duration,
+      masterVolume: this.masterVolume,
+      stems: this.getAllStemStates(),
+      clickTrack: this.getClickTrackState(),
+      timeStretch: {
+        tempo: this.tempo,
+        pitch: this.pitch,
+        formantPreservation: this.formantPreservation,
+      },
+      levels: this.getLevels(),
+      stretchMode: this.getStretchMode(),
+    };
+  }
+
+  private publish(): void {
+    const next = this.buildSnapshot();
+    const current = this.currentSnapshot;
+    if (current !== null && stemPlayerSnapshotsEqual(current, next)) {
+      return; // equal → no publish, no new object
+    }
+    this.currentSnapshot = next;
+    for (const listener of this.snapshotListeners) {
+      listener(next);
+    }
+  }
+
+  /** The sync read: the current snapshot, reference-stable between publishes. */
+  public snapshot(): StemPlayerSnapshot {
+    if (this.currentSnapshot === null) {
+      this.currentSnapshot = this.buildSnapshot();
+    }
+    return this.currentSnapshot;
+  }
+
+  /** The engine's one read channel: called on every published change. */
+  public subscribe(listener: SnapshotListener): () => void {
+    this.snapshotListeners.add(listener);
+    listener(this.snapshot());
+    return () => {
+      this.snapshotListeners.delete(listener);
+    };
+  }
+
   public getStemState(stem: StemName): StemMixerState {
     return { ...this.stemStates[stem] };
   }
@@ -617,6 +748,7 @@ export class StemPlayerEngine {
       this.masterVolume,
       this.audioContext.currentTime
     );
+    this.publish();
   }
 
   public setStemVolume(stem: StemName, volume: number): void {
@@ -649,6 +781,30 @@ export class StemPlayerEngine {
 
   public toggleStemSolo(stem: StemName): void {
     this.setStemSolo(stem, !this.stemStates[stem].solo);
+  }
+
+  /**
+   * The mixer command (ADR-0016): per-Stem { volume?, muted?, solo? } plus
+   * Master volume, applied in one step with one publish. ADR-0012's per-Stem
+   * exclusivity resolves inside the command — setStemMute/setStemSolo (the
+   * enforcement names the ADR cites) clear the opposite flag, and the gain
+   * matrix the setters drive already silences the solo-shaded lanes.
+   */
+  public applyMixer(command: MixerCommand): void {
+    if (command.stems) {
+      for (const stem of STEM_NAMES) {
+        const partial = command.stems[stem];
+        if (!partial) continue;
+        if (partial.volume !== undefined)
+          this.setStemVolume(stem, partial.volume);
+        if (partial.muted !== undefined) this.setStemMute(stem, partial.muted);
+        if (partial.solo !== undefined) this.setStemSolo(stem, partial.solo);
+      }
+    }
+    if (command.masterVolume !== undefined) {
+      this.setMasterVolume(command.masterVolume);
+    }
+    this.publish();
   }
 
   // --- Click Track lane (ADR-0010) -----------------------------------------
@@ -690,6 +846,7 @@ export class StemPlayerEngine {
     } else {
       this.stopClickSource();
     }
+    this.publish();
   }
 
   public toggleClickTrack(): void {
@@ -701,6 +858,7 @@ export class StemPlayerEngine {
   public setClickTrackVolume(volume: number): void {
     this.clickTrackState.volume = Math.max(0, Math.min(1, volume));
     this.applyClickGain();
+    this.publish();
   }
 
   private applyClickGain(): void {
@@ -1071,6 +1229,7 @@ export class StemPlayerEngine {
     for (const listener of this.levelsListeners) {
       listener(levels);
     }
+    this.publish();
   }
 
   private sampleChannelAnalyser(
@@ -1145,6 +1304,9 @@ export class StemPlayerEngine {
     for (const listener of this.positionListeners) {
       listener(curTime);
     }
+    // ADR-0016: the Playhead rides the one snapshot (the player already
+    // re-renders per frame today — the cadence is not new).
+    this.publish();
   }
 
   private notifyState(): void {
@@ -1152,6 +1314,7 @@ export class StemPlayerEngine {
     for (const listener of this.stateListeners) {
       listener(states);
     }
+    this.publish();
   }
 
   public getTempo(): number {
@@ -1274,6 +1437,7 @@ export class StemPlayerEngine {
     for (const listener of this.timeStretchListeners) {
       listener(state);
     }
+    this.publish();
   }
 
   public isUsingWorklet(): boolean {
@@ -1330,6 +1494,7 @@ export class StemPlayerEngine {
     this.stateListeners.clear();
     this.timeStretchListeners.clear();
     this.levelsListeners.clear();
+    this.snapshotListeners.clear();
 
     for (const tapNode of [
       this.splitterNode,

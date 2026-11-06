@@ -2,6 +2,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   StemPlayerEngine,
   ClickTrackMixerState,
+  StemMixerState,
+  TimeStretchState,
   CalibratedClickGrid,
   ClickCalibrationRejection,
   StereoPeakLevels,
@@ -417,6 +419,135 @@ describe("StemPlayerEngine", () => {
       engine.setMasterVolume(0.42);
       expect(engine.getMasterVolume()).toBeCloseTo(0.42);
       expect(engine.getMasterGainNode().gain.value).toBeCloseTo(0.42);
+    });
+  });
+
+  // ─── Player Engine command surface (ticket 01): applyMixer in, snapshot out ───
+  // ADR-0016 anchors: the verb is the whole Mixer interface — exclusivity
+  // (ADR-0012) and clamping live inside applyMixer, and every fact the command
+  // changes publishes its result through the one snapshot, equality-gated so a
+  // no-change command never mints an object or notifies.
+
+  describe("applyMixer + snapshot", () => {
+    const loadEngine = () => {
+      const engine = new StemPlayerEngine(dummyStems, {
+        audioContext: mockCtx as any,
+        sampleRate,
+      });
+      return engine;
+    };
+
+    it("snapshot() exposes the full Player Engine view with no getters", () => {
+      const engine = loadEngine();
+      const snap = engine.snapshot();
+      expect(snap.playing).toBe(false);
+      expect(snap.playheadSec).toBe(0);
+      expect(snap.duration).toBe(10);
+      expect(snap.masterVolume).toBe(1);
+      expect(Object.keys(snap.stems).sort()).toEqual([
+        "bass",
+        "drums",
+        "other",
+        "vocals",
+      ]);
+      const expectedStem: StemMixerState = {
+        volume: 1,
+        muted: false,
+        solo: false,
+      };
+      expect(snap.stems.vocals).toEqual(expectedStem);
+      expect(snap.clickTrack).toEqual({ enabled: false, volume: 1 });
+      const expectedTimeStretch: TimeStretchState = {
+        tempo: 1,
+        pitch: 0,
+        formantPreservation: true,
+      };
+      expect(snap.timeStretch).toEqual(expectedTimeStretch);
+      expect(snap.levels).toEqual({ left: 0, right: 0 });
+      expect(snap.stretchMode).toBe("basic");
+    });
+
+    it("snapshot() is reference-stable and mints a new object only when state changes", () => {
+      const engine = loadEngine();
+      const first = engine.snapshot();
+      expect(engine.snapshot()).toBe(first);
+      engine.setMasterVolume(0.5);
+      const second = engine.snapshot();
+      expect(second).not.toBe(first);
+      expect(second.masterVolume).toBe(0.5);
+      expect(engine.snapshot()).toBe(second);
+    });
+
+    it("applyMixer changes Mixer State through the verb and publishes the new snapshot once", () => {
+      const engine = loadEngine();
+      const listener = vi.fn();
+      engine.subscribe(listener);
+      expect(listener).toHaveBeenCalledTimes(1); // attach delivers the current snapshot
+      expect(listener.mock.calls[0][0].playing).toBe(false);
+      listener.mockClear();
+      engine.applyMixer({ stems: { vocals: { volume: 0.5 } } });
+      expect(listener).toHaveBeenCalledTimes(1);
+      const snap = listener.mock.calls[0][0];
+      expect(snap).toBe(engine.snapshot()); // the echo IS the published snapshot
+      expect(snap.stems.vocals.volume).toBe(0.5);
+      expect(snap.stems.drums.volume).toBe(1); // non-target stems are untouched
+    });
+
+    it("applyMixer enforces ADR-0012 exclusivity inside the verb", () => {
+      const engine = loadEngine();
+      engine.applyMixer({ stems: { vocals: { muted: true } } });
+      expect(engine.snapshot().stems.vocals.muted).toBe(true);
+      engine.applyMixer({ stems: { vocals: { solo: true } } });
+      let snap = engine.snapshot();
+      expect(snap.stems.vocals.solo).toBe(true);
+      expect(snap.stems.vocals.muted).toBe(false); // solo cancels mute (last press wins)
+      engine.applyMixer({ stems: { vocals: { muted: true } } });
+      snap = engine.snapshot();
+      expect(snap.stems.vocals.muted).toBe(true);
+      expect(snap.stems.vocals.solo).toBe(false); // mute cancels solo
+    });
+
+    it("applyMixer clamps the command to legal Mixer State", () => {
+      const engine = loadEngine();
+      engine.applyMixer({ stems: { vocals: { volume: 2 } } });
+      expect(engine.snapshot().stems.vocals.volume).toBe(1);
+      engine.applyMixer({ stems: { vocals: { volume: -1 } } });
+      expect(engine.snapshot().stems.vocals.volume).toBe(0);
+      engine.applyMixer({ masterVolume: 5 });
+      expect(engine.snapshot().masterVolume).toBe(1);
+    });
+
+    it("equality-gated publishing: a command that changes nothing publishes nothing", () => {
+      const engine = loadEngine();
+      const listener = vi.fn();
+      engine.subscribe(listener);
+      listener.mockClear();
+      engine.applyMixer({ stems: { vocals: { volume: 1 } } }); // already 1
+      engine.applyMixer({ masterVolume: 1 }); // already 1
+      expect(listener).not.toHaveBeenCalled();
+    });
+
+    it("published snapshots cannot be used to mutate engine state", () => {
+      const engine = loadEngine();
+      const snap = engine.snapshot();
+      snap.stems.vocals.volume = 0.25;
+      snap.levels.left = 99;
+      snap.timeStretch.tempo = 4;
+      // The publish-time clones protect engine state: the getters (engine seam
+      // until ticket 04) still report the untouched facts.
+      expect(engine.getAllStemStates().vocals.volume).toBe(1);
+      expect(engine.getLevels().left).toBe(0);
+      expect(engine.getTempo()).toBe(1);
+    });
+
+    it("unsubscribe stops snapshot delivery", () => {
+      const engine = loadEngine();
+      const listener = vi.fn();
+      const unsubscribe = engine.subscribe(listener);
+      listener.mockClear();
+      unsubscribe();
+      engine.applyMixer({ stems: { vocals: { volume: 0.5 } } });
+      expect(listener).not.toHaveBeenCalled();
     });
   });
 

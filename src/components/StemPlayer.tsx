@@ -1,4 +1,11 @@
-import React, { useEffect, useState, useRef, useCallback } from "react";
+import React, {
+  useEffect,
+  useState,
+  useRef,
+  useCallback,
+  useMemo,
+  useSyncExternalStore,
+} from "react";
 import {
   Play,
   Pause,
@@ -17,6 +24,7 @@ import { StemName, STEM_NAMES } from "../lib/chunkOverlapAdd";
 import {
   StemPlayerEngine,
   StemMixerStates,
+  StemPlayerSnapshot,
   TimeStretchState,
   ClickTrackMixerState,
   CalibratedClickGrid,
@@ -145,6 +153,48 @@ const formatConfidence = (confidence: number): string =>
 const isLockedCandidate = (bpm: number, lockedBpm: number | null): boolean =>
   lockedBpm !== null && Math.abs(bpm - lockedBpm) < 0.05;
 
+// Engine Command Surface (ADR-0016): the seeded pre-mount snapshot. The store
+// reads this until the engine attaches in the mount effect; it is built from
+// the same props the engine's constructor seeds from, so the first painted
+// frame carries exactly what the mirror states used to seed from (a restored
+// Session's mixer values, Master volume, Playhead, lane state).
+const DEFAULT_MIXER_STATES: StemMixerStates = {
+  vocals: { volume: 1.0, muted: false, solo: false },
+  drums: { volume: 1.0, muted: false, solo: false },
+  bass: { volume: 1.0, muted: false, solo: false },
+  other: { volume: 1.0, muted: false, solo: false },
+};
+
+const seedSnapshotFromProps = (seed: {
+  mixerStates?: StemMixerStates;
+  masterVolume?: number;
+  currentTime?: number;
+  duration?: number;
+  clickTrack?: ClickTrackMixerState;
+}): StemPlayerSnapshot => ({
+  playing: false,
+  playheadSec: seed.currentTime ?? 0,
+  duration: seed.duration ?? 0,
+  masterVolume: seed.masterVolume ?? 1.0,
+  stems: seed.mixerStates
+    ? {
+        vocals: { ...seed.mixerStates.vocals },
+        drums: { ...seed.mixerStates.drums },
+        bass: { ...seed.mixerStates.bass },
+        other: { ...seed.mixerStates.other },
+      }
+    : {
+        vocals: { ...DEFAULT_MIXER_STATES.vocals },
+        drums: { ...DEFAULT_MIXER_STATES.drums },
+        bass: { ...DEFAULT_MIXER_STATES.bass },
+        other: { ...DEFAULT_MIXER_STATES.other },
+      },
+  clickTrack: seed.clickTrack ?? CLICK_TRACK_DEFAULT,
+  timeStretch: { tempo: 1.0, pitch: 0, formantPreservation: true },
+  levels: { left: 0, right: 0 },
+  stretchMode: "basic",
+});
+
 export const StemPlayer: React.FC<StemPlayerProps> = ({
   stems,
   sampleRate = 44100,
@@ -178,15 +228,49 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(initialCurrentTime ?? 0);
   const [duration, setDuration] = useState(providedDuration ?? 0);
-  const [mixerStates, setMixerStates] = useState<StemMixerStates>(
-    initialMixerStates ?? {
-      vocals: { volume: 1.0, muted: false, solo: false },
-      drums: { volume: 1.0, muted: false, solo: false },
-      bass: { volume: 1.0, muted: false, solo: false },
-      other: { volume: 1.0, muted: false, solo: false },
-    }
+  // Engine Command Surface (ADR-0016, ticket 01): the per-Stem mixer mirror
+  // and the Master volume mirror are DEAD — the mixer facts ride the engine's
+  // one snapshot, read with useSyncExternalStore exactly like the shell reads
+  // the Transport snapshot (ADR-0013 amendment: mirrors are banned one layer
+  // down too).
+  const [playerEngine, setPlayerEngine] = useState<StemPlayerEngine | null>(
+    null
   );
-  const [masterVolume, setMasterVolume] = useState(initialMasterVolume ?? 1.0);
+  const seededSnapshot = useMemo(
+    () =>
+      seedSnapshotFromProps({
+        mixerStates: initialMixerStates,
+        masterVolume: initialMasterVolume,
+        currentTime: initialCurrentTime,
+        duration: providedDuration,
+        clickTrack: initialClickTrack,
+      }),
+    [
+      initialMixerStates,
+      initialMasterVolume,
+      initialCurrentTime,
+      providedDuration,
+      initialClickTrack,
+    ]
+  );
+  const subscribeSnapshot = useCallback(
+    (onStoreChange: () => void) => {
+      if (!playerEngine) return () => {};
+      return playerEngine.subscribe(onStoreChange);
+    },
+    [playerEngine]
+  );
+  const readSnapshot = useCallback(
+    () => (playerEngine ? playerEngine.snapshot() : seededSnapshot),
+    [playerEngine, seededSnapshot]
+  );
+  const snapshot = useSyncExternalStore(
+    subscribeSnapshot,
+    readSnapshot,
+    readSnapshot
+  );
+  const mixerStates = snapshot.stems;
+  const masterVolume = snapshot.masterVolume;
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
   const [tempo, setTempo] = useState(1.0);
   const [pitch, setPitch] = useState(0);
@@ -208,6 +292,10 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
       initialClickTrack,
     });
     engineRef.current = engine;
+    // ADR-0016: attach the engine to the snapshot store; the mixer faces read
+    // the snapshot from this instant on (the subscription's initial call
+    // delivers the engine's construction snapshot).
+    setPlayerEngine(engine);
 
     // Hand transport actions to the shell so the Listen Tab's Transport row
     // drives this same engine (ADR-0007 Tab Shell bridge).
@@ -222,8 +310,6 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
     });
 
     setDuration(engine.getDuration());
-    setMixerStates(engine.getAllStemStates());
-    setMasterVolume(engine.getMasterVolume());
     if (initialCurrentTime !== undefined) {
       setCurrentTime(initialCurrentTime);
     }
@@ -243,10 +329,6 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
       onPlayheadChange?.(time);
     });
 
-    const unsubState = engine.subscribeState((states) => {
-      setMixerStates(states);
-    });
-
     const unsubTimeStretch = engine.subscribeTimeStretch((ts) => {
       setTempo(ts.tempo);
       setPitch(ts.pitch);
@@ -263,11 +345,11 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
 
     return () => {
       unsubPos();
-      unsubState();
       unsubTimeStretch();
       unsubLevels();
       engine.dispose();
       engineRef.current = null;
+      setPlayerEngine(null);
     };
   }, [stems, sampleRate, providedDuration, audioContext]);
 
@@ -345,9 +427,13 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
       if (!engine) return;
       engine.seek(seekTime);
       setCurrentTime(seekTime);
+      // The seek echo keeps its exact payload shape (currentTime is the
+      // scrubbed position the Session persists); the mixer facts ride the
+      // post-command snapshot.
+      const snap = engine.snapshot();
       onMixerChange?.({
-        stems: engine.getAllStemStates(),
-        masterVolume: engine.getMasterVolume(),
+        stems: snap.stems,
+        masterVolume: snap.masterVolume,
         currentTime: seekTime,
       });
     },
@@ -378,11 +464,14 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
     (stem: StemName, volume: number) => {
       const engine = engineRef.current;
       if (!engine) return;
-      engine.setStemVolume(stem, volume);
+      // One command + one echo (ADR-0016): the mixer facts come back out of
+      // the post-command snapshot — no "set, re-get, re-emit" triplet.
+      engine.applyMixer({ stems: { [stem]: { volume } } });
+      const snap = engine.snapshot();
       onMixerChange?.({
-        stems: engine.getAllStemStates(),
-        masterVolume: engine.getMasterVolume(),
-        currentTime: engine.getCurrentTime(),
+        stems: snap.stems,
+        masterVolume: snap.masterVolume,
+        currentTime: snap.playheadSec,
       });
       emitExportDialogState();
     },
@@ -393,11 +482,15 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
     (stem: StemName) => {
       const engine = engineRef.current;
       if (!engine) return;
-      engine.toggleStemMute(stem);
+      // No toggle verb on the command surface: the next press is derived from
+      // the snapshot; ADR-0012's exclusivity resolves inside applyMixer.
+      const nextMuted = !engine.snapshot().stems[stem].muted;
+      engine.applyMixer({ stems: { [stem]: { muted: nextMuted } } });
+      const snap = engine.snapshot();
       onMixerChange?.({
-        stems: engine.getAllStemStates(),
-        masterVolume: engine.getMasterVolume(),
-        currentTime: engine.getCurrentTime(),
+        stems: snap.stems,
+        masterVolume: snap.masterVolume,
+        currentTime: snap.playheadSec,
       });
       emitExportDialogState();
     },
@@ -408,11 +501,13 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
     (stem: StemName) => {
       const engine = engineRef.current;
       if (!engine) return;
-      engine.toggleStemSolo(stem);
+      const nextSolo = !engine.snapshot().stems[stem].solo;
+      engine.applyMixer({ stems: { [stem]: { solo: nextSolo } } });
+      const snap = engine.snapshot();
       onMixerChange?.({
-        stems: engine.getAllStemStates(),
-        masterVolume: engine.getMasterVolume(),
-        currentTime: engine.getCurrentTime(),
+        stems: snap.stems,
+        masterVolume: snap.masterVolume,
+        currentTime: snap.playheadSec,
       });
       emitExportDialogState();
     },
@@ -423,12 +518,14 @@ export const StemPlayer: React.FC<StemPlayerProps> = ({
     (volume: number) => {
       const engine = engineRef.current;
       if (!engine) return;
-      engine.setMasterVolume(volume);
-      setMasterVolume(volume);
+      // The Transport bridge's setMasterVolume verb maps onto this same
+      // command (ticket 01): the bridge module and shell wiring are untouched.
+      engine.applyMixer({ masterVolume: volume });
+      const snap = engine.snapshot();
       onMixerChange?.({
-        stems: engine.getAllStemStates(),
-        masterVolume: volume,
-        currentTime: engine.getCurrentTime(),
+        stems: snap.stems,
+        masterVolume: snap.masterVolume,
+        currentTime: snap.playheadSec,
       });
       emitExportDialogState();
     },
