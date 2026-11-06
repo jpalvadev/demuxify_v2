@@ -273,20 +273,30 @@ export async function loadActiveSessionMetadata(): Promise<SessionMetadata | nul
     return new Promise((resolve) => {
       try {
         const tx = db.transaction(SESSIONS_STORE, "readonly");
-        const store = tx.objectStore(SESSIONS_STORE);
-        const req = store.get(ACTIVE_SESSION_KEY);
-        req.onsuccess = () => {
+        let record: StoredSessionRecord | undefined;
+        tx.oncomplete = () => {
           db.close();
-          const record = req.result as StoredSessionRecord | undefined;
           if (record && isValidMetadata(record.metadata)) {
             resolve(record.metadata);
           } else {
             resolve(null);
           }
         };
-        req.onerror = () => {
+        tx.onerror = () => {
           db.close();
           resolve(null);
+        };
+        tx.onabort = () => {
+          db.close();
+          resolve(null);
+        };
+        const store = tx.objectStore(SESSIONS_STORE);
+        const req = store.get(ACTIVE_SESSION_KEY);
+        req.onsuccess = () => {
+          record = req.result as StoredSessionRecord | undefined;
+        };
+        req.onerror = () => {
+          record = undefined;
         };
       } catch {
         db.close();
