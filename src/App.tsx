@@ -43,14 +43,11 @@ import { BeatClient, TempoAnalysisResult } from "./lib/beatClient";
 import { DownloadProgress } from "./lib/modelCache";
 import { StemName, STEM_NAMES } from "./lib/chunkOverlapAdd";
 import {
-  loadActiveSession,
-  hasActiveSession,
-  clearActiveSession,
-  createSessionAutoSaver,
-  DemuxifySession,
+  createSessionManager,
+  SessionManager,
   SessionMixerState,
   SessionClickCalibration,
-} from "./lib/sessionStore";
+} from "./lib/sessionManager";
 import {
   StemMixerStates,
   StemPlayerSnapshot,
@@ -162,9 +159,10 @@ const tabPanelClass = (gated: boolean, active: boolean) =>
 // drives the whole transport surface with no audio machinery at all.
 export interface AppProps {
   transport?: TransportBridge;
+  sessionManager?: SessionManager;
 }
 
-export const App: React.FC<AppProps> = ({ transport }) => {
+export const App: React.FC<AppProps> = ({ transport, sessionManager }) => {
   // Dark-only contract (ticket 09): no theme state — html keeps `dark` forever
   // and there is no light-token override block to switch into.
 
@@ -237,12 +235,22 @@ export const App: React.FC<AppProps> = ({ transport }) => {
   // honest on the old grid while the pass is in flight.
   const pendingCalibrationRef = useRef<CalibratedClickGrid | null>(null);
 
-  // Session Recovery & Persistence State
-  const [detectedSession, setDetectedSession] = useState<{
-    title: string;
-    duration: number;
-  } | null>(null);
-  const [isResumingSession, setIsResumingSession] = useState(false);
+  // Session Manager (ADR-0018): deep coordinator owning in-memory active session
+  // state, debounce auto-save, and recovery lifecycle.
+  const liveSessionManagerRef = useRef<SessionManager | null>(null);
+  if (!liveSessionManagerRef.current) {
+    liveSessionManagerRef.current = createSessionManager({
+      persistence: debugSession ? "memory-only" : "storage",
+      debounceMs: 600,
+    });
+  }
+  const manager = sessionManager ?? liveSessionManagerRef.current;
+  const sessionSnapshot = useSyncExternalStore(
+    manager.subscribe,
+    manager.getSnapshot,
+    manager.getSnapshot
+  );
+
   const [restoredMixerState, setRestoredMixerState] =
     useState<SessionMixerState | null>(null);
 
@@ -314,19 +322,6 @@ export const App: React.FC<AppProps> = ({ transport }) => {
   // Live Click Track rail state (ADR-0010): fed out of the Stem Player so the
   // Session snapshot can persist it (ticket 05). Never part of the Stem mixer.
   const clickTrackStateRef = useRef<ClickTrackMixerState | null>(null);
-  const cachedSessionRef = useRef<DemuxifySession | null>(null);
-  // Debug mode never writes the Session slot: the flag is a preview of the
-  // composition, so the auto-saver is swapped for a silent stand-in while it
-  // is on — a debug pass cannot poison what Session Recovery resumes from.
-  const autoSaverRef = useRef(
-    debugSession
-      ? {
-          cancel: () => {},
-          debounceSave: (_: DemuxifySession, __?: (err: unknown) => void) => {},
-          saveImmediately: async (_: DemuxifySession) => {},
-        }
-      : createSessionAutoSaver(600)
-  );
 
   useEffect(() => {
     const uninstallInterceptors = diagnostics.installGlobalInterceptors();
@@ -365,17 +360,7 @@ export const App: React.FC<AppProps> = ({ transport }) => {
 
     async function checkPreviousSession() {
       try {
-        const hasSession = await hasActiveSession();
-        if (hasSession && isMounted) {
-          const session = await loadActiveSession();
-          if (session && isMounted) {
-            cachedSessionRef.current = session;
-            setDetectedSession({
-              title: session.metadata.title,
-              duration: session.metadata.duration,
-            });
-          }
-        }
+        await manager.checkPrevious();
       } catch {
         // Silently ignore session check error
       }
@@ -387,7 +372,7 @@ export const App: React.FC<AppProps> = ({ transport }) => {
       isMounted = false;
       uninstallInterceptors();
       inferenceClientRef.current?.terminate();
-      autoSaverRef.current.cancel();
+      manager.dispose();
     };
   }, []);
 
@@ -499,8 +484,8 @@ export const App: React.FC<AppProps> = ({ transport }) => {
     }
   };
 
-  // A re-locked Beat Grid replaces the one the Session carries, so the auto-
-  // saver keeps writing the chosen tempo and its grid (ticket 03 persistence
+  // A re-locked Beat Grid replaces the one the Session carries, so the Session
+  // Manager keeps writing the chosen tempo and its grid (ticket 03 persistence
   // keeps working after every candidate switch). Hand Calibration (ticket 08)
   // rides along: only a tap-confirm pass supplies one, every other pass
   // clears the Session's by-hand reading — honest supersession.
@@ -508,15 +493,7 @@ export const App: React.FC<AppProps> = ({ transport }) => {
     result: TempoAnalysisResult,
     calibration?: SessionClickCalibration | null
   ) => {
-    const session = cachedSessionRef.current;
-    if (!session) return;
-    const updatedSession: DemuxifySession = {
-      ...session,
-      tempo: result,
-      calibration: calibration ?? undefined,
-    };
-    cachedSessionRef.current = updatedSession;
-    autoSaverRef.current.debounceSave(updatedSession);
+    manager.attachTempo(result, calibration);
   };
 
   const processAudioFile = async (file: File) => {
@@ -557,7 +534,7 @@ export const App: React.FC<AppProps> = ({ transport }) => {
   };
 
   const handleSourceMixSelected = (file: File) => {
-    setDetectedSession(null);
+    manager.purge().catch(() => {});
     processAudioFile(file);
   };
 
@@ -570,9 +547,7 @@ export const App: React.FC<AppProps> = ({ transport }) => {
       beatClientRef.current = null;
     }
     tempoResultRef.current = null;
-    autoSaverRef.current.cancel();
-    cachedSessionRef.current = null;
-    clearActiveSession().catch(() => {});
+    manager.purge().catch(() => {});
     setSelectedFile(null);
     setDecodedSourceMix(null);
     setWaveformPeaks(null);
@@ -598,18 +573,11 @@ export const App: React.FC<AppProps> = ({ transport }) => {
   };
 
   const handleResumeSession = async () => {
-    setIsResumingSession(true);
     try {
-      let session = cachedSessionRef.current;
+      const session = await manager.resume();
       if (!session) {
-        session = await loadActiveSession();
-      }
-      if (!session) {
-        setDetectedSession(null);
         return;
       }
-
-      cachedSessionRef.current = session;
 
       const AudioCtx =
         window.AudioContext ||
@@ -681,13 +649,10 @@ export const App: React.FC<AppProps> = ({ transport }) => {
         playheadSec: session.mixer.currentTime ?? 0,
       });
       setSeparationPhase("completed");
-      setDetectedSession(null);
       // ADR-0008: resuming lands on the Mix Tab, where playback lives
       setSelectedTab("mix");
-    } catch (err) {
+    } catch {
       setDecodeError("Failed to resume previous session.");
-    } finally {
-      setIsResumingSession(false);
     }
   };
 
@@ -696,9 +661,7 @@ export const App: React.FC<AppProps> = ({ transport }) => {
   // saved Session from storage, and clear the in-memory Source Mix, Stems,
   // mixer levels, and playhead (handleClearSourceMix).
   const handlePurgeSession = async () => {
-    autoSaverRef.current.cancel();
-    cachedSessionRef.current = null;
-    await clearActiveSession();
+    await manager.purge();
     handleClearSourceMix();
   };
 
@@ -707,7 +670,6 @@ export const App: React.FC<AppProps> = ({ transport }) => {
   // detected Session keeps the recovery prompt from re-rendering after the
   // purge, leaving a clean Separate Tab.
   const handleDiscardSession = async () => {
-    setDetectedSession(null);
     await handlePurgeSession();
   };
 
@@ -723,22 +685,7 @@ export const App: React.FC<AppProps> = ({ transport }) => {
     // restatement lands on the snapshot's masterVolume here, whatever fired
     // the bridge.
     liveTransportRef.current?.restateMasterVolume(mixer.masterVolume);
-    if (!cachedSessionRef.current) return;
-    const updatedSession: DemuxifySession = {
-      ...cachedSessionRef.current,
-      // Mirror the live Click Track rail (ADR-0010 ticket 05): the lane is
-      // domain-separate from the Stem mixer contract below.
-      clickTrack:
-        clickTrackStateRef.current ?? cachedSessionRef.current.clickTrack,
-      mixer: {
-        ...cachedSessionRef.current.mixer,
-        stems: mixer.stems,
-        masterVolume: mixer.masterVolume,
-        currentTime: mixer.currentTime,
-      },
-    };
-    cachedSessionRef.current = updatedSession;
-    autoSaverRef.current.debounceSave(updatedSession);
+    manager.updateMixer(mixer, clickTrackStateRef.current ?? undefined);
   };
 
   const handleChangeFile = () => {
@@ -887,7 +834,7 @@ export const App: React.FC<AppProps> = ({ transport }) => {
       };
       setRestoredMixerState(initialMixerState);
 
-      const sessionToSave: DemuxifySession = {
+      await manager.createSession({
         metadata: {
           id: `session-${Date.now()}`,
           createdAt: Date.now(),
@@ -906,10 +853,7 @@ export const App: React.FC<AppProps> = ({ transport }) => {
         mixer: initialMixerState,
         tempo: tempoResultRef.current ?? undefined,
         clickTrack: clickTrackStateRef.current ?? undefined,
-      };
-
-      cachedSessionRef.current = sessionToSave;
-      autoSaverRef.current.debounceSave(sessionToSave);
+      });
     } catch (err) {
       if (err instanceof Error && /cancelled/i.test(err.message)) {
         setSeparationPhase("idle");
@@ -1086,15 +1030,17 @@ export const App: React.FC<AppProps> = ({ transport }) => {
               />
 
               {/* Previous Session Recovery Prompt */}
-              {detectedSession && !decodedSourceMix && !isDecoding && (
-                <SessionRecovery
-                  title={detectedSession.title}
-                  duration={detectedSession.duration}
-                  onResume={handleResumeSession}
-                  onDiscard={handleDiscardSession}
-                  isResuming={isResumingSession}
-                />
-              )}
+              {sessionSnapshot.detectedMetadata &&
+                !decodedSourceMix &&
+                !isDecoding && (
+                  <SessionRecovery
+                    title={sessionSnapshot.detectedMetadata.title}
+                    duration={sessionSnapshot.detectedMetadata.duration}
+                    onResume={handleResumeSession}
+                    onDiscard={handleDiscardSession}
+                    isResuming={sessionSnapshot.status === "resuming"}
+                  />
+                )}
 
               {/* Decoding In-Progress Indicator */}
               {isDecoding && (
@@ -1350,7 +1296,7 @@ export const App: React.FC<AppProps> = ({ transport }) => {
                     sourceMixTitle={decodedSourceMix.metadata.fileName}
                     initialMixerStates={
                       playerSnapshot?.stems ??
-                      cachedSessionRef.current?.mixer.stems
+                      sessionSnapshot.session?.mixer.stems
                     }
                     initialMasterVolume={
                       playerSnapshot?.masterVolume ?? snapshot.masterVolume
@@ -1407,11 +1353,11 @@ export const App: React.FC<AppProps> = ({ transport }) => {
                 <FallbackAdvisory capability={capability} />
               )}
               <ModelCacheStatus />
-              {detectedSession && !decodedSourceMix && (
+              {sessionSnapshot.detectedMetadata && !decodedSourceMix && (
                 <p className="text-xs text-muted-foreground">
-                  Saved session: {detectedSession.title} (
-                  {detectedSession.duration.toFixed(1)}s) — resume it from the
-                  Separate Tab.
+                  Saved session: {sessionSnapshot.detectedMetadata.title} (
+                  {sessionSnapshot.detectedMetadata.duration.toFixed(1)}s) —
+                  resume it from the Separate Tab.
                 </p>
               )}
             </div>

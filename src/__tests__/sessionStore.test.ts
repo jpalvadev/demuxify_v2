@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
   saveActiveSession,
   loadActiveSession,
+  loadActiveSessionMetadata,
   hasActiveSession,
   clearActiveSession,
   createSessionAutoSaver,
@@ -89,6 +90,23 @@ describe("sessionStore", () => {
   it("returns null when loadActiveSession() is called with no stored session", async () => {
     const session = await loadActiveSession();
     expect(session).toBeNull();
+  });
+
+  it("returns null when loadActiveSessionMetadata() is called with no stored session", async () => {
+    const meta = await loadActiveSessionMetadata();
+    expect(meta).toBeNull();
+  });
+
+  it("loads only metadata via loadActiveSessionMetadata() without loading audio buffers", async () => {
+    const mockSession = createMockSession();
+    await saveActiveSession(mockSession);
+
+    const meta = await loadActiveSessionMetadata();
+    expect(meta).not.toBeNull();
+    expect(meta?.id).toBe(mockSession.metadata.id);
+    expect(meta?.title).toBe(mockSession.metadata.title);
+    expect(meta?.duration).toBe(mockSession.metadata.duration);
+    expect(meta?.sampleRate).toBe(mockSession.metadata.sampleRate);
   });
 
   it("saves and restores an active session with full metadata, audio buffers, and mixer settings", async () => {
