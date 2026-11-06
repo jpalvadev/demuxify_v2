@@ -744,6 +744,7 @@ export async function clearActiveSession(): Promise<void> {
 }
 
 /**
+ * @deprecated Retired in ADR-0018 in favor of headless SessionManager.
  * Creates an auto-saver debouncer that invokes saveActiveSession
  * after a specified delay when mixer settings change.
  */

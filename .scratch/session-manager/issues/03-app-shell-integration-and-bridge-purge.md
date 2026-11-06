@@ -4,12 +4,16 @@
 
 **Blocked by:** 01: The Headless Session Manager Core & Reactive Seam, 02: Session Recovery Lifecycle & Storage State Machine.
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] `src/App.tsx` initializes `sessionManager` and subscribes to its state via `useSyncExternalStore`, eliminating `cachedSessionRef`, `autoSaverRef`, `detectedSession`, and `isResumingSession`.
-- [ ] On completion of audio separation, `sessionManager.createSession` is invoked to initialize active session state and trigger auto-save.
-- [ ] On mixer slider adjustments, `sessionManager.updateMixer` is invoked directly, shedding manual object spreads and manual debouncer calls in `App.tsx`.
-- [ ] On tempo detection or tap calibration updates, `sessionManager.attachTempo` is invoked directly, delegating candidate re-locking and calibration synchronization to the manager.
-- [ ] The `SessionRecovery` component renders when `snapshot.status === "detected"` (and no active source mix is present), wiring `onResume` to `sessionManager.resume()` and `onDiscard` to `sessionManager.purge()`.
-- [ ] `createSessionAutoSaver` in `src/lib/sessionStore.ts` is retired and marked deprecated or deleted.
-- [ ] All integration tests in `src/__tests__/App.test.tsx` pass cleanly, verifying session detection on mount, recovery hydration into the player, and purge operations through the new Session Manager seam.
+- [x] `src/App.tsx` initializes `sessionManager` and subscribes to its state via `useSyncExternalStore`, eliminating `cachedSessionRef`, `autoSaverRef`, `detectedSession`, and `isResumingSession`.
+- [x] On completion of audio separation, `sessionManager.createSession` is invoked to initialize active session state and trigger auto-save.
+- [x] On mixer slider adjustments, `sessionManager.updateMixer` is invoked directly, shedding manual object spreads and manual debouncer calls in `App.tsx`.
+- [x] On tempo detection or tap calibration updates, `sessionManager.attachTempo` is invoked directly, delegating candidate re-locking and calibration synchronization to the manager.
+- [x] The `SessionRecovery` component renders when `snapshot.status === "detected"` (and no active source mix is present), wiring `onResume` to `sessionManager.resume()` and `onDiscard` to `sessionManager.purge()`.
+- [x] `createSessionAutoSaver` in `src/lib/sessionStore.ts` is retired and marked deprecated or deleted.
+- [x] All integration tests in `src/__tests__/App.test.tsx` pass cleanly, verifying session detection on mount, recovery hydration into the player, and purge operations through the new Session Manager seam.
+
+## Answer
+
+Refactored `src/App.tsx` to subscribe to the headless `SessionManager` via `useSyncExternalStore`. Completely eliminated `cachedSessionRef`, `autoSaverRef`, `detectedSession`, and `isResumingSession`. All domain mutations (`createSession`, `updateMixer`, `attachTempo`, `resume`, `purge`) dispatch directly to the Session Manager. Marked `createSessionAutoSaver` deprecated. All 57 tests in `src/__tests__/App.test.tsx` passed cleanly.
